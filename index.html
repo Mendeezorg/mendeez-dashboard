@@ -1966,6 +1966,38 @@ function renderAlerts(rev,ords,roas,rto){
 }
 
 // ═══════════ PRODUCTS ═══════════
+function updateProductCounts(){
+  const totalProds=allProducts.length;
+  const totalSkus=allProducts.reduce((s,p)=>s+(p.variants||[]).length,0);
+  const el1=document.getElementById('totalProductCount');
+  const el2=document.getElementById('totalSkuCount');
+  if(el1)el1.textContent=totalProds.toLocaleString();
+  if(el2)el2.textContent=totalSkus.toLocaleString();
+}
+
+async function searchProducts(){
+  const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
+  const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
+  if(!q&&!sku){renderProducts();return;}
+  if(allProducts.length>0){renderProducts();return;}
+  // Search via API if products not loaded
+  const tbl=document.getElementById('prodTbl');
+  if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching...</td></tr>';
+  try{
+    const status=document.getElementById('prodStatus')?.value||'active';
+    let url=q?`/products.json?limit=50&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`
+              :`/products.json?limit=50&status=${status}&fields=id,title,product_type,status,variants,created_at`;
+    const d=await shopFetch(url);
+    let results=d.products||[];
+    if(sku)results=results.filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
+    allProducts=results;
+    updateProductCounts();
+    renderProducts();
+  }catch(e){
+    if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Search error: ${e.message}</td></tr>`;
+  }
+}
+
 function renderProducts(){
   const filter=document.getElementById('stockFilter')?.value||'all';
   const validFilters=['all','out','low','ok'];
@@ -1974,9 +2006,6 @@ function renderProducts(){
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
   const skuQ=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
   let rows=[];
-
-  // Update total counts
-  updateProductCounts();
 
   // Group by product — one row per product, show all variants inline
   const filteredProds=allProducts.filter(p=>{
