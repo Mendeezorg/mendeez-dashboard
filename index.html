@@ -628,18 +628,15 @@ async function refreshAll(){
 // ═══════════ SHOPIFY ═══════════
 async function shopFetch(ep,method,body){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  // Always use GET request to worker, pass shopify method and body as params
-  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep)+'&smethod='+(method||'GET');
-  const opts={method:'GET',headers:{'Content-Type':'application/json'}};
-  // For POST/PUT requests, include body as query param
+  // Simple GET request — Worker handles GET by default
+  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep;
   if(body&&(method==='POST'||method==='PUT')){
-    const bodyUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep);
-    const r2=await fetch(bodyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopifyMethod:method,shopifyBody:body})});
-    if(!r2.ok)throw new Error('Shopify proxy error '+r2.status);
-    return r2.json();
+    const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopifyMethod:method,shopifyBody:body})});
+    if(!r.ok)throw new Error('Shopify '+r.status);
+    return r.json();
   }
-  const r=await fetch(workerUrl,opts);
-  if(!r.ok)throw new Error('Shopify proxy error '+r.status);
+  const r=await fetch(workerUrl);
+  if(!r.ok)throw new Error('Shopify '+r.status);
   return r.json();
 }
 // ═══════════ DATE RANGE STATE ═══════════
