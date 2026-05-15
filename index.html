@@ -2503,6 +2503,24 @@ async function testShopifyDirect(){
   }
 }
 
+
+let allCollections=[];
+async function loadCollections(){
+  try{
+    const [r1,r2]=await Promise.all([
+      shopFetch('/custom_collections.json?limit=250'),
+      shopFetch('/smart_collections.json?limit=250')
+    ]);
+    allCollections=[...(r1.custom_collections||[]),...(r2.smart_collections||[])].sort((a,b)=>a.title.localeCompare(b.title));
+    const sel=document.getElementById('sortCat');
+    if(sel){
+      sel.innerHTML='<option value="">Select a collection...</option>'+
+        allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
+    }
+    console.log('Loaded',allCollections.length,'collections');
+  }catch(e){console.error('loadCollections error:',e.message);}
+}
+
 </script>
 </body>
 </html>
