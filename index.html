@@ -431,20 +431,23 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <!-- Search + filter bar -->
   <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
-    <input class="tsrch" id="prodSearch" placeholder="🔍 Search by product name..." oninput="applyProdFilter()" style="width:240px">
-    <input class="tsrch" id="skuSearch" placeholder="🔍 Search by SKU..." oninput="applyProdFilter()" style="width:200px">
-    <select class="fi" id="stockFilter" style="width:160px">
+    <input class="tsrch" id="prodSearch" placeholder="🔍 Search by product name..." oninput="searchProducts()" style="width:240px">
+    <input class="tsrch" id="skuSearch" placeholder="🔍 Search by SKU..." oninput="searchProducts()" style="width:200px">
+    <select class="fi" id="stockFilter" style="width:160px" onchange="searchProducts()">
       <option value="all">All stock levels</option>
       <option value="out">Out of stock</option>
       <option value="low">Low stock (&lt;10)</option>
       <option value="ok">In stock</option>
     </select>
-    <select class="fi" id="prodStatus" style="width:150px">
+    <select class="fi" id="prodStatus" style="width:150px" onchange="searchProducts()">
       <option value="active">Active only</option>
       <option value="all">All statuses</option>
     </select>
-    <button class="btn btn-s btn-sm" onclick="applyProdFilter()">Filter</button>
-    <span id="prodCount" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+  </div>
+  <div style="display:flex;gap:16px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--muted)">
+    <span>Total Products: <strong id="totalProductCount" style="color:var(--accent)">—</strong></span>
+    <span>Total SKUs: <strong id="totalSkuCount" style="color:var(--accent)">—</strong></span>
+    <span>Showing: <strong id="prodCount" style="color:var(--text)">—</strong></span>
   </div>
   <!-- Products table with variants inline -->
   <div class="tc">
@@ -477,7 +480,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-p btn-sm" onclick="runSort().catch(e=>console.error(e))">▶ Generate Sort Order</button>
-      <button class="btn btn-s btn-sm" onclick="copySteps()">Copy Shopify Steps</button>
+      <button class="btn btn-s btn-sm" id="applyToShopifyBtn" onclick="applyCollectionSort()" style="display:none;background:var(--green);color:#000;border-color:var(--green)">✓ Apply to Shopify Collection</button>
+      <button class="btn btn-s btn-sm" onclick="copySteps()">Copy Steps</button>
       <span style="font-size:11px;color:var(--muted);font-family:var(--mono)" id="sortSts"></span>
     </div>
   </div>
@@ -751,36 +755,33 @@ async function loadShopify(){
     const {from,to}=getRange();
     const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
     ordersData=d.orders||[];
-    // Fetch ALL products with pagination
-    let allProds=[];let pg=1;let more=true;
-    while(more){
-      const pd=await shopFetch(`/products.json?limit=250&page=${pg}`);
-      const batch=pd.products||[];
-      allProds=allProds.concat(batch);
-      if(batch.length<250)more=false;else pg++;
-      if(pg>20)more=false;
-    }
-    allProducts=allProds;
-    setBadge('s','live',ordersData.length+' orders · '+allProducts.length+' products');
-    renderProducts();
-    loadCollections();
+    setBadge('s','live',ordersData.length+' orders · click Products tab to load stock');
     loadWeeklyOrders();
   }catch(e){setBadge('s','error','Error');throw e;}
 }
 async function loadProducts(){
   try{
-    let all=[];let page=1;let more=true;
-    while(more){
-      const ep='/products.json?limit=250&page='+page;
-      const d=await shopFetch(ep);
-      const p=d.products||[];all=all.concat(p);
-      if(p.length<250)more=false;else page++;
-      if(page>20)more=false;
+    const tbl=document.getElementById('prodTbl');
+    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Loading active products...</td></tr>';
+
+    // FAST: fetch only active products with inventory tracking
+    let all=[];
+    let prodUrl='/products.json?limit=250&status=active&fields=id,title,product_type,status,variants,created_at';
+    while(prodUrl){
+      const d=await shopFetch(prodUrl);
+      const prods=d.products||[];
+      all=all.concat(prods);
+      setBadge('s','amber',all.length+' products...');
+      if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="ldrow"><span class="si"></span>Loading... ${all.length} products</td></tr>`;
+      if(prods.length<250){prodUrl=null;}
+      else{const lastId=prods[prods.length-1].id;prodUrl='/products.json?limit=250&status=active&since_id='+lastId+'&fields=id,title,product_type,status,variants,created_at';}
+      if(all.length>10000)prodUrl=null;
     }
     allProducts=all;
+    setBadge('s','live',ordersData.length+' orders · '+allProducts.length+' products');
     renderProducts();
     loadCollections();
-  }catch(e){console.error(e);}
+  }catch(e){console.error('loadProducts:',e);setBadge('s','error','Products error');}
 }
 
 let allCollections=[];
@@ -1967,16 +1968,20 @@ function renderAlerts(rev,ords,roas,rto){
 // ═══════════ PRODUCTS ═══════════
 function renderProducts(){
   const filter=document.getElementById('stockFilter')?.value||'all';
+  const validFilters=['all','out','low','ok'];
+  const safeFilter=validFilters.includes(filter)?filter:'all';
   const status=document.getElementById('prodStatus')?.value||'active';
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
   const skuQ=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
   let rows=[];
 
+  // Update total counts
+  updateProductCounts();
+
   // Group by product — one row per product, show all variants inline
   const filteredProds=allProducts.filter(p=>{
     if(status==='active'&&p.status!=='active')return false;
     if(skuQ&&!(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(skuQ)))return false;
-    // Search matches product title or any variant SKU/title
     if(search){
       const titleMatch=p.title.toLowerCase().includes(search);
       const skuMatch=(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(search)||(v.title||'').toLowerCase().includes(search));
@@ -1988,10 +1993,11 @@ function renderProducts(){
   filteredProds.forEach(p=>{
     const variants=p.variants||[];
     // Apply stock filter
-    const totalStock=variants.reduce((s,v)=>s+(v.inventory_quantity||0),0);
-    if(filter==='out'&&totalStock!==0)return;
-    if(filter==='low'&&(totalStock===0||totalStock>=10))return;
-    if(filter==='ok'&&totalStock<10)return;
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    if(safeFilter==='out'&&totalStock!==0)return;
+    if(safeFilter==='low'&&(totalStock===0||totalStock>=10))return;
+    if(safeFilter==='ok'&&totalStock<=0)return;
+    // 'all' shows everything — no filter needed
 
     // Sort variants: highest stock first
     const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
@@ -2022,12 +2028,16 @@ function renderProducts(){
   document.getElementById('prodCount').textContent=filteredProds.length+' products';
 }
 function applyProdFilter(){
-  renderProducts();
+  searchProducts();
 }
 
 // ═══════════ SORT ═══════════
 async function runSort(){
-  if(!allProducts.length){document.getElementById('sortResults').innerHTML='<div class="nodata">Load Shopify data first</div>';return;}
+  console.log('runSort called, products:', allProducts.length, 'rule:', document.getElementById('sortRule')?.value);
+  const sortEl=document.getElementById('sortResults');
+  if(!sortEl){console.error('sortResults element not found');return;}
+  if(!allProducts.length){sortEl.innerHTML='<div class="nodata">No products loaded. Connect Shopify first.</div>';return;}
+  sortEl.innerHTML='<div class="ldrow"><span class="si"></span>Sorting...</div>';
   const rule=document.getElementById('sortRule').value,cat=document.getElementById('sortCat').value;
   let prods=[...allProducts];
   if(cat!=='all'){
@@ -2072,8 +2082,55 @@ async function runSort(){
       <div class="srbar"><div class="srbl">${s} units</div><div class="btrack"><div class="bfill" style="width:${pct}%;background:${col}"></div></div></div>
     </div>`;
   }).join('')+'</div>';
+  window._sortedProds=prods; // store for apply
   document.getElementById('sortSts').textContent=`✓ Sorted ${prods.length} products`;
+  // Show apply button only if a specific collection is selected
+  const applyBtn=document.getElementById('applyToShopifyBtn');
+  if(applyBtn){
+    const cat=document.getElementById('sortCat').value;
+    applyBtn.style.display=cat!=='all'?'inline-flex':'none';
+  }
 }
+async function applyCollectionSort(){
+  const cat=document.getElementById('sortCat').value;
+  if(cat==='all'){alert('Please select a specific collection to apply sort order.');return;}
+  if(!window._sortedProds||!window._sortedProds.length){alert('Generate sort order first.');return;}
+  const btn=document.getElementById('applyToShopifyBtn');
+  btn.textContent='Applying...';btn.disabled=true;
+  try{
+    // Shopify API: PUT /collections/{id}/products.json with ordered product IDs
+    // Actually use collects API to reorder
+    const ids=window._sortedProds.map(p=>p.id);
+    // Move products one by one using collects (Shopify manual sort)
+    // First get all collects for this collection
+    const d=await shopFetch('/collects.json?collection_id='+cat+'&limit=250');
+    const collects=d.collects||[];
+    // Build a map of product_id -> collect_id
+    const collectMap={};
+    collects.forEach(col=>collectMap[col.product_id]=col.id);
+    // Update position for each product
+    let pos=1;
+    let success=0;
+    for(const pid of ids){
+      const cid=collectMap[pid];
+      if(cid){
+        try{
+          await shopFetch('/collects/'+cid+'.json?position='+pos);
+          success++;
+        }catch(e){}
+      }
+      pos++;
+    }
+    btn.textContent='✓ Applied!';
+    btn.style.background='var(--green)';
+    document.getElementById('sortSts').textContent=`✓ Sort applied to collection (${success} products reordered)`;
+    setTimeout(()=>{btn.textContent='✓ Apply to Shopify Collection';btn.disabled=false;},3000);
+  }catch(e){
+    btn.textContent='Error — try again';btn.disabled=false;
+    console.error('Apply sort error:',e);
+  }
+}
+
 function copySteps(){
   navigator.clipboard.writeText('HOW TO APPLY CATALOG SORT IN SHOPIFY\n\n1. Shopify Admin → Products → Collections\n2. Open your collection → Sort → Manually\n3. Drag products to match Catalog Sorter order\n\nFor permanent automation: use Shopify Flow to re-sort by inventory_quantity every morning.');
   document.getElementById('sortSts').textContent='✓ Copied';setTimeout(()=>document.getElementById('sortSts').textContent='',3000);
@@ -2236,6 +2293,31 @@ function switchTab(name,el){
   document.getElementById('panel-'+name).classList.add('active');
   el.classList.add('active');
   if(name==='report')buildReport();
+  if(name==='products'||name==='sorter'){
+    if(!allProducts.length&&STORE&&STORE!=='demo'&&TOKEN){
+      // Load products now (lazy load)
+      loadProducts().then(()=>{
+        if(name==='sorter'){
+          const sel=document.getElementById('sortCat');
+          if(sel&&allCollections.length>0){
+            sel.innerHTML='<option value="all">All Products</option>'+
+              allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
+          }
+          runSort().catch(e=>console.error(e));
+        }
+      });
+    } else {
+      if(name==='products')renderProducts();
+      if(name==='sorter'){
+        const sel=document.getElementById('sortCat');
+        if(sel&&allCollections.length>0&&sel.options.length<=1){
+          sel.innerHTML='<option value="all">All Products</option>'+
+            allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
+        }
+        runSort().catch(e=>console.error(e));
+      }
+    }
+  }
 }
 
 // ═══════════ DEMO ═══════════
