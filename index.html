@@ -232,7 +232,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 <!-- TABS -->
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('daily',this)">Daily Overview</div>
+  <div class="tab active" onclick="switchTab('daily',this)">Overview</div>
   <div class="tab" onclick="switchTab('ads',this)">Ads</div>
   <div class="tab" onclick="switchTab('courier',this)">Courier</div>
   <div class="tab" onclick="switchTab('cs',this)">CS & Confirmations</div>
@@ -271,14 +271,16 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <div id="alertsZone"></div>
   <div class="sg" id="statGrid">
-    <div class="sc"><div class="sl">Revenue (Today)</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div></div>
-    <div class="sc"><div class="sl">Orders</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Avg Order Value</div><div class="sv shimmer" id="s-aov" style="height:26px;width:65%"></div></div>
-    <div class="sc"><div class="sl">Blended ROAS</div><div class="sv shimmer" id="s-roas" style="height:26px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div></div>
+    <div class="sc"><div class="sl">Total Orders</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div></div>
     <div class="sc"><div class="sl">Total Ad Spend</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div></div>
-    <div class="sc"><div class="sl">Confirmation Rate</div><div class="sv shimmer" id="s-conf" style="height:26px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Dispatched (Courier)</div><div class="sv shimmer" id="s-disp" style="height:26px;width:50%"></div></div>
-    <div class="sc"><div class="sl">RTO / Returns</div><div class="sv shimmer" id="s-rto" style="height:26px;width:45%"></div></div>
+    <div class="sc"><div class="sl">Total Dispatched</div><div class="sv shimmer" id="s-disp" style="height:26px;width:50%"></div></div>
+    <div class="sc"><div class="sl">Total Delivered</div><div class="sv shimmer" id="s-delivered" style="height:26px;width:50%"></div></div>
+    <div class="sc"><div class="sl">Total Cancellations</div><div class="sv shimmer" id="s-cancel" style="height:26px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Total Returns</div><div class="sv shimmer" id="s-rto" style="height:26px;width:45%"></div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Landed Orders</div><div class="sv muted" id="s-shopify-landed">—</div><div class="ssub" id="s-shopify-landed-sub">Connect Shopify</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Gross Sales</div><div class="sv muted" id="s-shopify-gross">—</div><div class="ssub" id="s-shopify-gross-sub">Connect Shopify</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Net Sales</div><div class="sv muted" id="s-shopify-net">—</div><div class="ssub" id="s-shopify-net-sub">Connect Shopify</div></div>
   </div>
   <!-- WEEKLY TOP 20 -->
   <div class="sh" style="margin-top:4px">
@@ -632,19 +634,16 @@ async function refreshAll(){
 // ═══════════ SHOPIFY ═══════════
 async function shopFetch(ep,method,body){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep;
+  // MUST encode ep — Worker uses decodeURIComponent(ep) to reconstruct full Shopify URL
+  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep);
   if(body&&(method==='POST'||method==='PUT')){
     const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopifyMethod:method,shopifyBody:body})});
-    if(!r.ok)throw new Error('Shopify '+r.status);
+    if(!r.ok){const t=await r.text();throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
     return r.json();
   }
   const r=await fetch(workerUrl);
-  console.log('Worker response status:', r.status, 'url:', workerUrl.slice(0,100));
-  if(!r.ok){
-    const txt=await r.text();
-    console.error('Worker error:', txt);
-    throw new Error('Shopify '+r.status+': '+txt.slice(0,100));
-  }
+  console.log('Worker status:',r.status,'ep:',ep.slice(0,50));
+  if(!r.ok){const t=await r.text();console.error('Worker error:',t);throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
   return r.json();
 }
 // ═══════════ DATE RANGE STATE ═══════════
@@ -744,10 +743,15 @@ async function loadShopify(){
     const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
     ordersData=d.orders||[];
     setBadge('s','live',ordersData.length+' orders');
+    renderDailyStats();
     fetchProductCounts();
     loadCollections();
     loadWeeklyOrders();
-  }catch(e){setBadge('s','error','Error');throw e;}
+  }catch(e){
+    console.error('loadShopify error:',e);
+    setBadge('s','error',e.message.slice(0,30));
+    throw e;
+  }
 }
 async function loadProducts(){
   try{const d=await shopFetch('/products.json?limit=250');allProducts=d.products||[];renderProducts();}
@@ -1473,24 +1477,48 @@ function renderCS(){
 // ═══════════ DAILY STATS ═══════════
 function renderDailyStats(){
   const rev=ordersData.reduce((s,o)=>s+parseFloat(o.total_price||0),0);
-  const ords=ordersData.length;const aov=ords>0?Math.round(rev/ords):0;
-  const adT=window._adsTot||{spend:0,rev:0,roas:0};
-  const cntCrr=window._crrCnt||{dispatched:0,returned:0};
-  // CS confirmation — use sheet data if available, fall back to manual override
-  const called=manualData.called||0,confirmed=manualData.confirmed||0;
-  const confRate=called>0?Math.round(confirmed/called*100):0;
+  const ords=ordersData.length;
+  const cntCrr=window._crrCnt||{dispatched:0,delivered:0,returned:0};
+  const os=csData.orderStatus||{};
+  const totalCancel=(os.cancelMTD||0)+(os.cancelCF||os.cancel||0);
+  const totalReturns=(os.returnsMTD||0)+(os.returnsCF||os.returns||0);
 
-  setV('s-rev','PKR '+fmt(rev),'amber');
-  setV('s-ord',ords,'');
-  setV('s-aov','PKR '+fmt(aov),'');
-  const roas=adT.spend>0?adT.rev/adT.spend:0;
-  setV('s-roas',roas>0?roas.toFixed(1)+'x':'—',rcol(roas));
-  setV('s-spend',adT.spend?'PKR '+fmt(adT.spend):'—','');
-  setV('s-conf',confRate>0?confRate+'%':'—',confRate>=90?'green':confRate>0?'amber':'muted');
-  setV('s-disp',cntCrr.dispatched||'—','blue');
-  setV('s-rto',cntCrr.returned||'—',cntCrr.returned>10?'red':'');
+  // Ad spend from date range
+  let adSpend=0;
+  if(adsIdx&&adsTrend.length){
+    const {from,to}=getRange();
+    const rows=adsTrend.filter(row=>{
+      const d=(row[0]||'').trim();
+      const p=new Date(d.replace(/(\d+)-([A-Za-z]+)-(\d+)/,'$2 $1 $3'));
+      return !isNaN(p)&&p>=from&&p<=to;
+    });
+    const use=rows.length>0?rows:adsTrend;
+    adSpend=use.reduce((s,r)=>[adsIdx.mS,adsIdx.gS,adsIdx.tS,adsIdx.sS].reduce((a,ci)=>a+nc(r[ci]),s),0);
+  }
 
-  renderSpark();renderAlerts(rev,ords,roas,cntCrr.returned);
+  // Update label
+  document.getElementById('todayDate').textContent=rangeLabel();
+
+  setV('s-rev',rev>0?'PKR '+fmt(rev):'—','amber');
+  setV('s-ord',ords>0?ords:'—','');
+  setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
+  setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
+  setV('s-delivered',cntCrr.delivered>0?cntCrr.delivered:'—','green');
+  setV('s-cancel',totalCancel>0?totalCancel:'—',totalCancel>50?'red':'');
+  setV('s-rto',totalReturns>0?totalReturns:'—',totalReturns>30?'red':'');
+
+  // Shopify cards
+  if(STORE&&STORE!=='demo'&&TOKEN){
+    const landed=document.getElementById('s-shopify-landed');
+    const gross=document.getElementById('s-shopify-gross');
+    const net=document.getElementById('s-shopify-net');
+    if(landed){landed.textContent=ords>0?ords:'—';landed.className='sv amber';document.getElementById('s-shopify-landed-sub').textContent='Orders in range';}
+    if(gross){const g=ordersData.reduce((s,o)=>{return s+(o.line_items||[]).reduce((ls,li)=>ls+parseFloat(li.price||0)*parseInt(li.quantity||1),0);},0);gross.textContent=g>0?'PKR '+fmt(g):'—';gross.className='sv amber';document.getElementById('s-shopify-gross-sub').textContent='Before discounts';}
+    if(net){net.textContent=rev>0?'PKR '+fmt(rev):'—';net.className='sv green';document.getElementById('s-shopify-net-sub').textContent='After discounts';}
+  }
+
+  renderSpark();
+  renderAlerts(rev,ords,0,cntCrr.returned);
 }
 // ── weeklyOrdersData: stores last 7 days orders (loaded separately) ──
 let weeklyOrdersData = [];
