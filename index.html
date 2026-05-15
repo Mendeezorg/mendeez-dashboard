@@ -206,6 +206,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="fg"><div class="fl">CS / Performance Tab</div><input class="fi" id="cfgCS" value="Perf Report 26"></div>
 
     <button class="btn btn-p btn-full" onclick="connectAll()">Connect & Load Dashboard</button>
+    <button class="btn btn-s btn-full" style="margin-top:6px;font-size:11px" onclick="testShopifyDirect()">🔧 Test Shopify Connection</button>
+    <div id="shopifyTestResult" style="margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--muted);display:none;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
     <button class="btn btn-s btn-full" style="margin-top:8px" onclick="loadDemo()">Use Demo Data</button>
     <div class="cnote">Shopify: Admin → Settings → Apps → Develop Apps → read_orders, read_products, read_inventory<br>Google Sheet: must be set to <strong style="color:var(--accent)">"Anyone with the link can view"</strong></div>
     <button class="btn btn-s btn-full" style="margin-top:10px;font-size:11px" onclick="testSheetConnection()">🔍 Test Sheet Connection</button>
@@ -609,7 +611,10 @@ async function connectAll(){
   saveConfig();
   document.getElementById('setupOverlay').innerHTML='<div class="setup-box" style="text-align:center"><div class="spinner"></div><div style="color:var(--accent);font-size:15px;font-weight:600">Connecting...</div><div style="color:var(--muted);font-size:12px;margin-top:6px">'+STORE+'</div></div>';
   try{await loadAll();document.getElementById('setupOverlay').style.display='none';}
-  catch(e){document.getElementById('setupOverlay').innerHTML='<div class="setup-box"><div style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:10px">Connection failed</div><div style="color:var(--muted);font-size:12px;margin-bottom:20px">'+e.message+'</div><button class="btn btn-s btn-full" onclick="location.reload()">Try Again</button></div>';}
+  catch(e){
+    console.error('Connection error:', e);
+    document.getElementById('setupOverlay').innerHTML='<div class="setup-box"><div style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:10px">Connection failed</div><div style="color:var(--muted);font-size:12px;margin-bottom:20px">'+e.message+'</div><div style="color:var(--muted);font-size:11px;font-family:var(--mono);margin-bottom:20px">Store: '+STORE+'</div><button class="btn btn-s btn-full" onclick="location.reload()">Try Again</button></div>';
+  }
 }
 
 async function loadAll(){
@@ -634,7 +639,12 @@ async function shopFetch(ep,method,body){
     return r.json();
   }
   const r=await fetch(workerUrl);
-  if(!r.ok)throw new Error('Shopify '+r.status);
+  console.log('Worker response status:', r.status, 'url:', workerUrl.slice(0,100));
+  if(!r.ok){
+    const txt=await r.text();
+    console.error('Worker error:', txt);
+    throw new Error('Shopify '+r.status+': '+txt.slice(0,100));
+  }
   return r.json();
 }
 // ═══════════ DATE RANGE STATE ═══════════
@@ -2433,6 +2443,34 @@ async function applyCollectionSort(){
     document.getElementById('sortSts').textContent=`✓ Done! ${ok}/${_sorterProds.length} reordered on Shopify.`;
     setTimeout(()=>{btn.textContent='✓ Apply to Shopify';btn.disabled=false;},4000);
   }catch(e){btn.textContent='✗ Error';btn.disabled=false;}
+}
+
+
+async function testShopifyDirect(){
+  const store=document.getElementById('cfgStore').value.trim().replace('https://','').replace(/\/$/,'');
+  const token=document.getElementById('cfgToken').value.trim();
+  const el=document.getElementById('shopifyTestResult');
+  el.style.display='block';
+  el.style.color='var(--accent)';
+  el.textContent='Testing...\n';
+  
+  const WORKER='https://mendeez-shopify.divine-mouse-0258.workers.dev';
+  const ep='/shop.json';
+  const url=WORKER+'?store='+encodeURIComponent(store)+'&token='+encodeURIComponent(token)+'&ep='+ep;
+  
+  el.textContent+='URL: '+url.slice(0,80)+'...\n';
+  
+  try{
+    const r=await fetch(url);
+    el.textContent+='Status: '+r.status+'\n';
+    const txt=await r.text();
+    el.textContent+='Response: '+txt.slice(0,100)+'\n';
+    if(r.ok){el.style.color='var(--green)';el.textContent+='✓ Connection OK!';}
+    else{el.style.color='var(--red)';el.textContent+='✗ Error: '+r.status;}
+  }catch(e){
+    el.style.color='var(--red)';
+    el.textContent+='✗ Fetch error: '+e.message;
+  }
 }
 
 </script>
