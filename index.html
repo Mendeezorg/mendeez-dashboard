@@ -2222,47 +2222,51 @@ function applyProdFilter(){
 
 // ═══════════ SORT ═══════════
 async function runSort(){
-  console.log('runSort called, products:', allProducts.length, 'rule:', document.getElementById('sortRule')?.value);
   const sortEl=document.getElementById('sortResults');
-  if(!sortEl){console.error('sortResults element not found');return;}
-  if(!allProducts.length){sortEl.innerHTML='<div class="nodata">No products loaded. Connect Shopify first.</div>';return;}
-  sortEl.innerHTML='<div class="ldrow"><span class="si"></span>Sorting...</div>';
-  const rule=document.getElementById('sortRule').value,cat=document.getElementById('sortCat').value;
-  let prods=[...allProducts];
+  if(!sortEl)return;
+  const rule=document.getElementById('sortRule').value;
+  const cat=document.getElementById('sortCat').value;
+  sortEl.innerHTML='<div class="ldrow"><span class="si"></span>Loading products...</div>';
+  let prods=[];
   if(cat!=='all'){
-    // Filter by collection ID
+    // Fetch products directly from selected collection — no need for allProducts
     try{
-      const d=await shopFetch('/collections/'+cat+'/products.json?limit=250');
-      const ids=new Set((d.products||[]).map(p=>String(p.id)));
-      const filtered=prods.filter(p=>ids.has(String(p.id)));
-      if(filtered.length>0)prods=filtered;
-    }catch(e){console.error('Collection filter error:',e);}
+      let collUrl='/collections/'+cat+'/products.json?limit=250&fields=id,title,product_type,status,variants,created_at';
+      while(collUrl){
+        const d=await shopFetch(collUrl);
+        const batch=d.products||[];
+        prods=prods.concat(batch);
+        if(batch.length<250)collUrl=null;
+        else collUrl='/collections/'+cat+'/products.json?limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,created_at';
+      }
+    }catch(e){sortEl.innerHTML='<div class="nodata">Error: '+e.message+'</div>';return;}
+  } else {
+    if(allProducts.length>0){prods=[...allProducts];}
+    else{
+      try{
+        const d=await shopFetch('/products.json?limit=250&status=active&fields=id,title,product_type,status,variants,created_at');
+        prods=d.products||[];
+      }catch(e){sortEl.innerHTML='<div class="nodata">Error: '+e.message+'</div>';return;}
+    }
   }
-  const gT=p=>(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
+  if(!prods.length){sortEl.innerHTML='<div class="nodata">No products found in this collection.</div>';return;}
+  const gT=p=>(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
   const gA=p=>(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
   prods.sort((a,b)=>{
     if(rule==='stock_asc')return gT(a)-gT(b);
     if(rule==='variants_desc')return gA(b)-gA(a);
     if(rule==='avail_desc'){
-      const totalVarsA=(a.variants||[]).length;
-      const totalVarsB=(b.variants||[]).length;
-      const availA=gA(a); // variants with stock > 0
-      const availB=gA(b);
-      // Primary: most available sizes first
-      const diff=availB-availA;
-      if(diff!==0)return diff;
-      // Secondary: if same count, fully stocked product first
-      // (all variants available = availA===totalVarsA)
-      const fullyA=availA===totalVarsA?1:0;
-      const fullyB=availB===totalVarsB?1:0;
-      if(fullyB!==fullyA)return fullyB-fullyA;
-      // Tiebreaker: total units
+      const tA=(a.variants||[]).length,tB=(b.variants||[]).length;
+      const aA=gA(a),aB=gA(b);
+      const diff=aB-aA;if(diff!==0)return diff;
+      const fA=aA===tA?1:0,fB=aB===tB?1:0;
+      if(fB!==fA)return fB-fA;
       return gT(b)-gT(a);
     }
-    return gT(b)-gT(a); // stock_desc default
+    return gT(b)-gT(a);
   });
   const mx=Math.max(...prods.map(gT),1);
-  document.getElementById('sortResults').innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+prods.map((p,i)=>{
+  sortEl.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+prods.map((p,i)=>{
     const s=gT(p),av=gA(p),tot=(p.variants||[]).length,pct=Math.round(s/mx*100);
     const col=s===0?'var(--red)':av<tot/2?'var(--accent)':'var(--green)';
     return`<div class="sort-item">
@@ -2271,53 +2275,10 @@ async function runSort(){
       <div class="srbar"><div class="srbl">${s} units</div><div class="btrack"><div class="bfill" style="width:${pct}%;background:${col}"></div></div></div>
     </div>`;
   }).join('')+'</div>';
-  window._sortedProds=prods; // store for apply
+  window._sortedProds=prods;
   document.getElementById('sortSts').textContent=`✓ Sorted ${prods.length} products`;
-  // Show apply button only if a specific collection is selected
   const applyBtn=document.getElementById('applyToShopifyBtn');
-  if(applyBtn){
-    const cat=document.getElementById('sortCat').value;
-    applyBtn.style.display=cat!=='all'?'inline-flex':'none';
-  }
-}
-async function applyCollectionSort(){
-  const cat=document.getElementById('sortCat').value;
-  if(cat==='all'){alert('Please select a specific collection to apply sort order.');return;}
-  if(!window._sortedProds||!window._sortedProds.length){alert('Generate sort order first.');return;}
-  const btn=document.getElementById('applyToShopifyBtn');
-  btn.textContent='Applying...';btn.disabled=true;
-  try{
-    // Shopify API: PUT /collections/{id}/products.json with ordered product IDs
-    // Actually use collects API to reorder
-    const ids=window._sortedProds.map(p=>p.id);
-    // Move products one by one using collects (Shopify manual sort)
-    // First get all collects for this collection
-    const d=await shopFetch('/collects.json?collection_id='+cat+'&limit=250');
-    const collects=d.collects||[];
-    // Build a map of product_id -> collect_id
-    const collectMap={};
-    collects.forEach(col=>collectMap[col.product_id]=col.id);
-    // Update position for each product
-    let pos=1;
-    let success=0;
-    for(const pid of ids){
-      const cid=collectMap[pid];
-      if(cid){
-        try{
-          await shopFetch('/collects/'+cid+'.json?position='+pos);
-          success++;
-        }catch(e){}
-      }
-      pos++;
-    }
-    btn.textContent='✓ Applied!';
-    btn.style.background='var(--green)';
-    document.getElementById('sortSts').textContent=`✓ Sort applied to collection (${success} products reordered)`;
-    setTimeout(()=>{btn.textContent='✓ Apply to Shopify Collection';btn.disabled=false;},3000);
-  }catch(e){
-    btn.textContent='Error — try again';btn.disabled=false;
-    console.error('Apply sort error:',e);
-  }
+  if(applyBtn){applyBtn.style.display=cat!=='all'?'inline-flex':'none';}
 }
 
 function copySteps(){
