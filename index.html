@@ -209,8 +209,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <button class="btn btn-s btn-full" style="margin-top:8px" onclick="loadDemo()">Use Demo Data</button>
     <div class="cnote">Shopify: Admin → Settings → Apps → Develop Apps → read_orders, read_products, read_inventory<br>Google Sheet: must be set to <strong style="color:var(--accent)">"Anyone with the link can view"</strong></div>
     <button class="btn btn-s btn-full" style="margin-top:10px;font-size:11px" onclick="testSheetConnection()">🔍 Test Sheet Connection</button>
-    <button class="btn btn-s btn-full" style="margin-top:6px;font-size:11px" onclick="debugAllTabs()">🐛 Debug: Show Raw Sheet Data</button>
-    <div id="sheetTestResult" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;display:none;max-height:300px;overflow-y:auto;white-space:pre-wrap"></div>
+    <div id="sheetTestResult" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;display:none"></div>
   </div>
 </div>
 
@@ -231,7 +230,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 <!-- TABS -->
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('daily',this)">Overview</div>
+  <div class="tab active" onclick="switchTab('daily',this)">Daily Overview</div>
   <div class="tab" onclick="switchTab('ads',this)">Ads</div>
   <div class="tab" onclick="switchTab('courier',this)">Courier</div>
   <div class="tab" onclick="switchTab('cs',this)">CS & Confirmations</div>
@@ -270,28 +269,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <div id="alertsZone"></div>
   <div class="sg" id="statGrid">
-    <div class="sc"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div></div>
-    <div class="sc"><div class="sl">Total Orders</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Revenue (Today)</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div></div>
+    <div class="sc"><div class="sl">Orders</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Avg Order Value</div><div class="sv shimmer" id="s-aov" style="height:26px;width:65%"></div></div>
+    <div class="sc"><div class="sl">Blended ROAS</div><div class="sv shimmer" id="s-roas" style="height:26px;width:55%"></div></div>
     <div class="sc"><div class="sl">Total Ad Spend</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div></div>
-    <div class="sc"><div class="sl">Total Dispatched</div><div class="sv shimmer" id="s-disp" style="height:26px;width:50%"></div></div>
-    <div class="sc"><div class="sl">Total Delivered</div><div class="sv shimmer" id="s-delivered" style="height:26px;width:50%"></div></div>
-    <div class="sc"><div class="sl">Total Cancellations</div><div class="sv shimmer" id="s-cancel" style="height:26px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Total Returns</div><div class="sv shimmer" id="s-rto" style="height:26px;width:45%"></div></div>
-    <div class="sc" id="sc-shopify-landed" style="border-color:var(--accent-dim)">
-      <div class="sl">Shopify Landed Orders</div>
-      <div class="sv muted" id="s-shopify-landed">—</div>
-      <div class="ssub" id="s-shopify-landed-sub">Connect Shopify</div>
-    </div>
-    <div class="sc" id="sc-shopify-gross" style="border-color:var(--accent-dim)">
-      <div class="sl">Shopify Gross Sales</div>
-      <div class="sv muted" id="s-shopify-gross">—</div>
-      <div class="ssub" id="s-shopify-gross-sub">Connect Shopify</div>
-    </div>
-    <div class="sc" id="sc-shopify-net" style="border-color:var(--accent-dim)">
-      <div class="sl">Shopify Net Sales</div>
-      <div class="sv muted" id="s-shopify-net">—</div>
-      <div class="ssub" id="s-shopify-net-sub">Connect Shopify</div>
-    </div>
+    <div class="sc"><div class="sl">Confirmation Rate</div><div class="sv shimmer" id="s-conf" style="height:26px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Dispatched (Courier)</div><div class="sv shimmer" id="s-disp" style="height:26px;width:50%"></div></div>
+    <div class="sc"><div class="sl">RTO / Returns</div><div class="sv shimmer" id="s-rto" style="height:26px;width:45%"></div></div>
   </div>
   <!-- WEEKLY TOP 20 -->
   <div class="sh" style="margin-top:4px">
@@ -350,7 +335,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <!-- ══ COURIER ══ -->
 <div class="panel" id="panel-courier">
   <div class="ds">
-    <div><div class="dt">Courier</div><div class="dsub">From Google Sheet · Dispatched = all except Delivered & Returned</div></div>
+    <div><div class="dt">Courier Tracking</div><div class="dsub">From Google Sheet · Dispatched = all except Delivered & Returned</div></div>
     <button class="btn btn-s btn-sm" onclick="fetchSheets()">↻ Refresh</button>
   </div>
   <!-- Courier date filter -->
@@ -405,10 +390,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sc"><div class="sl">Dispatched MTD</div><div class="sv shimmer" id="cs-dispatched" style="height:24px;width:65%"></div></div>
     <div class="sc"><div class="sl">Delivered MTD</div><div class="sv shimmer" id="cs-delivered" style="height:24px;width:65%"></div></div>
     <div class="sc"><div class="sl">Pending</div><div class="sv shimmer" id="cs-pending" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel-mtd" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="cs-cancel-cf" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns-mtd" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="cs-returns-cf" style="height:24px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel" style="height:24px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns" style="height:24px;width:55%"></div></div>
   </div>
   <!-- EWH WAREHOUSE -->
   <div class="sh"><div class="st">Warehouse (EWH) MTD</div></div>
@@ -426,11 +409,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <!-- ══ PRODUCTS ══ -->
 <div class="panel" id="panel-products">
   <div class="ds">
-    <div><div class="dt">Products & Stock</div><div class="dsub">Live from Shopify · All products with real inventory</div></div>
+    <div><div class="dt">Products & Stock</div><div class="dsub">Live from Shopify · Top 20 uses selected date range</div></div>
     <button class="btn btn-s btn-sm" onclick="loadProducts()">↻ Refresh</button>
   </div>
   <!-- Search + filter bar -->
-  <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <input class="tsrch" id="prodSearch" placeholder="🔍 Search by product name..." oninput="searchProducts()" style="width:240px">
     <input class="tsrch" id="skuSearch" placeholder="🔍 Search by SKU..." oninput="searchProducts()" style="width:200px">
     <select class="fi" id="stockFilter" style="width:160px" onchange="searchProducts()">
@@ -439,7 +422,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <option value="low">Low stock (&lt;10)</option>
       <option value="ok">In stock</option>
     </select>
-    <select class="fi" id="prodStatus" style="width:150px" onchange="searchProducts()">
+    <select class="fi" id="prodStatus" style="width:150px">
       <option value="active">Active only</option>
       <option value="all">All statuses</option>
     </select>
@@ -460,33 +443,31 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 <!-- ══ CATALOG SORTER ══ -->
 <div class="panel" id="panel-sorter">
-  <div class="ds"><div><div class="dt">Catalog Auto-Sorter</div><div class="dsub">Rank products by stock — protect ROAS from dead traffic</div></div></div>
-  <div class="alert al-amber"><div>⚡</div><div>Generates the correct product sort order by stock level. Sameer does this manually each morning — use this instead.</div></div>
-  <div class="tc" style="padding:16px;margin-bottom:12px">
-    <div class="fr" style="margin-bottom:10px">
-      <div class="fg"><div class="fl">Sort Rule</div>
-        <select class="fi" id="sortRule">
-          <option value="stock_desc">Highest total stock first</option>
-          <option value="stock_asc">Lowest stock first (clearance)</option>
-          <option value="variants_desc">Most variants in stock first</option>
-          <option value="avail_desc">All sizes available first (fully stocked on top)</option>
-        </select>
-      </div>
-      <div class="fg"><div class="fl">Collection</div>
-        <select class="fi" id="sortCat">
-          <option value="all">Loading collections...</option>
-        </select>
-      </div>
+  <div class="ds"><div><div class="dt">Catalog Sorter</div><div class="dsub">Select collection · Auto-sort or drag to reorder · Apply directly to Shopify</div></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;align-items:end">
+    <div>
+      <div class="fl" style="margin-bottom:6px">Auto-Sort Rule</div>
+      <select class="fi" id="sortRule">
+        <option value="avail_desc">All sizes available first</option>
+        <option value="stock_desc">Highest total stock first</option>
+        <option value="stock_asc">Lowest stock first (clearance)</option>
+        <option value="variants_desc">Most variants in stock first</option>
+      </select>
+      <button class="btn btn-p btn-sm" style="margin-top:8px;width:100%" onclick="runSort()">▶ Auto-Sort</button>
     </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" onclick="runSort().catch(e=>console.error(e))">▶ Generate Sort Order</button>
-      <button class="btn btn-s btn-sm" id="applyToShopifyBtn" onclick="applyCollectionSort()" style="display:none;background:var(--green);color:#000;border-color:var(--green)">✓ Apply to Shopify Collection</button>
-      <button class="btn btn-s btn-sm" onclick="copySteps()">Copy Steps</button>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--mono)" id="sortSts"></span>
+    <div>
+      <div class="fl" style="margin-bottom:6px">Collection</div>
+      <select class="fi" id="sortCat" onchange="loadSorterCollection()">
+        <option value="">Select a collection...</option>
+      </select>
+      <button class="btn btn-sm" id="applyToShopifyBtn" onclick="applyCollectionSort()" style="margin-top:8px;width:100%;display:none;background:var(--green);color:#000;border:none;font-weight:700;padding:9px;border-radius:6px;cursor:pointer">✓ Apply to Shopify</button>
     </div>
   </div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+    <span style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="sortSts">Select a collection to start</span>
+    <span style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="sortCount"></span>
+  </div>
   <div id="sortResults"></div>
-</div>
 
 <!-- ══ MANUAL INPUTS ══ -->
 <div class="panel" id="panel-manual">
@@ -562,20 +543,13 @@ function setV(id,v,cls=''){
 }
 
 function statusMap(raw){
-  if(!raw||!raw.trim()) return{l:'Dispatched',c:'dispatched',p:'pb'};
+  if(!raw)return{l:'Unknown',c:'dispatched',p:'pm'};
   const s=raw.trim().toLowerCase();
-  // Booked = excluded
-  if(s==='booked') return{l:'Booked',c:null,p:'pm'};
-  // Return Delivered = returned
-  if(s.includes('return')&&s.includes('deliver')) return{l:'Return Delivered',c:'returned',p:'pr'};
-  // Delivered = delivered
-  if(s.includes('deliver')) return{l:'Delivered',c:'delivered',p:'pg'};
-  // Everything else = dispatched
-  if(s==='arrived')             return{l:'Arrived',           c:'dispatched',p:'pb'};
-  if(s.includes('out for del')) return{l:'Out For Delivery',  c:'dispatched',p:'pa'};
-  if(s.includes('in-transit')||s.includes('in transit')) return{l:'In-Transit',c:'dispatched',p:'pa'};
-  if(s.includes('return'))      return{l:'Returned',          c:'dispatched',p:'po'};
-  if(s.includes('dispatch'))    return{l:'Dispatched',        c:'dispatched',p:'pb'};
+  if(s==='booked')           return{l:'Booked',          c:null,         p:'pm'};
+  if(s==='arrived')          return{l:'Arrived',         c:'dispatched', p:'pb'};
+  if(s==='out for delivery') return{l:'Out For Delivery',c:'dispatched', p:'pa'};
+  if(s.includes('deliver'))  return{l:'Delivered',       c:'delivered',  p:'pg'};
+  if(s.includes('return'))   return{l:'Returned',        c:'returned',   p:'pr'};
   return{l:raw.trim(),c:'dispatched',p:'po'};
 }
 function cPill(c){
@@ -651,12 +625,11 @@ async function refreshAll(){
 }
 
 // ═══════════ SHOPIFY ═══════════
-async function shopFetch(ep, method='GET', body=null){
+async function shopFetch(ep,method,body){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep+'&method='+(method||'GET');
-  const opts={method:'POST',headers:{'Content-Type':'application/json'}};
-  // Always POST to worker — worker decides whether to GET or POST to Shopify
-  opts.body=JSON.stringify({shopifyMethod:method||'GET', shopifyBody:body});
+  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep;
+  const opts={method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({shopifyMethod:method||'GET',shopifyBody:body||null})};
   const r=await fetch(workerUrl,opts);
   if(!r.ok)throw new Error('Shopify proxy error '+r.status);
   return r.json();
@@ -689,7 +662,7 @@ function rangeLabel(){
 
 function setPreset(preset,el){
   _preset=preset;_customFrom=null;_customTo=null;
-  document.querySelectorAll('.datebar .dp').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.dp').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
   document.getElementById('dateFrom').value='';
   document.getElementById('dateTo').value='';
@@ -704,7 +677,7 @@ function applyCustom(){
   _preset='custom';
   _customFrom=fv+'T00:00:00';
   _customTo=tv+'T23:59:59';
-  document.querySelectorAll('.datebar .dp').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.dp').forEach(b=>b.classList.remove('active'));
   document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
   applyDateRange();
 }
@@ -758,50 +731,14 @@ async function loadShopify(){
     const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
     ordersData=d.orders||[];
     setBadge('s','live',ordersData.length+' orders');
+    fetchProductCounts();
+    loadCollections();
     loadWeeklyOrders();
-    fetchProductCounts(); // get counts fast without loading all products
-    if(!allCollections.length)loadCollections(); // load collections for catalog sorter
   }catch(e){setBadge('s','error','Error');throw e;}
 }
 async function loadProducts(){
-  try{
-    const tbl=document.getElementById('prodTbl');
-    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Loading active products...</td></tr>';
-
-    // FAST: fetch only active products with inventory tracking
-    let all=[];
-    let prodUrl='/products.json?limit=250&status=active&fields=id,title,product_type,status,variants,created_at';
-    while(prodUrl){
-      const d=await shopFetch(prodUrl);
-      const prods=d.products||[];
-      all=all.concat(prods);
-      setBadge('s','amber',all.length+' products...');
-      if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="ldrow"><span class="si"></span>Loading... ${all.length} products</td></tr>`;
-      if(prods.length<250){prodUrl=null;}
-      else{const lastId=prods[prods.length-1].id;prodUrl='/products.json?limit=250&status=active&since_id='+lastId+'&fields=id,title,product_type,status,variants,created_at';}
-      if(all.length>10000)prodUrl=null;
-    }
-    allProducts=all;
-    setBadge('s','live',ordersData.length+' orders · '+allProducts.length+' products');
-    renderProducts();
-    loadCollections();
-  }catch(e){console.error('loadProducts:',e);setBadge('s','error','Products error');}
-}
-
-let allCollections=[];
-async function loadCollections(){
-  try{
-    const [r1,r2]=await Promise.all([
-      shopFetch('/custom_collections.json?limit=250'),
-      shopFetch('/smart_collections.json?limit=250')
-    ]);
-    allCollections=[...(r1.custom_collections||[]),...(r2.smart_collections||[])].sort((a,b)=>a.title.localeCompare(b.title));
-    const sel=document.getElementById('sortCat');
-    if(sel){
-      sel.innerHTML='<option value="all">All Products</option>'+
-        allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
-    }
-  }catch(e){console.error('Collections:',e);}
+  try{const d=await shopFetch('/products.json?limit=250');allProducts=d.products||[];renderProducts();}
+  catch(e){console.error(e);}
 }
 
 // ═══════════ SHEETS CSV ═══════════
@@ -969,21 +906,17 @@ async function fetchSheets(){
 
 // ═══════════ ADS PROCESSING ═══════════
 function processAds(rows){
-  // Sheet structure (confirmed from debug):
-  // Row 0: "April Date | Overall Shopify Perf | ... | Meta/Spend | Meta/Orders..."  ← ONLY header
-  // Rows 1-30: April daily data
-  // Row 31-35: April summary rows (blank col0)
-  // Row 36+: May daily data (1-May-2026, 2-May-2026...) — NO separate May header
-  // So: use row 0 as header for column mapping, but show May data as current
-  
-  // Find the header row (has Meta/Spend or similar column labels)
-  let hi=-1, hdr=[];
+  // The sheet has TWO header rows — one for April (April/Date) and one for May (May/Date)
+  // We want the LAST one (most recent month). Each header row has Meta/Spend etc.
+  // Column structure: [April/Date or May/Date] [Shopify cols...] [Meta/Spend] [Meta/Orders]...
+  let hi=-1,hdr=[];
   for(let i=0;i<rows.length;i++){
     const joined=rows[i].join('|').toLowerCase();
-    const hasMetaSpend=joined.includes('meta/spend')||(joined.includes('meta')&&joined.includes('spend'));
-    if(hasMetaSpend){hi=i;hdr=rows[i];break;} // use FIRST match = row 0
+    // Match header rows that contain both a date column and meta/spend
+    if(joined.includes('meta/spend')||(joined.includes('meta')&&joined.includes('spend'))){
+      hi=i;hdr=rows[i]; // keep going to find the LAST one (May comes after April)
+    }
   }
-  const monthLabel='May'; // We always show May data (most recent)
   if(hi===-1){setBadge('a','error','Header not found');return;}
 
   // Find column indices — handle variations like "Meta/Spend", "Meta Spend", "meta/spend"
@@ -997,34 +930,25 @@ function processAds(rows){
   // Date column: could be "April/Date", "May/Date", "Date", "date"
   let dateCol=hdr.findIndex(h=>/date/i.test(h));
 
-  // Fixed column positions confirmed from sheet structure:
-  // 0=date, 1-8=Overall Shopify, 9-14=Overall Platform
-  // 15=Meta/Spend, 16=Meta/Orders, 17=Meta/CPA, 18=Meta/Revenue, 19=Meta/ROAS
-  // 20=Google/Spend, 21=Google/Orders, 22=Google/CPA, 23=Google/Revenue, 24=Google/ROAS
-  // 25=TikTok/Spend, 26=TikTok/Orders, 27=TikTok/CPA, 28=TikTok/Revenue, 29=TikTok/ROAS
-  // 30=Snapchat/Spend, 31=Snapchat/Orders, 32=Snapchat/CPA, 33=Snapchat/Revenue, 34=Snapchat/ROAS
   adsIdx={
-    date:0,
-    mS:15, mO:16, mR:18, mRoas:19,
-    gS:20, gO:21, gR:23, gRoas:24,
-    tS:25, tO:26, tR:28, tRoas:29,
-    sS:30, sO:31, sR:33, sRoas:34,
+    date:dateCol,
+    mS:col('meta/spend'),mO:col('meta/orders'),mR:col('meta/revenue'),mRoas:col('meta/roas'),
+    gS:col('google/spend'),gO:col('google/orders'),gR:col('google/revenue'),gRoas:col('google/roas'),
+    tS:col('tiktok/spend'),tO:col('tiktok/orders'),tR:col('tiktok/revenue'),tRoas:col('tiktok/roas'),
+    sS:col('snapchat/spend'),sO:col('snapchat/orders'),sR:col('snapchat/revenue'),sRoas:col('snapchat/roas'),
   };
 
   // Get all data rows after this header — filter for rows with a date and spend value
   const dr=rows.slice(hi+1).filter(r=>{
-    const d=(r[adsIdx.date]||'').trim();
-    if(!d) return false;
-    const looksLikeDate=/\d/.test(d)&&(
-      /jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(d)||
-      /2025|2026|2027/.test(d)||
-      /^\d{1,2}[\-\/]/.test(d)
-    );
-    if(!looksLikeDate) return false;
-    return true;
+    const d=r[adsIdx.date]||'';
+    const s=r[adsIdx.mS>=0?adsIdx.mS:0]||'';
+    // Must have a date, and at least some spend somewhere in the row
+    if(!d.trim()) return false;
+    if(d.toLowerCase().includes('date')||d.toLowerCase().includes('platform')) return false;
+    // Has any spend value
+    const rowText=r.join('');
+    return rowText.replace(/[^0-9]/g,'').length > 0;
   });
-  // Show ALL date rows (April + May combined)
-  const finalRows=dr;
 
   if(!dr.length){setBadge('a','error','No rows after header');return;}
 
@@ -1034,19 +958,11 @@ function processAds(rows){
     return s.trim()&&!s.includes('#DIV')&&!s.includes('#')&&nc(s)>0;
   });
 
-  // Filter out rows with no spend at all (empty future dates)
-  const validFinal=finalRows.filter(r=>{
-    const s=r[adsIdx.mS]||'';
-    // Include row if ANY platform has spend (not just Meta)
-    const anySpend=[adsIdx.mS,adsIdx.gS,adsIdx.tS,adsIdx.sS].some(idx=>nc(r[idx])>0);
-    return anySpend;
-  });
-  const finalDr=validFinal.length>0?validFinal:finalRows;
-  adsTrend=finalDr; // show ALL days (April + May)
+  const finalDr=validDr.length>0?validDr:dr;
+  adsTrend=finalDr.slice(-7);
   adsLatest=finalDr[finalDr.length-1];
   document.getElementById('adsDateLbl').textContent='Most recent: '+(adsLatest[adsIdx.date]||'—');
-  const months=[...new Set(finalDr.map(r=>(r[0]||'').replace(/\d{1,2}-/,'').replace(/-\d{4}/,'')))].join('+');
-  setBadge('a','live',finalDr.length+' days · '+months);
+  setBadge('a','live',finalDr.length+' days · '+hdr[dateCol]);
   renderAds();
 }
 
@@ -1060,44 +976,24 @@ function setAdsPlatform(p,el){
 }
 
 function renderAds(){
-  if(!adsTrend.length||!adsIdx){
+  if(!adsLatest||!adsIdx){
+    // Show placeholder with platform name so buttons feel responsive
     const pName={all:'All Platforms',meta:'Meta',google:'Google',tiktok:'TikTok',snapchat:'Snapchat'}[_adsPlatform]||_adsPlatform;
     document.getElementById('platCards').innerHTML=`<div style="padding:20px;color:var(--muted);font-family:var(--mono);font-size:12px">No ads data loaded yet. Sheet data loads automatically — check the badge at the top. Selected: <strong style="color:var(--accent)">${pName}</strong></div>`;
     return;
   }
-  const i=adsIdx;
-  // Filter rows by selected date range
-  const {from,to}=getRange();
-  const filteredRows=adsTrend.filter(row=>{
-    const d=(row[0]||'').trim();
-    if(!d)return false;
-    // Parse date like "13-May-2026" or "2-Apr-2026"
-    const parsed=new Date(d.replace(/(\d+)-([A-Za-z]+)-(\d+)/,'$2 $1 $3'));
-    if(isNaN(parsed))return true; // include if can't parse
-    return parsed>=from&&parsed<=to;
-  });
-  // Use filtered rows if available, else all rows
-  const rows=filteredRows.length>0?filteredRows:adsTrend;
-  // Aggregate (SUM) all rows for card totals
-  const sum=(key)=>rows.reduce((a,r)=>a+nc(r[i[key]]),0);
-  const mS=sum('mS'),mO=sum('mO'),mR=sum('mR');
-  const gS=sum('gS'),gO=sum('gO'),gR=sum('gR');
-  const tS=sum('tS'),tO=sum('tO'),tR=sum('tR');
-  const sS=sum('sS'),sO=sum('sO'),sR=sum('sR');
+  const r=adsLatest,i=adsIdx;
   const allPlats=[
-    {key:'meta',    n:'Meta',     ic:'im',lt:'M',s:mS,o:mO,rv:mR,roas:mS>0?mR/mS:0},
-    {key:'google',  n:'Google',   ic:'ig',lt:'G',s:gS,o:gO,rv:gR,roas:gS>0?gR/gS:0},
-    {key:'tiktok',  n:'TikTok',   ic:'it',lt:'T',s:tS,o:tO,rv:tR,roas:tS>0?tR/tS:0},
-    {key:'snapchat',n:'Snapchat', ic:'is',lt:'S',s:sS,o:sO,rv:sR,roas:sS>0?sR/sS:0},
+    {key:'meta',    n:'Meta',     ic:'im',lt:'M',s:nc(r[i.mS]),o:nc(r[i.mO]),rv:nc(r[i.mR]),roas:nc(r[i.mRoas])},
+    {key:'google',  n:'Google',   ic:'ig',lt:'G',s:nc(r[i.gS]),o:nc(r[i.gO]),rv:nc(r[i.gR]),roas:nc(r[i.gRoas])},
+    {key:'tiktok',  n:'TikTok',   ic:'it',lt:'T',s:nc(r[i.tS]),o:nc(r[i.tO]),rv:nc(r[i.tR]),roas:nc(r[i.tRoas])},
+    {key:'snapchat',n:'Snapchat', ic:'is',lt:'S',s:nc(r[i.sS]),o:nc(r[i.sO]),rv:nc(r[i.sR]),roas:nc(r[i.sRoas])},
   ];
   // Filter plats based on selection
   const plats=_adsPlatform==='all'?allPlats:allPlats.filter(p=>p.key===_adsPlatform);
   const totS=plats.reduce((a,p)=>a+p.s,0),totR=plats.reduce((a,p)=>a+p.rv,0),totO=plats.reduce((a,p)=>a+p.o,0);
   const totRoas=totS>0?totR/totS:0;
   window._adsTot={spend:totS,rev:totR,orders:totO,roas:totRoas};
-  // Update date label to show how many days aggregated
-  const dateRange=rows.length===1?(rows[0][0]||''):`${rows[rows.length-1]?.[0]||''} → ${rows[0]?.[0]||''} (${rows.length} days)`;
-  document.getElementById('adsDateLbl').textContent='Aggregated: '+dateRange;
 
   // Platform cards
   let html=plats.map(p=>{
@@ -1145,7 +1041,7 @@ function renderAds(){
   const isAll=_adsPlatform==='all';
   if(isAll){
     document.getElementById('adsTblHead').innerHTML='<th>Date</th><th>Meta Spend</th><th>Meta ROAS</th><th>Google Spend</th><th>Google ROAS</th><th>TikTok Spend</th><th>TikTok ROAS</th><th>Snap Spend</th><th>Snap ROAS</th><th>Total Spend</th><th>Blended ROAS</th>';
-    document.getElementById('adsTbl').innerHTML=[...rows].map(row=>{
+    document.getElementById('adsTbl').innerHTML=adsTrend.map(row=>{
       const ms=nc(row[i.mS]),mr=nc(row[i.mRoas]),gs=nc(row[i.gS]),gr=nc(row[i.gRoas]);
       const ts=nc(row[i.tS]),tr=nc(row[i.tRoas]),ss=nc(row[i.sS]),sr=nc(row[i.sRoas]);
       const tS2=ms+gs+ts+ss,tRv2=nc(row[i.mR])+nc(row[i.gR])+nc(row[i.tR])+nc(row[i.sR]);
@@ -1155,7 +1051,7 @@ function renderAds(){
   } else {
     const cols=colMap[_adsPlatform]||colMap.meta;
     document.getElementById('adsTblHead').innerHTML=cols.map(c=>`<th>${c.h}</th>`).join('');
-    document.getElementById('adsTbl').innerHTML=[...rows].map(row=>{
+    document.getElementById('adsTbl').innerHTML=adsTrend.map(row=>{
       return'<tr>'+cols.map(col=>{
         if(col.h==='Date')return`<td style="font-weight:500">${row[i.date]||'—'}</td>`;
         if(col.calc==='cpa'){const s=nc(row[i[col.ks]]),o=nc(row[i[col.ko]]);return`<td class="tm tmut">${o>0?'PKR '+fmt(Math.round(s/o)):'—'}</td>`;}
@@ -1235,28 +1131,12 @@ function renderCrrSummaryFiltered(){
   const rtoR=active>0?Math.round(cnt.returned/active*100):0;
   window._crrCnt=cnt;
   // Cards
-  // 3 main summary cards + booked note
   document.getElementById('crrCards').innerHTML=`
-    <div class="cc" style="border-color:var(--blue-dim)">
-      <div class="ccl">Dispatched</div>
-      <div class="ccv" style="color:var(--blue)">${cnt.dispatched}</div>
-      <div class="ccs">All except Delivered, Return Delivered & Booked · COD: ${fPKR(dispValue)}</div>
-    </div>
-    <div class="cc" style="border-color:var(--green-dim)">
-      <div class="ccl">Delivered</div>
-      <div class="ccv" style="color:var(--green)">${cnt.delivered}</div>
-      <div class="ccs">Delivery rate: ${delR}% · ${fPKR(delivValue)}</div>
-    </div>
-    <div class="cc" style="border-color:var(--red-dim)">
-      <div class="ccl">Returned / RTO</div>
-      <div class="ccv" style="color:var(--red)">${cnt.returned}</div>
-      <div class="ccs">Return Delivered only · ${fPKR(returnValue)}</div>
-    </div>
-    <div class="cc">
-      <div class="ccl">Booked (Not Counted)</div>
-      <div class="ccv" style="color:var(--muted)">${cnt.booked}</div>
-      <div class="ccs">Not yet dispatched · excluded from rates</div>
-    </div>`;
+    <div class="cc"><div class="ccl">Total CNs</div><div class="ccv">${cnt.total}</div><div class="ccs">In filter</div></div>
+    <div class="cc" style="border-color:var(--blue-dim)"><div class="ccl">Dispatched</div><div class="ccv" style="color:var(--blue)">${cnt.dispatched}</div><div class="ccs">COD: ${fPKR(dispValue)}</div></div>
+    <div class="cc" style="border-color:var(--green-dim)"><div class="ccl">Delivered</div><div class="ccv" style="color:var(--green)">${cnt.delivered}</div><div class="ccs">Rate: ${delR}% · ${fPKR(delivValue)}</div></div>
+    <div class="cc" style="border-color:var(--red-dim)"><div class="ccl">RTO / Returned</div><div class="ccv" style="color:var(--red)">${cnt.returned}</div><div class="ccs">RTO: ${rtoR}% · ${fPKR(returnValue)}</div></div>
+    <div class="cc"><div class="ccl">Booked (Excl.)</div><div class="ccv" style="color:var(--muted)">${cnt.booked}</div><div class="ccs">Not yet picked up</div></div>`;
   // Status bars
   const maxC=Math.max(...Object.values(bd),1);
   const barCol={'Booked':'var(--muted2)','Arrived':'var(--blue)','Out For Delivery':'var(--accent)','Delivered':'var(--green)','Returned':'var(--red)'};
@@ -1279,32 +1159,16 @@ function processCourier(rows){
   let hi=-1,hdr=[];
   for(let i=0;i<rows.length;i++){
     const j=rows[i].join('|').toLowerCase();
-    // Primary: CN # + Status
-    if((j.includes('cn #')||j.includes('cn#')||j.includes('cn ')||j.includes(' cn'))&&j.includes('status')){hi=i;hdr=rows[i];break;}
-    // Secondary: ship date + customer + status
+    // Look for courier header: has CN# and Status columns
+    if((j.includes('cn #')||j.includes('cn#')||j.includes('cn '))&&j.includes('status')){hi=i;hdr=rows[i];break;}
+    // Fallback: has ship date and customer and status
     if(j.includes('ship date')&&j.includes('customer')&&j.includes('status')){hi=i;hdr=rows[i];break;}
-    // Tertiary: shipment type + status (also in courier header)
-    if(j.includes('shipment type')&&j.includes('status')){hi=i;hdr=rows[i];break;}
   }
   if(hi===-1){
-    // Broad fallback: any row with 'status' AND at least 20 cols (courier rows are wide)
+    // Last fallback: find any row with 'status' that also has date-like content
     for(let i=0;i<rows.length;i++){
       const j=rows[i].join('|').toLowerCase();
-      if(j.includes('status')&&rows[i].length>=20){hi=i;hdr=rows[i];break;}
-    }
-  }
-  if(hi===-1){
-    // Last resort: find a row that looks like courier data (has MND- reference number)
-    // and back up to find the header
-    for(let i=0;i<rows.length;i++){
-      if((rows[i].join(' ')).includes('MND-')){
-        // Go back up to find a row with 'status'
-        for(let k=Math.max(0,i-5);k<i;k++){
-          const jk=rows[k].join('|').toLowerCase();
-          if(jk.includes('status')){hi=k;hdr=rows[k];break;}
-        }
-        if(hi>-1)break;
-      }
+      if(j.includes('status')&&(j.includes('date')||j.includes('customer'))){hi=i;hdr=rows[i];break;}
     }
   }
   if(hi===-1){setBadge('c','error','Header not found');return;}
@@ -1359,45 +1223,7 @@ function processCS(rows){
   const currentMonth=now.toLocaleString('en-US',{month:'long'}).toLowerCase(); // e.g. "may"
   const currentMonthShort=now.toLocaleString('en-US',{month:'short'}).toLowerCase(); // e.g. "may"
   const currentYear=String(now.getFullYear()).slice(-2); // "26"
-  csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-
-  // ── DIRECT SCAN: Find agents and EWH from summary tables ──
-  // Sheet has: | Agent 1 | 892 | 163 | 570 | 235 | - |
-  //             | Agent 2 | 1047 | 54 | 481 | - | 149 |
-  //             | E.COM WH | ...labels... |
-  //             |  | 21 | 5,772,966 | 2904 | 137 |
-  // ── DIRECT AGENT DETECTION ──
-  // Sheet structure (confirmed from debug):
-  // Row N:   "MTD Productivity Tra..." (header before agents)
-  // Row N+1: "," (blank separator row)  
-  // Row N+2: "" | "" | chats1 | inbound1 | outbound1 | returns1 | "" | ""  ← Agent 1
-  // Row N+3: "" | "" | chats2 | inbound2 | outbound2 | ""        | compl2  ← Agent 2
-  // Row N+4: "" | "" | exch   | dispVal  | dispUnits | returnUnits         ← EWH
-  // We use LAST occurrence of "MTD Productivity" to get May data
-  let mtdProdRow = -1;
-  for(let si=0;si<rows.length;si++){
-    if((rows[si][0]||'').toLowerCase().includes('mtd productivity')||
-       (rows[si].join(' ').toLowerCase().includes('mtd productivity'))){
-      mtdProdRow = si;
-    }
-  }
-  if(mtdProdRow >= 0){
-    // Skip separator row (N+1), read agents from N+2 and N+3
-    const a1row = rows[mtdProdRow+2]||[];
-    const a2row = rows[mtdProdRow+3]||[];
-    const ewhRow = rows[mtdProdRow+4]||[];
-    // Agent rows: col2=chats, col3=inbound, col4=outbound, col5=returns, col6=complaints
-    if(nc(a1row[2])>0){
-      csData.agents.push({name:'Agent 1',chats:nc(a1row[2]),inbound:nc(a1row[3]),outbound:nc(a1row[4]),returns:nc(a1row[5]),complaints:nc(a1row[6]),todayChats:0,todayOut:0});
-    }
-    if(nc(a2row[2])>0){
-      csData.agents.push({name:'Agent 2',chats:nc(a2row[2]),inbound:nc(a2row[3]),outbound:nc(a2row[4]),returns:nc(a2row[5]),complaints:nc(a2row[6]),todayChats:0,todayOut:0});
-    }
-    // EWH: col2=exch, col3=dispVal, col4=dispUnits, col5=returnUnits
-    if(nc(ewhRow[3])>0){
-      csData.ewh={exch:nc(ewhRow[2]),dispVal:nc(ewhRow[3]),dispUnits:nc(ewhRow[4]),returnUnits:nc(ewhRow[5])};
-    }
-  }
+  csData={agents:[],orderStatus:{},ewh:{}};
 
   // ── STEP 1: Find the start row of the CURRENT month's CS section ──
   // The sheet labels each month's CS block with a cell like:
@@ -1405,27 +1231,25 @@ function processCS(rows){
   // We scan all rows and find the LAST occurrence whose label matches current month
   // (last = most recent, so if June is added later it'll pick June)
   let sectionStart=0;
+  const monthNames={
+    january:'jan',february:'feb',march:'mar',april:'apr',may:'may',
+    june:'jun',july:'jul',august:'aug',september:'sep',october:'oct',
+    november:'nov',december:'dec'
+  };
 
-  // Find the LAST row that mentions current month in a CS/agent context
   for(let i=0;i<rows.length;i++){
     const rowText=rows[i].join(' ').toLowerCase();
+    // Match patterns like "may2026 cs data", "may 26", "may cs data", "april cs data"
     const matchesCurrent=(
-      rowText.includes(currentMonth)&&(rowText.includes('cs data')||rowText.includes('agent')||rowText.includes('26')||rowText.includes('cs'))
+      rowText.includes(currentMonth)&&(rowText.includes('cs data')||rowText.includes('cs')||rowText.includes('26'))
     )||(
       rowText.includes(currentMonthShort)&&rowText.includes('26')
     );
-    if(matchesCurrent){sectionStart=i;}
-  }
-  // Also look for 2nd "Dates | 1 | 2 | 3..." row = start of May CS block
-  let datesRowCount=0;
-  for(let i=0;i<rows.length;i++){
-    const r=rows[i];
-    const di=r.findIndex(cell=>cell.trim()==='Dates');
-    if(di>=0&&r[di+1]==='1'&&r[di+2]==='2'){
-      datesRowCount++;
-      if(datesRowCount>=2){sectionStart=Math.max(sectionStart,Math.max(0,i-3));}
+    if(matchesCurrent){
+      sectionStart=i; // keep updating — we want the LAST match (most recent month)
     }
   }
+  // If no month label found at all, start from row 0 (graceful fallback)
 
   // ── STEP 2: Within the current month section, find the Dates row ──
   // The Dates row looks like: [..., "Dates", "1", "2", "3", ... "31", "Total"]
@@ -1464,8 +1288,8 @@ function processCS(rows){
   // so we also scan a window before sectionStart for "Landed MTD" etc.
   // But actually the Landed MTD for May is the one right after "Operations Data For May"
   // which is close to but before the CS section. Let's scan a wider range.
-  const scanStart=Math.max(0,sectionStart-100);
-  const scanEnd=Math.min(rows.length,sectionStart+200);
+  const scanStart=Math.max(0,sectionStart-80);
+  const scanEnd=Math.min(rows.length,sectionStart+150);
 
   // Track if we're inside current month's agent section
   let inCurrentSection=false;
@@ -1485,24 +1309,18 @@ function processCS(rows){
     // Order Status rows — read from current month's "Operations Data For [Month]" section
     // These rows have the pattern: "Landed MTD", value in col 3 (No Of Orders) or col 4 (Achieved Value)
     const isOrderSection=rowText.includes('operations data for '+currentMonth)||rowText.includes('ecom mendeez')||rowText.includes('order status');
-    // Order status — always overwrite to get the LAST (most recent) occurrence
-    if(a0l.includes('landed mtd')){csData.orderStatus.landed=nc(r[3]);csData.orderStatus.landedVal=nc(r[4]);}
-    if(a0l.includes('total dispach')||a0l.includes('total dispatch')){csData.orderStatus.dispatched=nc(r[3]);}
-    if(a0l.includes('delivered to customer')){csData.orderStatus.delivered=nc(r[3]);}
-    if(a0l.includes('pending orders')){csData.orderStatus.pending=nc(r[3]);}
-    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){csData.orderStatus.cancelMTD=nc(r[3]);}
-    if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){csData.orderStatus.cancelCF=nc(r[3]);}
-    if(a0l.includes('mtd returns')&&!a0l.includes('cf')){csData.orderStatus.returnsMTD=nc(r[3]);}
-    if(a0l.includes('cf returns')){csData.orderStatus.returnsCF=nc(r[3]);}
-    // backwards compat
-    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){csData.orderStatus.cancel=nc(r[3]);}
-    if(a0l.includes('cf returns')){if(!csData.orderStatus.returns)csData.orderStatus.returns=nc(r[3]);}
+    if(a0l.includes('landed mtd')&&i>=sectionStart-80){csData.orderStatus.landed=nc(r[3]);csData.orderStatus.landedVal=nc(r[4]);}
+    if((a0l.includes('total dispach')||a0l.includes('total dispatch'))&&i>=sectionStart-80){csData.orderStatus.dispatched=nc(r[3]);}
+    if(a0l.includes('delivered to customer')&&i>=sectionStart-80){csData.orderStatus.delivered=nc(r[3]);}
+    if(a0l.includes('pending orders')&&i>=sectionStart-80){csData.orderStatus.pending=nc(r[3]);}
+    if(a0l.includes('cancelations mtd')&&i>=sectionStart-80){csData.orderStatus.cancel=nc(r[3]);}
+    if(a0l.includes('mtd returns')&&i>=sectionStart-80){csData.orderStatus.returns=nc(r[3]);}
 
     // Only read agent + EWH data from WITHIN the current month section
     if(!inCurrentSection)continue;
 
     // Agent block
-    if(a0l.includes('agent')||a0l.includes('nimra')||a0l.includes('abdullah')||a0l.startsWith('agent')){
+    if(a0l.includes('agent')||a0l.includes('nimra')||a0l.includes('abdullah')){
       const agentName=a0;
       const agentData={name:agentName,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
       let j=i;
@@ -1525,16 +1343,23 @@ function processCS(rows){
       i=j-1;continue;
     }
 
-    // EWH — always overwrite to get the LAST occurrence (most recent month)
-    if(a0l.includes('e.com wh')||a0l==='ewh'){
+    // EWH / Warehouse — same logic, only from current month section
+    if(a0l.includes('e.com wh')||a0l==='ewh'||(a0l===''&&(r[1]||'').toLowerCase().includes('e.com wh'))){
+      // The EWH summary row is: [blank | "E.COM WH" | Exch Count | Total Dispatch | Total Disp unit | Rtrn Units]
+      // followed by a data row: [blank | blank | value | value | value | value]
       const dataRow=rows[i+1]||[];
-      const exch=nc(dataRow[1]||r[1]),disp=nc(dataRow[2]||r[2]);
-      const units=nc(dataRow[3]||r[3]),rtn=nc(dataRow[4]||r[4]);
-      if(disp>0){csData.ewh.exch=exch;csData.ewh.dispVal=disp;csData.ewh.dispUnits=units;csData.ewh.returnUnits=rtn;}
+      csData.ewh.exch=nc(dataRow[2]||r[2]);
+      csData.ewh.dispVal=nc(dataRow[3]||r[3]);
+      csData.ewh.dispUnits=nc(dataRow[4]||r[4]);
+      csData.ewh.returnUnits=nc(dataRow[5]||r[5]);
+      i++;continue;
     }
-    if(a0===''&&nc(r[1])>0&&nc(r[2])>100000){
-      csData.ewh.exch=nc(r[1]);csData.ewh.dispVal=nc(r[2]);
-      csData.ewh.dispUnits=nc(r[3]);csData.ewh.returnUnits=nc(r[4]);
+    // Also handle the inline EWH row: [blank | value | "5,772,966" | 2904 | 137]
+    if(a0===''&&(r[1]||'').trim()&&!isNaN(parseFloat((r[1]||'').replace(/,/g,'')))&&nc(r[3])>100){
+      if(!csData.ewh.dispVal){
+        csData.ewh.exch=nc(r[1]);csData.ewh.dispVal=nc(r[2]);
+        csData.ewh.dispUnits=nc(r[3]);csData.ewh.returnUnits=nc(r[4]);
+      }
     }
   }
 
@@ -1545,21 +1370,13 @@ function processCS(rows){
   for(let i=Math.max(0,sectionStart-120);i<scanEnd;i++){
     const r=rows[i];const a0=(r[0]||'').trim();const a0l=a0.toLowerCase();
     // Cancellation reason rows typically: [Reason label] [count] ...
-    // Cancellation breakdown rows: col0=reason, col1=count, col2=value
-    // Only match specific known reason labels (not section headers or totals)
-    const isCancelReason=(
-      a0l.includes('call not answered')||a0l.includes('customer cancelled')||
-      a0l.includes('duplicate order')||a0l.includes('fake order')||
-      a0l.includes('invalid customer')||a0l.includes('non service')||
-      a0l.includes('payment issue')||a0l.includes('inventory constraint')||
-      a0l.includes('not interested')||a0l.includes('no answer')||
-      a0l.includes('wrong product')||a0l.includes('high price')||
-      a0l.includes('size issue')||a0l.includes('cod issue')
-    );
-    if(isCancelReason&&a0.length>2&&a0.length<60){
-      const count=nc(r[1]); // col1 = count (not value)
-      if(count>0){
-        csData.cancelReasons.push({reason:a0,count:count});
+    const isCancelSection=(a0l.includes('cancel')||a0l.includes('reason')||a0l.includes('wrong')||a0l.includes('price')||a0l.includes('size')||a0l.includes('cod')||a0l.includes('fake')||a0l.includes('duplicate')||a0l.includes('no answer')||a0l.includes('not interested'));
+    if(isCancelSection&&a0.length>2&&a0.length<60){
+      // Try to find a numeric count in this row
+      const nums=r.slice(1).map(v=>nc(v)).filter(v=>v>0);
+      if(nums.length>0){
+        // Take the last numeric value as the count (usually the total)
+        csData.cancelReasons.push({reason:a0,count:nums[nums.length-1]});
       }
     }
   }
@@ -1577,9 +1394,11 @@ function renderCS(){
         <td class="tm">${fmt(a.outbound)}</td>
         <td class="tm">${fmt(a.returns)}</td>
         <td class="tm">${a.complaints>0?fmt(a.complaints):'—'}</td>
+        <td class="tm" style="color:var(--accent)">${a.todayChats>0?a.todayChats:'—'}</td>
+        <td class="tm" style="color:var(--accent)">${a.todayOut>0?a.todayOut:'—'}</td>
       </tr>`).join('');
     document.getElementById('csAgentTable').innerHTML=`<table>
-      <thead><tr><th>Agent</th><th>Chats MTD</th><th>Inbound Calls</th><th>Outbound Calls</th><th>R/Returns</th><th>Complaints</th></tr></thead>
+      <thead><tr><th>Agent</th><th>Chats MTD</th><th>Inbound Calls</th><th>Outbound Calls</th><th>R/Returns</th><th>Complaints</th><th>Chats Today</th><th>Outbound Today</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
   }else{
     document.getElementById('csAgentTable').innerHTML='<div class="nodata">No agent data found in sheet</div>';
@@ -1591,10 +1410,8 @@ function renderCS(){
   setV('cs-dispatched',os.dispatched?fmt(os.dispatched):'—','blue');
   setV('cs-delivered',os.delivered?fmt(os.delivered):'—','green');
   setV('cs-pending',os.pending?fmt(os.pending):'—','');
-  setV('cs-cancel-mtd',os.cancelMTD!=null?fmt(os.cancelMTD):'—',os.cancelMTD>50?'red':'');
-  setV('cs-cancel-cf',os.cancelCF!=null?fmt(os.cancelCF):'—',os.cancelCF>50?'red':'');
-  setV('cs-returns-mtd',(os.returnsMTD!=null&&os.returnsMTD>0)?fmt(os.returnsMTD):'—',os.returnsMTD>30?'red':'');
-  setV('cs-returns-cf',os.returnsCF!=null?fmt(os.returnsCF):'—',os.returnsCF>30?'red':'');
+  setV('cs-cancel',os.cancel?fmt(os.cancel):'—',os.cancel>50?'red':'');
+  setV('cs-returns',os.returns?fmt(os.returns):'—',os.returns>30?'red':'');
 
   // Warehouse
   const ewh=csData.ewh;
@@ -1634,92 +1451,26 @@ function renderCS(){
 
 // ═══════════ DAILY STATS ═══════════
 function renderDailyStats(){
-  // Revenue + Orders from Shopify (date range filtered)
   const rev=ordersData.reduce((s,o)=>s+parseFloat(o.total_price||0),0);
-  const ords=ordersData.length;
+  const ords=ordersData.length;const aov=ords>0?Math.round(rev/ords):0;
+  const adT=window._adsTot||{spend:0,rev:0,roas:0};
+  const cntCrr=window._crrCnt||{dispatched:0,returned:0};
+  // CS confirmation — use sheet data if available, fall back to manual override
+  const called=manualData.called||0,confirmed=manualData.confirmed||0;
+  const confRate=called>0?Math.round(confirmed/called*100):0;
 
-  // Total Ad Spend — sum ads rows matching selected date range
-  let adSpend=0;
-  if(adsIdx&&adsTrend.length){
-    const {from,to}=getRange();
-    const filtered=adsTrend.filter(row=>{
-      const d=(row[0]||'').trim();
-      if(!d)return false;
-      const parsed=new Date(d.replace(/(\d+)-([A-Za-z]+)-(\d+)/,'$2 $1 $3'));
-      return !isNaN(parsed)&&parsed>=from&&parsed<=to;
-    });
-    const rows=filtered.length>0?filtered:adsTrend;
-    adSpend=rows.reduce((s,r)=>{
-      return s+[adsIdx.mS,adsIdx.gS,adsIdx.tS,adsIdx.sS].reduce((a,ci)=>a+nc(r[ci]),0);
-    },0);
-  }
+  setV('s-rev','PKR '+fmt(rev),'amber');
+  setV('s-ord',ords,'');
+  setV('s-aov','PKR '+fmt(aov),'');
+  const roas=adT.spend>0?adT.rev/adT.spend:0;
+  setV('s-roas',roas>0?roas.toFixed(1)+'x':'—',rcol(roas));
+  setV('s-spend',adT.spend?'PKR '+fmt(adT.spend):'—','');
+  setV('s-conf',confRate>0?confRate+'%':'—',confRate>=90?'green':confRate>0?'amber':'muted');
+  setV('s-disp',cntCrr.dispatched||'—','blue');
+  setV('s-rto',cntCrr.returned||'—',cntCrr.returned>10?'red':'');
 
-  // Courier stats — from filtCrr (respects courier date filter)
-  const cntCrr=window._crrCnt||{dispatched:0,delivered:0,returned:0};
-
-  // Cancellations + Returns — from CS sheet order status (MTD values)
-  const os=csData.orderStatus||{};
-  const totalCancel=(os.cancelMTD||0)+(os.cancelCF||0);
-  const totalReturns=(os.returnsMTD||0)+(os.returnsCF||0);
-
-  // Update label to show selected range
-  document.getElementById('todayDate').textContent=rangeLabel();
-
-  setV('s-rev',rev>0?'PKR '+fmt(rev):'—','amber');
-  setV('s-ord',ords>0?ords:'—','');
-  setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
-  setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
-  setV('s-delivered',cntCrr.delivered>0?cntCrr.delivered:'—','green');
-  setV('s-cancel',totalCancel>0?totalCancel:'—',totalCancel>50?'red':'');
-  setV('s-rto',totalReturns>0?totalReturns:'—',totalReturns>30?'red':'');
-
-  // Shopify cards — only populate when Shopify is connected
-  if(STORE&&STORE!=='demo'&&TOKEN){
-    // Landed Orders = count of orders in selected date range
-    const landedEl=document.getElementById('s-shopify-landed');
-    const grossEl=document.getElementById('s-shopify-gross');
-    const netEl=document.getElementById('s-shopify-net');
-    const subLanded=document.getElementById('s-shopify-landed-sub');
-    const subGross=document.getElementById('s-shopify-gross-sub');
-    const subNet=document.getElementById('s-shopify-net-sub');
-
-    if(landedEl){
-      landedEl.textContent=ords>0?ords:'—';
-      landedEl.className='sv amber';
-      subLanded.textContent='Shopify orders in range';
-    }
-    if(grossEl){
-      // Gross Sales = sum of (line item price × quantity) before any discounts
-      const gross=ordersData.reduce((s,o)=>{
-        const lineTotal=(o.line_items||[]).reduce((ls,li)=>ls+(parseFloat(li.price||0)*parseInt(li.quantity||1)),0);
-        return s+lineTotal;
-      },0);
-      grossEl.textContent=gross>0?'PKR '+fmt(gross):'—';
-      grossEl.className='sv amber';
-      subGross.textContent='Before discounts';
-    }
-    if(netEl){
-      // Net Sales = total_price (after discounts applied)
-      const net=ordersData.reduce((s,o)=>s+parseFloat(o.total_price||0),0);
-      netEl.textContent=net>0?'PKR '+fmt(net):'—';
-      netEl.className='sv green';
-      subNet.textContent='After discounts';
-    }
-  } else {
-    ['s-shopify-landed','s-shopify-gross','s-shopify-net'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el){el.textContent='—';el.className='sv muted';}
-    });
-    ['s-shopify-landed-sub','s-shopify-gross-sub','s-shopify-net-sub'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el)el.textContent='Connect Shopify to view';
-    });
-  }
-
-  renderSpark();
-  renderAlerts(rev,ords,0,cntCrr.returned);
+  renderSpark();renderAlerts(rev,ords,roas,cntCrr.returned);
 }
-
 // ── weeklyOrdersData: stores last 7 days orders (loaded separately) ──
 let weeklyOrdersData = [];
 
@@ -1778,7 +1529,7 @@ function renderWeeklyTop20(){
   const stockMap={};
   const typeMap={};
   allProducts.forEach(p=>{
-    const stock=(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const stock=(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
     stockMap[p.title]=stock;
     typeMap[p.title]=p.product_type||'—';
   });
@@ -1844,7 +1595,7 @@ function renderNoSaleDiagnosis(){
 
   // Diagnose each product
   const diagnosed=noSale.map(p=>{
-    const stock=(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const stock=(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
     const availVariants=(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
     const totalVariants=(p.variants||[]).length;
     const price=parseFloat((p.variants||[{}])[0]?.price||0);
@@ -1970,207 +1721,16 @@ function renderAlerts(rev,ords,roas,rto){
 }
 
 // ═══════════ PRODUCTS ═══════════
-function updateProductCounts(){
-  const totalProds=allProducts.length;
-  const totalSkus=allProducts.reduce((s,p)=>s+(p.variants||[]).length,0);
-  const el1=document.getElementById('totalProductCount');
-  const el2=document.getElementById('totalSkuCount');
-  if(el1)el1.textContent=totalProds.toLocaleString();
-  if(el2)el2.textContent=totalSkus.toLocaleString();
-}
-
-async function fetchProductCounts(){
-  // Get total product and SKU counts without loading all products
-  // Use Shopify count endpoints - very fast single API calls
-  try{
-    const [pc, vc] = await Promise.all([
-      shopFetch('/products/count.json?status=active'),
-      shopFetch('/variants/count.json')
-    ]);
-    const el1=document.getElementById('totalProductCount');
-    const el2=document.getElementById('totalSkuCount');
-    if(el1&&pc.count)el1.textContent=pc.count.toLocaleString();
-    if(el2&&vc.count)el2.textContent=vc.count.toLocaleString();
-  }catch(e){console.log('Count fetch:',e.message);}
-}
-
-let _prodSearchTimer=null;
-async function searchProducts(){
-  // Debounce — wait 400ms after user stops typing
-  clearTimeout(_prodSearchTimer);
-  _prodSearchTimer=setTimeout(async()=>{
-    const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
-    const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
-    const status=document.getElementById('prodStatus')?.value||'active';
-    const filter=document.getElementById('stockFilter')?.value||'all';
-
-    // No search terms — show whatever is loaded or prompt
-    if(!q&&!sku){
-      if(allProducts.length>0){renderProducts();}
-      else{
-        const tbl=document.getElementById('prodTbl');
-        if(tbl)tbl.innerHTML='<tr><td colspan="6" class="nodata">Type a product name or SKU above to search instantly.</td></tr>';
-      }
-      return;
-    }
-
-    // Always search via API for fresh accurate results
-    // (even mid-load, this gives instant results from Shopify directly)
-    const tbl=document.getElementById('prodTbl');
-    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching Shopify...</td></tr>';
-    try{
-      let results=[];
-      if(sku){
-        // SKU search using GraphQL — the only reliable way to search by SKU in Shopify
-        try{
-          const graphqlQuery={query:`{
-            productVariants(first:20, query:"sku:${sku}") {
-              edges { node {
-                sku inventoryQuantity price title
-                product { id title productType status
-                  variants(first:20){ edges{ node{ title sku inventoryQuantity price }}}
-                }
-              }}
-            }
-          }`};
-          const gd=await shopFetch('/graphql.json', 'POST', graphqlQuery);
-          const edges=(gd.data?.productVariants?.edges)||[];
-          const seen=new Set();
-          edges.forEach(e=>{
-            const prod=e.node?.product;
-            if(prod&&!seen.has(prod.id)){
-              seen.add(prod.id);
-              // Convert GraphQL product to REST format
-              const numId=prod.id.replace('gid://shopify/Product/','');
-              results.push({
-                id:parseInt(numId),
-                title:prod.title,
-                product_type:prod.productType||'',
-                status:prod.status?.toLowerCase()||'active',
-                created_at:new Date().toISOString(),
-                variants:(prod.variants?.edges||[]).map(ve=>({
-                  title:ve.node.title,
-                  sku:ve.node.sku||'',
-                  inventory_quantity:ve.node.inventoryQuantity||0,
-                  price:ve.node.price
-                }))
-              });
-            }
-          });
-        }catch(e){
-          console.log('GraphQL SKU search failed, trying REST fallback:',e.message);
-          // REST fallback — paginate products and filter by SKU
-          let skuUrl=`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`;
-          let pages=0;
-          while(skuUrl&&results.length<10&&pages<5){
-            const d=await shopFetch(skuUrl);
-            const prods=d.products||[];
-            prods.filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku))).forEach(p=>results.push(p));
-            if(prods.length<250)skuUrl=null;
-            else skuUrl=`/products.json?limit=250&status=${status}&since_id=${prods[prods.length-1].id}&fields=id,title,product_type,status,variants,created_at`;
-            pages++;
-          }
-        }
-        if(q)results=results.filter(p=>p.title.toLowerCase().includes(q));
-      } else if(q){
-        // Title search using GraphQL — supports partial matching anywhere in title
-        try{
-          const graphqlQuery={query:`{
-            products(first:20, query:"title:*${q}* status:${status}") {
-              edges { node {
-                id title productType status createdAt
-                variants(first:20){ edges{ node{ title sku inventoryQuantity price }}}
-              }}
-            }
-          }`};
-          const gd=await shopFetch('/graphql.json','POST',graphqlQuery);
-          const edges=(gd.data?.products?.edges)||[];
-          results=edges.map(e=>{
-            const p=e.node;
-            const numId=p.id.replace('gid://shopify/Product/','');
-            return{
-              id:parseInt(numId),
-              title:p.title,
-              product_type:p.productType||'',
-              status:p.status?.toLowerCase()||'active',
-              created_at:p.createdAt,
-              variants:(p.variants?.edges||[]).map(ve=>({
-                title:ve.node.title,
-                sku:ve.node.sku||'',
-                inventory_quantity:ve.node.inventoryQuantity||0,
-                price:ve.node.price
-              }))
-            };
-          });
-          // Client side filter to ensure match
-          results=results.filter(p=>p.title.toLowerCase().includes(q));
-        }catch(e){
-          console.log('GraphQL title search failed, REST fallback:',e.message);
-          const d=await shopFetch(`/products.json?limit=250&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`);
-          results=(d.products||[]).filter(p=>p.title.toLowerCase().includes(q));
-        }
-      }
-      // Apply stock filter
-      if(filter!=='all'){
-        results=results.filter(p=>{
-          const tot=(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
-          if(filter==='out')return tot===0;
-          if(filter==='low')return tot>0&&tot<10;
-          if(filter==='ok')return tot>0;
-          return true;
-        });
-      }
-      // Show results without affecting allProducts loading
-      const countEl=document.getElementById('prodCount');
-      if(countEl)countEl.textContent=results.length+' results';
-      // Render search results directly
-      renderProductRows(results,tbl);
-    }catch(e){
-      if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Search error: ${e.message}</td></tr>`;
-    }
-  },400);
-}
-
-function renderProductRows(prods,tbl){
-  if(!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
-  let rows=[];
-  prods.forEach(p=>{
-    const variants=p.variants||[];
-    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
-    const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
-    const varPills=sortedVars.map(v=>{
-      const qty=Math.max(0,v.inventory_quantity||0);
-      const lbl=v.title==='Default Title'?'Default':v.title;
-      const pillCls=qty===0?'pr':qty<5?'pa':qty<10?'po':'pg';
-      return`<span class="pill ${pillCls}" style="margin:2px;font-size:10px" title="SKU: ${v.sku||'—'}">${lbl}: ${qty}</span>`;
-    }).join('');
-    const totalPill=totalStock===0?'pr':totalStock<10?'pa':'pg';
-    const price=parseFloat(sortedVars[0]?.price||0);
-    rows.push(`<tr>
-      <td style="font-weight:500;max-width:220px">${p.title}</td>
-      <td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td>
-      <td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td>
-      <td class="tm">PKR ${fmt(price)}</td>
-      <td style="max-width:400px;line-height:1.6">${varPills}</td>
-      <td><span class="pill ${totalPill}">${totalStock===0?'Out':totalStock+' units'}</span></td>
-    </tr>`);
-  });
-  tbl.innerHTML=rows.join('');
-}
-
 function renderProducts(){
   const filter=document.getElementById('stockFilter')?.value||'all';
-  const validFilters=['all','out','low','ok'];
-  const safeFilter=validFilters.includes(filter)?filter:'all';
   const status=document.getElementById('prodStatus')?.value||'active';
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
-  const skuQ=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
   let rows=[];
 
   // Group by product — one row per product, show all variants inline
   const filteredProds=allProducts.filter(p=>{
     if(status==='active'&&p.status!=='active')return false;
-    if(skuQ&&!(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(skuQ)))return false;
+    // Search matches product title or any variant SKU/title
     if(search){
       const titleMatch=p.title.toLowerCase().includes(search);
       const skuMatch=(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(search)||(v.title||'').toLowerCase().includes(search));
@@ -2182,11 +1742,10 @@ function renderProducts(){
   filteredProds.forEach(p=>{
     const variants=p.variants||[];
     // Apply stock filter
-    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
-    if(safeFilter==='out'&&totalStock!==0)return;
-    if(safeFilter==='low'&&(totalStock===0||totalStock>=10))return;
-    if(safeFilter==='ok'&&totalStock<=0)return;
-    // 'all' shows everything — no filter needed
+    const totalStock=variants.reduce((s,v)=>s+(v.inventory_quantity||0),0);
+    if(filter==='out'&&totalStock!==0)return;
+    if(filter==='low'&&(totalStock===0||totalStock>=10))return;
+    if(filter==='ok'&&totalStock<10)return;
 
     // Sort variants: highest stock first
     const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
@@ -2216,60 +1775,23 @@ function renderProducts(){
   document.getElementById('prodTbl').innerHTML=rows.join('')||'<tr><td colspan="6" class="nodata">No products match filter</td></tr>';
   document.getElementById('prodCount').textContent=filteredProds.length+' products';
 }
-function applyProdFilter(){
-  searchProducts();
-}
+function applyProdFilter(){renderProducts();}
 
 // ═══════════ SORT ═══════════
-async function runSort(){
-  const sortEl=document.getElementById('sortResults');
-  if(!sortEl)return;
-  const rule=document.getElementById('sortRule').value;
-  const cat=document.getElementById('sortCat').value;
-  sortEl.innerHTML='<div class="ldrow"><span class="si"></span>Loading products...</div>';
-  let prods=[];
-  if(cat!=='all'){
-    // Fetch products directly from selected collection — no need for allProducts
-    try{
-      // Strip gid prefix if present — REST API needs numeric ID only
-      const collId=String(cat).replace('gid://shopify/Collection/','');
-      // Use /products.json?collection_id= — works for BOTH smart and custom collections
-      let collUrl='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,created_at';
-      while(collUrl){
-        const d=await shopFetch(collUrl);
-        const batch=d.products||[];
-        prods=prods.concat(batch);
-        if(batch.length<250)collUrl=null;
-        else collUrl='/products.json?collection_id='+collId+'&limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,created_at';
-      }
-    }catch(e){sortEl.innerHTML='<div class="nodata">Error: '+e.message+'</div>';return;}
-  } else {
-    if(allProducts.length>0){prods=[...allProducts];}
-    else{
-      try{
-        const d=await shopFetch('/products.json?limit=250&status=active&fields=id,title,product_type,status,variants,created_at');
-        prods=d.products||[];
-      }catch(e){sortEl.innerHTML='<div class="nodata">Error: '+e.message+'</div>';return;}
-    }
-  }
-  if(!prods.length){sortEl.innerHTML='<div class="nodata">No products found in this collection.</div>';return;}
-  const gT=p=>(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+function runSort(){
+  if(!allProducts.length){document.getElementById('sortResults').innerHTML='<div class="nodata">Load Shopify data first</div>';return;}
+  const rule=document.getElementById('sortRule').value,cat=document.getElementById('sortCat').value;
+  let prods=[...allProducts];
+  if(cat!=='all')prods=prods.filter(p=>p.product_type===cat||p.title.toLowerCase().includes(cat.toLowerCase()));
+  const gT=p=>(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
   const gA=p=>(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
   prods.sort((a,b)=>{
     if(rule==='stock_asc')return gT(a)-gT(b);
     if(rule==='variants_desc')return gA(b)-gA(a);
-    if(rule==='avail_desc'){
-      const tA=(a.variants||[]).length,tB=(b.variants||[]).length;
-      const aA=gA(a),aB=gA(b);
-      const diff=aB-aA;if(diff!==0)return diff;
-      const fA=aA===tA?1:0,fB=aB===tB?1:0;
-      if(fB!==fA)return fB-fA;
-      return gT(b)-gT(a);
-    }
-    return gT(b)-gT(a);
+    return gT(b)-gT(a); // stock_desc default
   });
   const mx=Math.max(...prods.map(gT),1);
-  sortEl.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+prods.map((p,i)=>{
+  document.getElementById('sortResults').innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+prods.map((p,i)=>{
     const s=gT(p),av=gA(p),tot=(p.variants||[]).length,pct=Math.round(s/mx*100);
     const col=s===0?'var(--red)':av<tot/2?'var(--accent)':'var(--green)';
     return`<div class="sort-item">
@@ -2278,12 +1800,8 @@ async function runSort(){
       <div class="srbar"><div class="srbl">${s} units</div><div class="btrack"><div class="bfill" style="width:${pct}%;background:${col}"></div></div></div>
     </div>`;
   }).join('')+'</div>';
-  window._sortedProds=prods;
   document.getElementById('sortSts').textContent=`✓ Sorted ${prods.length} products`;
-  const applyBtn=document.getElementById('applyToShopifyBtn');
-  if(applyBtn){applyBtn.style.display=cat!=='all'?'inline-flex':'none';}
 }
-
 function copySteps(){
   navigator.clipboard.writeText('HOW TO APPLY CATALOG SORT IN SHOPIFY\n\n1. Shopify Admin → Products → Collections\n2. Open your collection → Sort → Manually\n3. Drag products to match Catalog Sorter order\n\nFor permanent automation: use Shopify Flow to re-sort by inventory_quantity every morning.');
   document.getElementById('sortSts').textContent='✓ Copied';setTimeout(()=>document.getElementById('sortSts').textContent='',3000);
@@ -2446,22 +1964,17 @@ function switchTab(name,el){
   document.getElementById('panel-'+name).classList.add('active');
   el.classList.add('active');
   if(name==='report')buildReport();
-  if(name==='products'){
-    // Never auto-load all products — just show search prompt
-    const tbl=document.getElementById('prodTbl');
-    if(tbl&&!document.getElementById('prodSearch').value){
-      tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px;font-size:13px">🔍 Search by product name or SKU above to find products instantly.</td></tr>';
-    }
-  }
   if(name==='sorter'){
-    // Populate collections for catalog sorter
     const sel=document.getElementById('sortCat');
-    if(sel&&allCollections.length>0&&sel.options.length<=1){
-      sel.innerHTML='<option value="all">All Products</option>'+
-        allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
-    } else if(sel&&allCollections.length===0&&STORE&&STORE!=='demo'&&TOKEN){
-      loadCollections();
-    }
+    if(sel&&allCollections.length>0&&sel.options.length<=1)
+      sel.innerHTML='<option value="">Select a collection...</option>'+allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
+    else if(sel&&allCollections.length===0&&STORE&&STORE!=='demo'&&TOKEN)
+      loadCollections().then(()=>{if(sel&&allCollections.length>0)sel.innerHTML='<option value="">Select a collection...</option>'+allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');});
+  }
+  if(name==='products'){
+    const tbl=document.getElementById('prodTbl');
+    if(tbl&&!document.getElementById('prodSearch').value)
+      tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU above to search instantly</td></tr>';
   }
 }
 
@@ -2613,35 +2126,6 @@ async function testSheetConnection(){
   }
 }
 
-// ═══════════ DEBUG ═══════════
-async function debugAllTabs(){
-  const el=document.getElementById('sheetTestResult');
-  el.style.display='block';el.style.color='var(--accent)';
-  el.textContent='Loading... please wait 30 seconds...\n';
-  const sid=document.getElementById('cfgSheet').value.trim()||SHEET_ID;
-  // Show CS rows 40-96 where agents should be
-  el.textContent+='\n=== CS/Perf ROWS 40-96 ===\n';
-  try{
-    const rows=await fetchSheetJSONP(sid,CS_TAB);
-    el.textContent+=`Total CS rows: ${rows.length}\n`;
-    for(let i=40;i<rows.length;i++){
-      const r=rows[i].slice(0,8).map(v=>String(v).slice(0,20).padEnd(20));
-      el.textContent+=`Row ${String(i).padStart(2,'0')}: ${r.join(' | ')}\n`;
-    }
-  }catch(e){el.textContent+=`CS ERROR: ${e.message}\n`;}
-  // Show Ads rows 34-45 where May header should be
-  el.textContent+='\n=== ADS ROWS 34-45 ===\n';
-  try{
-    const rows=await fetchSheetJSONP(sid,ADS_TAB);
-    for(let i=34;i<Math.min(46,rows.length);i++){
-      const r=rows[i].slice(0,8).map(v=>String(v).slice(0,20).padEnd(20));
-      el.textContent+=`Row ${String(i).padStart(2,'0')}: ${r.join(' | ')}\n`;
-    }
-  }catch(e){el.textContent+=`ADS ERROR: ${e.message}\n`;}
-  el.style.color='var(--green)';
-  el.textContent+='\n=== DONE - NOW TELL ME: what is the tab name for your courier/shipment data? (the sheet with CN numbers) ===';
-}
-
 // ═══════════ INIT ═══════════
 window.addEventListener('load',()=>{
   loadConfig();
@@ -2668,6 +2152,188 @@ window.addEventListener('load',()=>{
   if(manualData.called)document.getElementById('i-called').value=manualData.called;
   if(manualData.confirmed)document.getElementById('i-confirmed').value=manualData.confirmed;
 });
+
+// ═══ PRODUCT COUNTS ═══
+async function fetchProductCounts(){
+  try{
+    const [pc,vc]=await Promise.all([shopFetch('/products/count.json?status=active'),shopFetch('/variants/count.json')]);
+    const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
+    if(e1&&pc.count)e1.textContent=pc.count.toLocaleString();
+    if(e2&&vc.count)e2.textContent=vc.count.toLocaleString();
+  }catch(e){console.log('counts:',e.message);}
+}
+function updateProductCounts(){
+  const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
+  if(e1)e1.textContent=allProducts.length.toLocaleString();
+  if(e2)e2.textContent=allProducts.reduce((s,p)=>s+(p.variants||[]).length,0).toLocaleString();
+}
+
+// ═══ SEARCH PRODUCTS ═══
+let _searchTimer=null;
+async function searchProducts(){
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(async()=>{
+    const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
+    const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
+    const status=document.getElementById('prodStatus')?.value||'active';
+    const tbl=document.getElementById('prodTbl');
+    if(!q&&!sku){
+      if(tbl)tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU to search instantly</td></tr>';
+      return;
+    }
+    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching Shopify...</td></tr>';
+    try{
+      let results=[];
+      if(sku){
+        // GraphQL SKU search
+        const gq={query:`{productVariants(first:20,query:"sku:${sku}"){edges{node{sku inventoryQuantity price title product{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}}`};
+        const gd=await shopFetch('/graphql.json','POST',gq);
+        const edges=(gd.data?.productVariants?.edges)||[];
+        const seen=new Set();
+        edges.forEach(e=>{
+          const prod=e.node?.product;
+          if(prod&&!seen.has(prod.id)){
+            seen.add(prod.id);
+            results.push({id:parseInt(prod.id.replace('gid://shopify/Product/','')),title:prod.title,product_type:prod.productType||'',status:(prod.status||'').toLowerCase(),created_at:'',variants:(prod.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))});
+          }
+        });
+      } else if(q){
+        // GraphQL title search
+        const gq={query:`{products(first:20,query:"title:*${q}* status:${status}"){edges{node{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}`};
+        const gd=await shopFetch('/graphql.json','POST',gq);
+        results=(gd.data?.products?.edges||[]).map(e=>{
+          const p=e.node;
+          return{id:parseInt(p.id.replace('gid://shopify/Product/','')),title:p.title,product_type:p.productType||'',status:(p.status||'').toLowerCase(),created_at:'',variants:(p.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))};
+        }).filter(p=>p.title.toLowerCase().includes(q));
+      }
+      const ce=document.getElementById('prodCount');
+      if(ce)ce.textContent=results.length+' results';
+      renderProductRows(results,tbl);
+    }catch(e){if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Error: ${e.message}</td></tr>`;}
+  },400);
+}
+function applyProdFilter(){searchProducts();}
+
+function renderProductRows(prods,tbl){
+  if(!prods||!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
+  tbl.innerHTML=prods.map(p=>{
+    const variants=p.variants||[];
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
+    const pills=sortedVars.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const l=v.title==='Default Title'?'Default':v.title;const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="margin:2px;font-size:10px">${l}: ${q}</span>`;}).join('');
+    const tp=totalStock===0?'pr':totalStock<10?'pa':'pg';
+    return`<tr><td style="font-weight:500">${p.title}</td><td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td><td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td><td class="tm">PKR ${fmt(parseFloat(sortedVars[0]?.price||0))}</td><td style="line-height:1.6">${pills}</td><td><span class="pill ${tp}">${totalStock===0?'Out':totalStock+' units'}</span></td></tr>`;
+  }).join('');
+}
+
+// ═══ DRAG SORTER ═══
+let _sorterProds=[],_dragSrcIdx=null;
+
+async function loadSorterCollection(){
+  const cat=document.getElementById('sortCat').value;
+  if(!cat){document.getElementById('sortResults').innerHTML='';document.getElementById('sortSts').textContent='Select a collection to start';document.getElementById('applyToShopifyBtn').style.display='none';return;}
+  document.getElementById('sortSts').textContent='Loading collection...';
+  document.getElementById('sortResults').innerHTML='<div class="ldrow"><span class="si"></span>Loading products with images...</div>';
+  try{
+    const collId=String(cat).replace('gid://shopify/Collection/','');
+    let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
+    let prods=[];
+    while(url){
+      const d=await shopFetch(url);
+      const batch=d.products||[];
+      prods=prods.concat(batch);
+      if(batch.length<250)url=null;
+      else url='/products.json?collection_id='+collId+'&limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,images';
+    }
+    _sorterProds=prods;
+    document.getElementById('sortCount').textContent=prods.length+' products';
+    document.getElementById('sortSts').textContent='✓ Loaded '+prods.length+' products — drag to reorder or click Auto-Sort';
+    document.getElementById('applyToShopifyBtn').style.display='block';
+    renderSorterGrid();
+  }catch(e){document.getElementById('sortResults').innerHTML='<div class="nodata">Error: '+e.message+'</div>';}
+}
+
+function renderSorterGrid(){
+  const el=document.getElementById('sortResults');
+  if(!_sorterProds.length){el.innerHTML='<div class="nodata">No products</div>';return;}
+  el.innerHTML=_sorterProds.map((p,i)=>{
+    const variants=p.variants||[];
+    const img=(p.images&&p.images[0])?p.images[0].src:'';
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const availV=variants.filter(v=>(v.inventory_quantity||0)>0).length;
+    const totalV=variants.length;
+    const stockColor=totalStock===0?'var(--red)':availV<totalV?'var(--accent)':'var(--green)';
+    const stockIcon=totalStock===0?'🔴':availV===totalV?'✅':'⚠️';
+    const pills=variants.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="font-size:9px;margin:1px">${v.title==='Default Title'?'1':v.title}:${q}</span>`;}).join('');
+    return`<div class="sorter-item" draggable="true" data-idx="${i}" ondragstart="sorterDragStart(event,${i})" ondragover="sorterDragOver(event)" ondrop="sorterDrop(event,${i})" ondragend="sorterDragEnd(event)" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:grab;user-select:none;transition:border-color .15s">
+      <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted2);min-width:26px">${String(i+1).padStart(2,'0')}</div>
+      <div style="color:var(--muted2);font-size:20px;cursor:grab">⠿</div>
+      <div style="width:52px;height:52px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--surface2)">
+        ${img?`<img src="${img}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted2);font-size:20px">📦</div>'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px">${p.product_type||'—'}</div>
+        <div style="margin-top:4px;flex-wrap:wrap;display:flex;gap:2px">${pills}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:20px">${stockIcon}</div>
+        <div style="font-family:var(--mono);font-size:12px;color:${stockColor};font-weight:600">${totalStock}</div>
+        <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">${availV}/${totalV} sizes</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function sorterDragStart(e,idx){_dragSrcIdx=idx;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
+function sorterDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.style.borderColor='var(--accent)';}
+function sorterDrop(e,targetIdx){
+  e.preventDefault();e.currentTarget.style.borderColor='';
+  if(_dragSrcIdx===null||_dragSrcIdx===targetIdx)return;
+  const moved=_sorterProds.splice(_dragSrcIdx,1)[0];
+  _sorterProds.splice(targetIdx,0,moved);
+  _dragSrcIdx=null;renderSorterGrid();
+  document.getElementById('sortSts').textContent='✓ Reordered — click Apply to Shopify to save';
+}
+function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style.borderColor='';_dragSrcIdx=null;document.querySelectorAll('.sorter-item').forEach(el=>el.style.borderColor='');}
+
+function runSort(){
+  if(!_sorterProds.length){document.getElementById('sortSts').textContent='Select a collection first';return;}
+  const rule=document.getElementById('sortRule').value;
+  const gT=p=>(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+  const gA=p=>(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
+  _sorterProds.sort((a,b)=>{
+    if(rule==='stock_asc')return gT(a)-gT(b);
+    if(rule==='variants_desc')return gA(b)-gA(a);
+    if(rule==='avail_desc'){const tA=(a.variants||[]).length,tB=(b.variants||[]).length,aA=gA(a),aB=gA(b),diff=aB-aA;if(diff!==0)return diff;const fA=aA===tA?1:0,fB=aB===tB?1:0;if(fB!==fA)return fB-fA;return gT(b)-gT(a);}
+    return gT(b)-gT(a);
+  });
+  renderSorterGrid();
+  document.getElementById('sortSts').textContent='✓ Auto-sorted '+_sorterProds.length+' products — drag to fine-tune, then Apply to Shopify';
+}
+
+async function applyCollectionSort(){
+  const cat=document.getElementById('sortCat').value;
+  if(!cat||!_sorterProds.length)return;
+  const btn=document.getElementById('applyToShopifyBtn');
+  btn.textContent='Applying...';btn.disabled=true;
+  document.getElementById('sortSts').textContent='Applying to Shopify...';
+  try{
+    const collId=String(cat).replace('gid://shopify/Collection/','');
+    let allCollects=[];
+    let cu='/collects.json?collection_id='+collId+'&limit=250';
+    while(cu){const d=await shopFetch(cu);const b=d.collects||[];allCollects=allCollects.concat(b);if(b.length<250)cu=null;else cu='/collects.json?collection_id='+collId+'&limit=250&since_id='+b[b.length-1].id;}
+    const cm={};allCollects.forEach(col=>cm[String(col.product_id)]=col.id);
+    let ok=0;
+    for(let i=0;i<_sorterProds.length;i++){
+      const cid=cm[String(_sorterProds[i].id)];
+      if(cid){try{await shopFetch('/collects/'+cid+'.json','POST',{collect:{id:cid,position:i+1}});ok++;}catch(e){}}
+    }
+    btn.textContent='✓ Applied!';btn.style.background='var(--green)';
+    document.getElementById('sortSts').textContent=`✓ Done! ${ok}/${_sorterProds.length} products reordered on Shopify.`;
+    setTimeout(()=>{btn.textContent='✓ Apply to Shopify';btn.disabled=false;},4000);
+  }catch(e){btn.textContent='✗ Error';btn.disabled=false;document.getElementById('sortSts').textContent='Error: '+e.message;}
+}
 </script>
 </body>
 </html>
