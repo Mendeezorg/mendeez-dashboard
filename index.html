@@ -426,7 +426,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <!-- ══ PRODUCTS ══ -->
 <div class="panel" id="panel-products">
   <div class="ds">
-    <div><div class="dt">Products & Stock</div><div class="dsub">Live from Shopify · Top 20 uses selected date range</div></div>
+    <div><div class="dt">Products & Stock</div><div class="dsub">Live from Shopify · All products with real inventory</div></div>
     <button class="btn btn-s btn-sm" onclick="loadProducts()">↻ Refresh</button>
   </div>
   <!-- Search + filter bar -->
@@ -2022,19 +2022,7 @@ function renderProducts(){
   document.getElementById('prodCount').textContent=filteredProds.length+' products';
 }
 function applyProdFilter(){
-  const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
-  const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
-  const sf=document.getElementById('stockFilter')?.value||'all';
-  let fp=allProducts.filter(p=>{
-    if(q&&!p.title.toLowerCase().includes(q))return false;
-    if(sku&&!(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)))return false;
-    const tot=(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
-    if(sf==='out'&&tot>0)return false;
-    if(sf==='low'&&(tot===0||tot>10))return false;
-    if(sf==='in'&&tot<=0)return false;
-    return true;
-  });
-  renderProductList(fp);
+  renderProducts();
 }
 
 // ═══════════ SORT ═══════════
@@ -2042,7 +2030,15 @@ async function runSort(){
   if(!allProducts.length){document.getElementById('sortResults').innerHTML='<div class="nodata">Load Shopify data first</div>';return;}
   const rule=document.getElementById('sortRule').value,cat=document.getElementById('sortCat').value;
   let prods=[...allProducts];
-  if(cat!=='all')prods=prods.filter(p=>p.product_type===cat||p.title.toLowerCase().includes(cat.toLowerCase()));
+  if(cat!=='all'){
+    // Filter by collection ID
+    try{
+      const d=await shopFetch('/collections/'+cat+'/products.json?limit=250');
+      const ids=new Set((d.products||[]).map(p=>String(p.id)));
+      const filtered=prods.filter(p=>ids.has(String(p.id)));
+      if(filtered.length>0)prods=filtered;
+    }catch(e){console.error('Collection filter error:',e);}
+  }
   const gT=p=>(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
   const gA=p=>(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
   prods.sort((a,b)=>{
