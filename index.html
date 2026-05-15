@@ -649,7 +649,8 @@ async function refreshAll(){
 // ═══════════ SHOPIFY ═══════════
 async function shopFetch(ep){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep);
+  // Do NOT encode ep — Worker receives it raw and passes directly to Shopify
+  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep;
   const r=await fetch(workerUrl);
   if(!r.ok)throw new Error('Shopify proxy error '+r.status);
   return r.json();
