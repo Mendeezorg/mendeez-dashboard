@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 <title>Mendeez Ops Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -444,7 +443,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 <!-- ══ CATALOG SORTER ══ -->
 <div class="panel" id="panel-sorter">
-  <div class="ds"><div><div class="dt">Catalog Sorter</div><div class="dsub">Select collection · Auto-sort or drag to reorder · Apply directly to Shopify</div></div></div>
+  <div class="ds"><div><div class="dt">Catalog Sorter</div><div class="dsub">Select collection · Auto-sort or drag to reorder · Apply to Shopify</div></div></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;align-items:end">
     <div>
       <div class="fl" style="margin-bottom:6px">Auto-Sort Rule</div>
@@ -461,7 +460,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <select class="fi" id="sortCat" onchange="loadSorterCollection()">
         <option value="">Select a collection...</option>
       </select>
-      <button class="btn btn-sm" id="applyToShopifyBtn" onclick="applyCollectionSort()" style="margin-top:8px;width:100%;display:none;background:var(--green);color:#000;border:none;font-weight:700;padding:9px;border-radius:6px;cursor:pointer">✓ Apply to Shopify</button>
+      <button id="applyToShopifyBtn" onclick="applyCollectionSort()" style="margin-top:8px;width:100%;display:none;background:var(--green);color:#000;border:none;font-weight:700;padding:9px;border-radius:6px;cursor:pointer;font-size:12px">✓ Apply to Shopify</button>
     </div>
   </div>
   <div style="display:flex;justify-content:space-between;margin-bottom:10px">
@@ -628,7 +627,6 @@ async function refreshAll(){
 // ═══════════ SHOPIFY ═══════════
 async function shopFetch(ep,method,body){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  // Simple GET request — Worker handles GET by default
   const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep;
   if(body&&(method==='POST'||method==='PUT')){
     const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopifyMethod:method,shopifyBody:body})});
@@ -911,19 +909,17 @@ async function fetchSheets(){
 
 // ═══════════ ADS PROCESSING ═══════════
 function processAds(rows){
-  // Prefer May header over April
-  let aprilHi=-1,mayHi=-1,aprilHdr=[],mayHdr=[],hi=-1,hdr=[];
+  // The sheet has TWO header rows — one for April (April/Date) and one for May (May/Date)
+  // We want the LAST one (most recent month). Each header row has Meta/Spend etc.
+  // Column structure: [April/Date or May/Date] [Shopify cols...] [Meta/Spend] [Meta/Orders]...
+  let hi=-1,hdr=[];
   for(let i=0;i<rows.length;i++){
     const joined=rows[i].join('|').toLowerCase();
-    if(!(joined.includes('meta/spend')||(joined.includes('meta')&&joined.includes('spend'))))continue;
-    const first=(rows[i][0]||'').toLowerCase();
-    if(first.includes('may')){mayHi=i;mayHdr=rows[i];}
-    else if(first.includes('apr')){aprilHi=i;aprilHdr=rows[i];}
-    else{hi=i;hdr=rows[i];}
+    // Match header rows that contain both a date column and meta/spend
+    if(joined.includes('meta/spend')||(joined.includes('meta')&&joined.includes('spend'))){
+      hi=i;hdr=rows[i]; // keep going to find the LAST one (May comes after April)
+    }
   }
-  if(mayHi>=0){hi=mayHi;hdr=mayHdr;}
-  else if(aprilHi>=0){hi=aprilHi;hdr=aprilHdr;}
-  const monthLabel=mayHi>=0?'May':aprilHi>=0?'April':'Data';
   if(hi===-1){setBadge('a','error','Header not found');return;}
 
   // Find column indices — handle variations like "Meta/Spend", "Meta Spend", "meta/spend"
@@ -969,7 +965,7 @@ function processAds(rows){
   adsTrend=finalDr.slice(-7);
   adsLatest=finalDr[finalDr.length-1];
   document.getElementById('adsDateLbl').textContent='Most recent: '+(adsLatest[adsIdx.date]||'—');
-  setBadge('a','live',finalDr.length+' days · '+(typeof monthLabel!=='undefined'?monthLabel:hdr[dateCol]));
+  setBadge('a','live',finalDr.length+' days · '+hdr[dateCol]);
   renderAds();
 }
 
@@ -1231,12 +1227,8 @@ function processCS(rows){
   const currentMonthShort=now.toLocaleString('en-US',{month:'short'}).toLowerCase(); // e.g. "may"
   const currentYear=String(now.getFullYear()).slice(-2); // "26"
   csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-
-  // Direct agent detection via MTD Productivity row
   let mtdProdRow=-1;
-  for(let si=0;si<rows.length;si++){
-    if(rows[si].join(' ').toLowerCase().includes('mtd productivity')) mtdProdRow=si;
-  }
+  for(let si=0;si<rows.length;si++){if(rows[si].join(' ').toLowerCase().includes('mtd productivity'))mtdProdRow=si;}
   if(mtdProdRow>=0){
     const a1=rows[mtdProdRow+2]||[],a2=rows[mtdProdRow+3]||[],ewh=rows[mtdProdRow+4]||[];
     if(nc(a1[2])>0)csData.agents.push({name:'Agent 1',chats:nc(a1[2]),inbound:nc(a1[3]),outbound:nc(a1[4]),returns:nc(a1[5]),complaints:nc(a1[6]),todayChats:0,todayOut:0});
@@ -1797,30 +1789,6 @@ function renderProducts(){
 function applyProdFilter(){renderProducts();}
 
 // ═══════════ SORT ═══════════
-function runSort(){
-  if(!allProducts.length){document.getElementById('sortResults').innerHTML='<div class="nodata">Load Shopify data first</div>';return;}
-  const rule=document.getElementById('sortRule').value,cat=document.getElementById('sortCat').value;
-  let prods=[...allProducts];
-  if(cat!=='all')prods=prods.filter(p=>p.product_type===cat||p.title.toLowerCase().includes(cat.toLowerCase()));
-  const gT=p=>(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
-  const gA=p=>(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
-  prods.sort((a,b)=>{
-    if(rule==='stock_asc')return gT(a)-gT(b);
-    if(rule==='variants_desc')return gA(b)-gA(a);
-    return gT(b)-gT(a); // stock_desc default
-  });
-  const mx=Math.max(...prods.map(gT),1);
-  document.getElementById('sortResults').innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+prods.map((p,i)=>{
-    const s=gT(p),av=gA(p),tot=(p.variants||[]).length,pct=Math.round(s/mx*100);
-    const col=s===0?'var(--red)':av<tot/2?'var(--accent)':'var(--green)';
-    return`<div class="sort-item">
-      <div class="srnk">${String(i+1).padStart(2,'0')}</div>
-      <div class="srinfo"><div class="srname">${p.title}</div><div class="srmeta">${p.product_type||'—'} · ${av}/${tot} variants in stock</div></div>
-      <div class="srbar"><div class="srbl">${s} units</div><div class="btrack"><div class="bfill" style="width:${pct}%;background:${col}"></div></div></div>
-    </div>`;
-  }).join('')+'</div>';
-  document.getElementById('sortSts').textContent=`✓ Sorted ${prods.length} products`;
-}
 function copySteps(){
   navigator.clipboard.writeText('HOW TO APPLY CATALOG SORT IN SHOPIFY\n\n1. Shopify Admin → Products → Collections\n2. Open your collection → Sort → Manually\n3. Drag products to match Catalog Sorter order\n\nFor permanent automation: use Shopify Flow to re-sort by inventory_quantity every morning.');
   document.getElementById('sortSts').textContent='✓ Copied';setTimeout(()=>document.getElementById('sortSts').textContent='',3000);
@@ -2188,7 +2156,6 @@ function updateProductCounts(){
 }
 
 // ═══ SEARCH PRODUCTS ═══
-let _searchTimer=null;
 async function searchProducts(){
   clearTimeout(_searchTimer);
   _searchTimer=setTimeout(async()=>{
@@ -2316,6 +2283,126 @@ function sorterDrop(e,targetIdx){
 }
 function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style.borderColor='';_dragSrcIdx=null;document.querySelectorAll('.sorter-item').forEach(el=>el.style.borderColor='');}
 
+
+
+// ═══ PRODUCT COUNTS ═══
+async function fetchProductCounts(){
+  try{
+    const [pc,vc]=await Promise.all([shopFetch('/products/count.json?status=active'),shopFetch('/variants/count.json')]);
+    const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
+    if(e1&&pc.count!=null)e1.textContent=pc.count.toLocaleString();
+    if(e2&&vc.count!=null)e2.textContent=vc.count.toLocaleString();
+  }catch(e){console.log('counts:',e.message);}
+}
+function updateProductCounts(){
+  const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
+  if(e1)e1.textContent=allProducts.length.toLocaleString();
+  if(e2)e2.textContent=allProducts.reduce((s,p)=>s+(p.variants||[]).length,0).toLocaleString();
+}
+
+// ═══ SEARCH PRODUCTS ═══
+async function searchProducts(){
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(async()=>{
+    const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
+    const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
+    const status=document.getElementById('prodStatus')?.value||'active';
+    const tbl=document.getElementById('prodTbl');
+    if(!q&&!sku){if(tbl)tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU to search instantly</td></tr>';return;}
+    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching...</td></tr>';
+    try{
+      let results=[];
+      if(sku){
+        const gq={query:`{productVariants(first:20,query:"sku:${sku}"){edges{node{sku product{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}}`};
+        const gd=await shopFetch('/graphql.json','POST',gq);
+        const edges=(gd.data?.productVariants?.edges)||[];
+        const seen=new Set();
+        edges.forEach(e=>{const p=e.node?.product;if(p&&!seen.has(p.id)){seen.add(p.id);results.push({id:parseInt(p.id.replace('gid://shopify/Product/','')),title:p.title,product_type:p.productType||'',status:(p.status||'').toLowerCase(),variants:(p.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))});}});
+      } else {
+        const gq={query:`{products(first:20,query:"title:*${q}* status:${status}"){edges{node{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}`};
+        const gd=await shopFetch('/graphql.json','POST',gq);
+        results=(gd.data?.products?.edges||[]).map(e=>{const p=e.node;return{id:parseInt(p.id.replace('gid://shopify/Product/','')),title:p.title,product_type:p.productType||'',status:(p.status||'').toLowerCase(),variants:(p.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))};}).filter(p=>p.title.toLowerCase().includes(q));
+      }
+      const ce=document.getElementById('prodCount');if(ce)ce.textContent=results.length+' results';
+      renderProductRows(results,tbl);
+    }catch(e){if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Error: ${e.message}</td></tr>`;}
+  },400);
+}
+function applyProdFilter(){searchProducts();}
+function renderProductRows(prods,tbl){
+  if(!prods||!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
+  tbl.innerHTML=prods.map(p=>{
+    const variants=p.variants||[];
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
+    const pills=sortedVars.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const l=v.title==='Default Title'?'Default':v.title;const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="margin:2px;font-size:10px">${l}:${q}</span>`;}).join('');
+    const tp=totalStock===0?'pr':totalStock<10?'pa':'pg';
+    const price=parseFloat(sortedVars[0]?.price||0);
+    return`<tr><td style="font-weight:500">${p.title}</td><td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td><td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td><td class="tm">PKR ${fmt(price)}</td><td style="line-height:1.6">${pills}</td><td><span class="pill ${tp}">${totalStock===0?'Out':totalStock+' units'}</span></td></tr>`;
+  }).join('');
+}
+
+// ═══ DRAG SORTER ═══
+async function loadSorterCollection(){
+  const cat=document.getElementById('sortCat').value;
+  if(!cat){document.getElementById('sortResults').innerHTML='';document.getElementById('sortSts').textContent='Select a collection to start';document.getElementById('applyToShopifyBtn').style.display='none';return;}
+  document.getElementById('sortSts').textContent='Loading...';
+  document.getElementById('sortResults').innerHTML='<div class="ldrow"><span class="si"></span>Loading products...</div>';
+  try{
+    const collId=String(cat).replace('gid://shopify/Collection/','');
+    let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
+    let prods=[];
+    while(url){
+      const d=await shopFetch(url);const batch=d.products||[];prods=prods.concat(batch);
+      if(batch.length<250)url=null;
+      else url='/products.json?collection_id='+collId+'&limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,images';
+    }
+    _sorterProds=prods;
+    document.getElementById('sortCount').textContent=prods.length+' products';
+    document.getElementById('sortSts').textContent='✓ '+prods.length+' products loaded — drag to reorder or Auto-Sort';
+    document.getElementById('applyToShopifyBtn').style.display='block';
+    renderSorterGrid();
+  }catch(e){document.getElementById('sortResults').innerHTML='<div class="nodata">Error: '+e.message+'</div>';}
+}
+function renderSorterGrid(){
+  const el=document.getElementById('sortResults');
+  if(!_sorterProds.length){el.innerHTML='<div class="nodata">No products</div>';return;}
+  el.innerHTML=_sorterProds.map((p,i)=>{
+    const variants=p.variants||[];
+    const img=(p.images&&p.images[0])?p.images[0].src:'';
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const availV=variants.filter(v=>(v.inventory_quantity||0)>0).length;
+    const totalV=variants.length;
+    const sc=totalStock===0?'var(--red)':availV<totalV?'var(--accent)':'var(--green)';
+    const si=totalStock===0?'🔴':availV===totalV?'✅':'⚠️';
+    const pills=variants.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="font-size:9px;margin:1px">${v.title==='Default Title'?'1':v.title}:${q}</span>`;}).join('');
+    return`<div class="sorter-item" draggable="true" data-idx="${i}" ondragstart="sorterDragStart(event,${i})" ondragover="sorterDragOver(event)" ondrop="sorterDrop(event,${i})" ondragend="sorterDragEnd(event)" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:grab;user-select:none;transition:border-color .15s">
+      <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted2);min-width:26px">${String(i+1).padStart(2,'0')}</div>
+      <div style="color:var(--muted2);font-size:20px">⠿</div>
+      <div style="width:52px;height:52px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--surface2)">${img?`<img src="${img}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted2)">📦</div>'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${p.product_type||'—'}</div>
+        <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:2px">${pills}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:18px">${si}</div>
+        <div style="font-family:var(--mono);font-size:12px;color:${sc};font-weight:600">${totalStock}</div>
+        <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">${availV}/${totalV} sizes</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function sorterDragStart(e,idx){_dragSrcIdx=idx;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
+function sorterDragOver(e){e.preventDefault();e.currentTarget.style.borderColor='var(--accent)';}
+function sorterDrop(e,targetIdx){
+  e.preventDefault();e.currentTarget.style.borderColor='';
+  if(_dragSrcIdx===null||_dragSrcIdx===targetIdx)return;
+  const moved=_sorterProds.splice(_dragSrcIdx,1)[0];_sorterProds.splice(targetIdx,0,moved);
+  _dragSrcIdx=null;renderSorterGrid();
+  document.getElementById('sortSts').textContent='✓ Reordered — click Apply to Shopify to save';
+}
+function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style.borderColor='';_dragSrcIdx=null;document.querySelectorAll('.sorter-item').forEach(el=>el.style.borderColor='');}
 function runSort(){
   if(!_sorterProds.length){document.getElementById('sortSts').textContent='Select a collection first';return;}
   const rule=document.getElementById('sortRule').value;
@@ -2324,35 +2411,30 @@ function runSort(){
   _sorterProds.sort((a,b)=>{
     if(rule==='stock_asc')return gT(a)-gT(b);
     if(rule==='variants_desc')return gA(b)-gA(a);
-    if(rule==='avail_desc'){const tA=(a.variants||[]).length,tB=(b.variants||[]).length,aA=gA(a),aB=gA(b),diff=aB-aA;if(diff!==0)return diff;const fA=aA===tA?1:0,fB=aB===tB?1:0;if(fB!==fA)return fB-fA;return gT(b)-gT(a);}
+    if(rule==='avail_desc'){const tA=(a.variants||[]).length,tB=(b.variants||[]).length,aA=gA(a),aB=gA(b),diff=aB-aA;if(diff!==0)return diff;return(aB===tB?1:0)-(aA===tA?1:0)||gT(b)-gT(a);}
     return gT(b)-gT(a);
   });
   renderSorterGrid();
-  document.getElementById('sortSts').textContent='✓ Auto-sorted '+_sorterProds.length+' products — drag to fine-tune, then Apply to Shopify';
+  document.getElementById('sortSts').textContent='✓ Sorted — drag to fine-tune, then Apply to Shopify';
 }
-
 async function applyCollectionSort(){
   const cat=document.getElementById('sortCat').value;
   if(!cat||!_sorterProds.length)return;
   const btn=document.getElementById('applyToShopifyBtn');
   btn.textContent='Applying...';btn.disabled=true;
-  document.getElementById('sortSts').textContent='Applying to Shopify...';
   try{
     const collId=String(cat).replace('gid://shopify/Collection/','');
-    let allCollects=[];
-    let cu='/collects.json?collection_id='+collId+'&limit=250';
-    while(cu){const d=await shopFetch(cu);const b=d.collects||[];allCollects=allCollects.concat(b);if(b.length<250)cu=null;else cu='/collects.json?collection_id='+collId+'&limit=250&since_id='+b[b.length-1].id;}
-    const cm={};allCollects.forEach(col=>cm[String(col.product_id)]=col.id);
+    let allC=[];let cu='/collects.json?collection_id='+collId+'&limit=250';
+    while(cu){const d=await shopFetch(cu);const b=d.collects||[];allC=allC.concat(b);if(b.length<250)cu=null;else cu='/collects.json?collection_id='+collId+'&limit=250&since_id='+b[b.length-1].id;}
+    const cm={};allC.forEach(col=>cm[String(col.product_id)]=col.id);
     let ok=0;
-    for(let i=0;i<_sorterProds.length;i++){
-      const cid=cm[String(_sorterProds[i].id)];
-      if(cid){try{await shopFetch('/collects/'+cid+'.json','PUT',{collect:{id:cid,position:i+1}});ok++;}catch(e){console.log('pos err:',e.message);}}
-    }
+    for(let i=0;i<_sorterProds.length;i++){const cid=cm[String(_sorterProds[i].id)];if(cid){try{await shopFetch('/collects/'+cid+'.json','PUT',{collect:{id:cid,position:i+1}});ok++;}catch(e){}}}
     btn.textContent='✓ Applied!';btn.style.background='var(--green)';
-    document.getElementById('sortSts').textContent=`✓ Done! ${ok}/${_sorterProds.length} products reordered on Shopify.`;
+    document.getElementById('sortSts').textContent=`✓ Done! ${ok}/${_sorterProds.length} reordered on Shopify.`;
     setTimeout(()=>{btn.textContent='✓ Apply to Shopify';btn.disabled=false;},4000);
-  }catch(e){btn.textContent='✗ Error';btn.disabled=false;document.getElementById('sortSts').textContent='Error: '+e.message;}
+  }catch(e){btn.textContent='✗ Error';btn.disabled=false;}
 }
+
 </script>
 </body>
 </html>
