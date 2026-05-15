@@ -471,9 +471,6 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div class="fg"><div class="fl">Category</div>
         <select class="fi" id="sortCat">
           <option value="all">All Products</option>
-          <option value="T-Shirts">T-Shirts</option><option value="Polo">Polo</option>
-          <option value="Pajama">Pajama</option><option value="Jogger Pants">Jogger Pants</option>
-          <option value="Underwear">Underwear</option>
         </select>
       </div>
     </div>
@@ -1989,6 +1986,14 @@ function applyProdFilter(){renderProducts();}
 
 // ═══════════ SORT ═══════════
 function runSort(){
+  // Dynamically populate categories from real product types
+  const sel=document.getElementById('sortCat');
+  if(sel&&allProducts.length>0){
+    const types=[...new Set(allProducts.map(p=>(p.product_type||'').trim()).filter(t=>t))].sort();
+    const current=sel.value;
+    sel.innerHTML='<option value="all">All Products</option>'+
+      types.map(t=>`<option value="${t}"${t===current?' selected':''}>${t}</option>`).join('');
+  }
   if(!allProducts.length){document.getElementById('sortResults').innerHTML='<div class="nodata">Load Shopify data first</div>';return;}
   const rule=document.getElementById('sortRule').value,cat=document.getElementById('sortCat').value;
   let prods=[...allProducts];
