@@ -2019,15 +2019,23 @@ async function searchProducts(){
     try{
       let results=[];
       if(sku){
-        // SKU search — paginate through all products to find matching SKU
-        let skuUrl=`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`;
-        while(skuUrl&&results.length<20){
-          const d=await shopFetch(skuUrl);
-          const prods=d.products||[];
-          const matched=prods.filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
-          results=results.concat(matched);
-          if(prods.length<250)skuUrl=null;
-          else skuUrl=`/products.json?limit=250&status=${status}&since_id=${prods[prods.length-1].id}&fields=id,title,product_type,status,variants,created_at`;
+        // SKU search — use variants endpoint which supports direct SKU lookup
+        try{
+          const vd=await shopFetch(`/variants.json?limit=250&fields=id,sku,product_id,title,inventory_quantity,price`);
+          const matched=(vd.variants||[]).filter(v=>(v.sku||'').toLowerCase().includes(sku));
+          // Get unique product IDs
+          const productIds=[...new Set(matched.map(v=>v.product_id))];
+          // Fetch full product details for each matched product
+          const productFetches=productIds.slice(0,20).map(pid=>
+            shopFetch(`/products/${pid}.json?fields=id,title,product_type,status,variants,created_at`)
+              .then(d=>d.product).catch(()=>null)
+          );
+          const fetched=await Promise.all(productFetches);
+          results=fetched.filter(p=>p&&(status==='all'||p.status===status));
+        }catch(e){
+          // Fallback: search by SKU using product search
+          const d=await shopFetch(`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`);
+          results=(d.products||[]).filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
         }
         if(q)results=results.filter(p=>p.title.toLowerCase().includes(q));
       } else if(q){
