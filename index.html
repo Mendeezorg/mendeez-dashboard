@@ -651,11 +651,13 @@ async function refreshAll(){
 }
 
 // ═══════════ SHOPIFY ═══════════
-async function shopFetch(ep){
+async function shopFetch(ep, method='GET', body=null){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  // Do NOT encode ep — Worker receives it raw and passes directly to Shopify
-  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep;
-  const r=await fetch(workerUrl);
+  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+ep+'&method='+(method||'GET');
+  const opts={method:'POST',headers:{'Content-Type':'application/json'}};
+  // Always POST to worker — worker decides whether to GET or POST to Shopify
+  opts.body=JSON.stringify({shopifyMethod:method||'GET', shopifyBody:body});
+  const r=await fetch(workerUrl,opts);
   if(!r.ok)throw new Error('Shopify proxy error '+r.status);
   return r.json();
 }
@@ -2019,35 +2021,93 @@ async function searchProducts(){
     try{
       let results=[];
       if(sku){
-        // SKU search — use variants endpoint which supports direct SKU lookup
+        // SKU search using GraphQL — the only reliable way to search by SKU in Shopify
         try{
-          const vd=await shopFetch(`/variants.json?limit=250&fields=id,sku,product_id,title,inventory_quantity,price`);
-          const matched=(vd.variants||[]).filter(v=>(v.sku||'').toLowerCase().includes(sku));
-          // Get unique product IDs
-          const productIds=[...new Set(matched.map(v=>v.product_id))];
-          // Fetch full product details for each matched product
-          const productFetches=productIds.slice(0,20).map(pid=>
-            shopFetch(`/products/${pid}.json?fields=id,title,product_type,status,variants,created_at`)
-              .then(d=>d.product).catch(()=>null)
-          );
-          const fetched=await Promise.all(productFetches);
-          results=fetched.filter(p=>p&&(status==='all'||p.status===status));
+          const graphqlQuery={query:`{
+            productVariants(first:20, query:"sku:${sku}") {
+              edges { node {
+                sku inventoryQuantity price title
+                product { id title productType status
+                  variants(first:20){ edges{ node{ title sku inventoryQuantity price }}}
+                }
+              }}
+            }
+          }`};
+          const gd=await shopFetch('/graphql.json', 'POST', graphqlQuery);
+          const edges=(gd.data?.productVariants?.edges)||[];
+          const seen=new Set();
+          edges.forEach(e=>{
+            const prod=e.node?.product;
+            if(prod&&!seen.has(prod.id)){
+              seen.add(prod.id);
+              // Convert GraphQL product to REST format
+              const numId=prod.id.replace('gid://shopify/Product/','');
+              results.push({
+                id:parseInt(numId),
+                title:prod.title,
+                product_type:prod.productType||'',
+                status:prod.status?.toLowerCase()||'active',
+                created_at:new Date().toISOString(),
+                variants:(prod.variants?.edges||[]).map(ve=>({
+                  title:ve.node.title,
+                  sku:ve.node.sku||'',
+                  inventory_quantity:ve.node.inventoryQuantity||0,
+                  price:ve.node.price
+                }))
+              });
+            }
+          });
         }catch(e){
-          // Fallback: search by SKU using product search
-          const d=await shopFetch(`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`);
-          results=(d.products||[]).filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
+          console.log('GraphQL SKU search failed, trying REST fallback:',e.message);
+          // REST fallback — paginate products and filter by SKU
+          let skuUrl=`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`;
+          let pages=0;
+          while(skuUrl&&results.length<10&&pages<5){
+            const d=await shopFetch(skuUrl);
+            const prods=d.products||[];
+            prods.filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku))).forEach(p=>results.push(p));
+            if(prods.length<250)skuUrl=null;
+            else skuUrl=`/products.json?limit=250&status=${status}&since_id=${prods[prods.length-1].id}&fields=id,title,product_type,status,variants,created_at`;
+            pages++;
+          }
         }
         if(q)results=results.filter(p=>p.title.toLowerCase().includes(q));
       } else if(q){
-        // Title search — Shopify ?title= does partial match from start
-        // Fetch multiple pages and filter client-side for best results
-        const d=await shopFetch(`/products.json?limit=250&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`);
-        // Filter client-side to ensure partial match anywhere in title
-        results=(d.products||[]).filter(p=>p.title.toLowerCase().includes(q));
-        // If no results from title param, try broader search
-        if(!results.length){
-          const d2=await shopFetch(`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`);
-          results=(d2.products||[]).filter(p=>p.title.toLowerCase().includes(q));
+        // Title search using GraphQL — supports partial matching anywhere in title
+        try{
+          const graphqlQuery={query:`{
+            products(first:20, query:"title:*${q}* status:${status}") {
+              edges { node {
+                id title productType status createdAt
+                variants(first:20){ edges{ node{ title sku inventoryQuantity price }}}
+              }}
+            }
+          }`};
+          const gd=await shopFetch('/graphql.json','POST',graphqlQuery);
+          const edges=(gd.data?.products?.edges)||[];
+          results=edges.map(e=>{
+            const p=e.node;
+            const numId=p.id.replace('gid://shopify/Product/','');
+            return{
+              id:parseInt(numId),
+              title:p.title,
+              product_type:p.productType||'',
+              status:p.status?.toLowerCase()||'active',
+              created_at:p.createdAt,
+              variants:(p.variants?.edges||[]).map(ve=>({
+                title:ve.node.title,
+                sku:ve.node.sku||'',
+                inventory_quantity:ve.node.inventoryQuantity||0,
+                price:ve.node.price
+              }))
+            };
+          });
+          // Client side filter to ensure match
+          results=results.filter(p=>p.title.toLowerCase().includes(q));
+        }catch(e){
+          console.log('GraphQL title search failed, REST fallback:',e.message);
+          const d=await shopFetch(`/products.json?limit=250&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`);
+          results=(d.products||[]).filter(p=>p.title.toLowerCase().includes(q));
         }
       }
       // Apply stock filter
