@@ -431,7 +431,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <!-- Search + filter bar -->
   <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
-    <input class="tsrch" id="prodSearch" placeholder="Search product name or SKU..." oninput="applyProdFilter()" style="width:260px">
+    <input class="tsrch" id="prodSearch" placeholder="🔍 Search by product name..." oninput="applyProdFilter()" style="width:240px">
+    <input class="tsrch" id="skuSearch" placeholder="🔍 Search by SKU..." oninput="applyProdFilter()" style="width:200px">
     <select class="fi" id="stockFilter" style="width:160px">
       <option value="all">All stock levels</option>
       <option value="out">Out of stock</option>
@@ -468,14 +469,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <option value="avail_desc">All sizes available first (fully stocked on top)</option>
         </select>
       </div>
-      <div class="fg"><div class="fl">Category</div>
+      <div class="fg"><div class="fl">Collection</div>
         <select class="fi" id="sortCat">
-          <option value="all">All Products</option>
+          <option value="all">Loading collections...</option>
         </select>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" onclick="runSort()">▶ Generate Sort Order</button>
+      <button class="btn btn-p btn-sm" onclick="runSort().catch(e=>console.error(e))">▶ Generate Sort Order</button>
       <button class="btn btn-s btn-sm" onclick="copySteps()">Copy Shopify Steps</button>
       <span style="font-size:11px;color:var(--muted);font-family:var(--mono)" id="sortSts"></span>
     </div>
@@ -750,16 +751,51 @@ async function loadShopify(){
     const {from,to}=getRange();
     const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
     ordersData=d.orders||[];
-    const p=await shopFetch('/products.json?limit=250');
-    allProducts=p.products||[];
-    setBadge('s','live',ordersData.length+' orders');
+    // Fetch ALL products with pagination
+    let allProds=[];let pg=1;let more=true;
+    while(more){
+      const pd=await shopFetch(`/products.json?limit=250&page=${pg}`);
+      const batch=pd.products||[];
+      allProds=allProds.concat(batch);
+      if(batch.length<250)more=false;else pg++;
+      if(pg>20)more=false;
+    }
+    allProducts=allProds;
+    setBadge('s','live',ordersData.length+' orders · '+allProducts.length+' products');
     renderProducts();
+    loadCollections();
     loadWeeklyOrders();
   }catch(e){setBadge('s','error','Error');throw e;}
 }
 async function loadProducts(){
-  try{const d=await shopFetch('/products.json?limit=250');allProducts=d.products||[];renderProducts();}
-  catch(e){console.error(e);}
+  try{
+    let all=[];let page=1;let more=true;
+    while(more){
+      const d=await shopFetch(`/products.json?limit=250&page=${page}`);
+      const p=d.products||[];all=all.concat(p);
+      if(p.length<250)more=false;else page++;
+      if(page>20)more=false;
+    }
+    allProducts=all;
+    renderProducts();
+    loadCollections();
+  }catch(e){console.error(e);}
+}
+
+let allCollections=[];
+async function loadCollections(){
+  try{
+    const [r1,r2]=await Promise.all([
+      shopFetch('/custom_collections.json?limit=250'),
+      shopFetch('/smart_collections.json?limit=250')
+    ]);
+    allCollections=[...(r1.custom_collections||[]),...(r2.smart_collections||[])].sort((a,b)=>a.title.localeCompare(b.title));
+    const sel=document.getElementById('sortCat');
+    if(sel){
+      sel.innerHTML='<option value="all">All Products</option>'+
+        allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
+    }
+  }catch(e){console.error('Collections:',e);}
 }
 
 // ═══════════ SHEETS CSV ═══════════
@@ -1736,7 +1772,7 @@ function renderWeeklyTop20(){
   const stockMap={};
   const typeMap={};
   allProducts.forEach(p=>{
-    const stock=(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
+    const stock=(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
     stockMap[p.title]=stock;
     typeMap[p.title]=p.product_type||'—';
   });
@@ -1802,7 +1838,7 @@ function renderNoSaleDiagnosis(){
 
   // Diagnose each product
   const diagnosed=noSale.map(p=>{
-    const stock=(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
+    const stock=(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
     const availVariants=(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
     const totalVariants=(p.variants||[]).length;
     const price=parseFloat((p.variants||[{}])[0]?.price||0);
@@ -1932,11 +1968,13 @@ function renderProducts(){
   const filter=document.getElementById('stockFilter')?.value||'all';
   const status=document.getElementById('prodStatus')?.value||'active';
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
+  const skuQ=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
   let rows=[];
 
   // Group by product — one row per product, show all variants inline
   const filteredProds=allProducts.filter(p=>{
     if(status==='active'&&p.status!=='active')return false;
+    if(skuQ&&!(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(skuQ)))return false;
     // Search matches product title or any variant SKU/title
     if(search){
       const titleMatch=p.title.toLowerCase().includes(search);
@@ -1982,18 +2020,24 @@ function renderProducts(){
   document.getElementById('prodTbl').innerHTML=rows.join('')||'<tr><td colspan="6" class="nodata">No products match filter</td></tr>';
   document.getElementById('prodCount').textContent=filteredProds.length+' products';
 }
-function applyProdFilter(){renderProducts();}
+function applyProdFilter(){
+  const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
+  const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
+  const sf=document.getElementById('stockFilter')?.value||'all';
+  let fp=allProducts.filter(p=>{
+    if(q&&!p.title.toLowerCase().includes(q))return false;
+    if(sku&&!(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)))return false;
+    const tot=(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
+    if(sf==='out'&&tot>0)return false;
+    if(sf==='low'&&(tot===0||tot>10))return false;
+    if(sf==='in'&&tot<=0)return false;
+    return true;
+  });
+  renderProductList(fp);
+}
 
 // ═══════════ SORT ═══════════
-function runSort(){
-  // Dynamically populate categories from real product types
-  const sel=document.getElementById('sortCat');
-  if(sel&&allProducts.length>0){
-    const types=[...new Set(allProducts.map(p=>(p.product_type||'').trim()).filter(t=>t))].sort();
-    const current=sel.value;
-    sel.innerHTML='<option value="all">All Products</option>'+
-      types.map(t=>`<option value="${t}"${t===current?' selected':''}>${t}</option>`).join('');
-  }
+async function runSort(){
   if(!allProducts.length){document.getElementById('sortResults').innerHTML='<div class="nodata">Load Shopify data first</div>';return;}
   const rule=document.getElementById('sortRule').value,cat=document.getElementById('sortCat').value;
   let prods=[...allProducts];
