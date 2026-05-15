@@ -755,8 +755,10 @@ async function loadShopify(){
     const {from,to}=getRange();
     const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
     ordersData=d.orders||[];
-    setBadge('s','live',ordersData.length+' orders · click Products tab to load stock');
+    setBadge('s','live',ordersData.length+' orders');
     loadWeeklyOrders();
+    fetchProductCounts(); // get counts fast without loading all products
+    if(!allCollections.length)loadCollections(); // load collections for catalog sorter
   }catch(e){setBadge('s','error','Error');throw e;}
 }
 async function loadProducts(){
@@ -1975,27 +1977,103 @@ function updateProductCounts(){
   if(el2)el2.textContent=totalSkus.toLocaleString();
 }
 
-async function searchProducts(){
-  const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
-  const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
-  if(!q&&!sku){renderProducts();return;}
-  if(allProducts.length>0){renderProducts();return;}
-  // Search via API if products not loaded
-  const tbl=document.getElementById('prodTbl');
-  if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching...</td></tr>';
+async function fetchProductCounts(){
+  // Get total product and SKU counts without loading all products
+  // Use Shopify count endpoints - very fast single API calls
   try{
+    const [pc, vc] = await Promise.all([
+      shopFetch('/products/count.json?status=active'),
+      shopFetch('/variants/count.json')
+    ]);
+    const el1=document.getElementById('totalProductCount');
+    const el2=document.getElementById('totalSkuCount');
+    if(el1&&pc.count)el1.textContent=pc.count.toLocaleString();
+    if(el2&&vc.count)el2.textContent=vc.count.toLocaleString();
+  }catch(e){console.log('Count fetch:',e.message);}
+}
+
+let _prodSearchTimer=null;
+async function searchProducts(){
+  // Debounce — wait 400ms after user stops typing
+  clearTimeout(_prodSearchTimer);
+  _prodSearchTimer=setTimeout(async()=>{
+    const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
+    const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
     const status=document.getElementById('prodStatus')?.value||'active';
-    let url=q?`/products.json?limit=50&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`
-              :`/products.json?limit=50&status=${status}&fields=id,title,product_type,status,variants,created_at`;
-    const d=await shopFetch(url);
-    let results=d.products||[];
-    if(sku)results=results.filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
-    allProducts=results;
-    updateProductCounts();
-    renderProducts();
-  }catch(e){
-    if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Search error: ${e.message}</td></tr>`;
-  }
+    const filter=document.getElementById('stockFilter')?.value||'all';
+
+    // No search terms — show whatever is loaded or prompt
+    if(!q&&!sku){
+      if(allProducts.length>0){renderProducts();}
+      else{
+        const tbl=document.getElementById('prodTbl');
+        if(tbl)tbl.innerHTML='<tr><td colspan="6" class="nodata">Type a product name or SKU above to search instantly.</td></tr>';
+      }
+      return;
+    }
+
+    // Always search via API for fresh accurate results
+    // (even mid-load, this gives instant results from Shopify directly)
+    const tbl=document.getElementById('prodTbl');
+    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching Shopify...</td></tr>';
+    try{
+      let results=[];
+      if(sku){
+        // SKU search — fetch and filter
+        const d=await shopFetch(`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`);
+        results=(d.products||[]).filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
+        if(q)results=results.filter(p=>p.title.toLowerCase().includes(q));
+      } else {
+        // Title search via Shopify API
+        const d=await shopFetch(`/products.json?limit=50&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`);
+        results=d.products||[];
+      }
+      // Apply stock filter
+      if(filter!=='all'){
+        results=results.filter(p=>{
+          const tot=(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+          if(filter==='out')return tot===0;
+          if(filter==='low')return tot>0&&tot<10;
+          if(filter==='ok')return tot>0;
+          return true;
+        });
+      }
+      // Show results without affecting allProducts loading
+      const countEl=document.getElementById('prodCount');
+      if(countEl)countEl.textContent=results.length+' results';
+      // Render search results directly
+      renderProductRows(results,tbl);
+    }catch(e){
+      if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Search error: ${e.message}</td></tr>`;
+    }
+  },400);
+}
+
+function renderProductRows(prods,tbl){
+  if(!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
+  let rows=[];
+  prods.forEach(p=>{
+    const variants=p.variants||[];
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
+    const varPills=sortedVars.map(v=>{
+      const qty=Math.max(0,v.inventory_quantity||0);
+      const lbl=v.title==='Default Title'?'Default':v.title;
+      const pillCls=qty===0?'pr':qty<5?'pa':qty<10?'po':'pg';
+      return`<span class="pill ${pillCls}" style="margin:2px;font-size:10px" title="SKU: ${v.sku||'—'}">${lbl}: ${qty}</span>`;
+    }).join('');
+    const totalPill=totalStock===0?'pr':totalStock<10?'pa':'pg';
+    const price=parseFloat(sortedVars[0]?.price||0);
+    rows.push(`<tr>
+      <td style="font-weight:500;max-width:220px">${p.title}</td>
+      <td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td>
+      <td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td>
+      <td class="tm">PKR ${fmt(price)}</td>
+      <td style="max-width:400px;line-height:1.6">${varPills}</td>
+      <td><span class="pill ${totalPill}">${totalStock===0?'Out':totalStock+' units'}</span></td>
+    </tr>`);
+  });
+  tbl.innerHTML=rows.join('');
 }
 
 function renderProducts(){
@@ -2322,29 +2400,21 @@ function switchTab(name,el){
   document.getElementById('panel-'+name).classList.add('active');
   el.classList.add('active');
   if(name==='report')buildReport();
-  if(name==='products'||name==='sorter'){
-    if(!allProducts.length&&STORE&&STORE!=='demo'&&TOKEN){
-      // Load products now (lazy load)
-      loadProducts().then(()=>{
-        if(name==='sorter'){
-          const sel=document.getElementById('sortCat');
-          if(sel&&allCollections.length>0){
-            sel.innerHTML='<option value="all">All Products</option>'+
-              allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
-          }
-          runSort().catch(e=>console.error(e));
-        }
-      });
-    } else {
-      if(name==='products')renderProducts();
-      if(name==='sorter'){
-        const sel=document.getElementById('sortCat');
-        if(sel&&allCollections.length>0&&sel.options.length<=1){
-          sel.innerHTML='<option value="all">All Products</option>'+
-            allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
-        }
-        runSort().catch(e=>console.error(e));
-      }
+  if(name==='products'){
+    // Never auto-load all products — just show search prompt
+    const tbl=document.getElementById('prodTbl');
+    if(tbl&&!document.getElementById('prodSearch').value){
+      tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px;font-size:13px">🔍 Search by product name or SKU above to find products instantly.</td></tr>';
+    }
+  }
+  if(name==='sorter'){
+    // Populate collections for catalog sorter
+    const sel=document.getElementById('sortCat');
+    if(sel&&allCollections.length>0&&sel.options.length<=1){
+      sel.innerHTML='<option value="all">All Products</option>'+
+        allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
+    } else if(sel&&allCollections.length===0&&STORE&&STORE!=='demo'&&TOKEN){
+      loadCollections();
     }
   }
 }
