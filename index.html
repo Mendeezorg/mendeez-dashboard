@@ -2327,7 +2327,7 @@ async function applyCollectionSort(){
     let ok=0;
     for(let i=0;i<_sorterProds.length;i++){
       const cid=cm[String(_sorterProds[i].id)];
-      if(cid){try{await shopFetch('/collects/'+cid+'.json','POST',{collect:{id:cid,position:i+1}});ok++;}catch(e){}}
+      if(cid){try{await shopFetch('/collects/'+cid+'.json','PUT',{collect:{id:cid,position:i+1}});ok++;}catch(e){console.log('pos err:',e.message);}}
     }
     btn.textContent='✓ Applied!';btn.style.background='var(--green)';
     document.getElementById('sortSts').textContent=`✓ Done! ${ok}/${_sorterProds.length} products reordered on Shopify.`;
