@@ -2019,14 +2019,28 @@ async function searchProducts(){
     try{
       let results=[];
       if(sku){
-        // SKU search — fetch and filter
-        const d=await shopFetch(`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`);
-        results=(d.products||[]).filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
+        // SKU search — paginate through all products to find matching SKU
+        let skuUrl=`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`;
+        while(skuUrl&&results.length<20){
+          const d=await shopFetch(skuUrl);
+          const prods=d.products||[];
+          const matched=prods.filter(p=>(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(sku)));
+          results=results.concat(matched);
+          if(prods.length<250)skuUrl=null;
+          else skuUrl=`/products.json?limit=250&status=${status}&since_id=${prods[prods.length-1].id}&fields=id,title,product_type,status,variants,created_at`;
+        }
         if(q)results=results.filter(p=>p.title.toLowerCase().includes(q));
-      } else {
-        // Title search via Shopify API
-        const d=await shopFetch(`/products.json?limit=50&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`);
-        results=d.products||[];
+      } else if(q){
+        // Title search — Shopify ?title= does partial match from start
+        // Fetch multiple pages and filter client-side for best results
+        const d=await shopFetch(`/products.json?limit=250&title=${encodeURIComponent(q)}&status=${status}&fields=id,title,product_type,status,variants,created_at`);
+        // Filter client-side to ensure partial match anywhere in title
+        results=(d.products||[]).filter(p=>p.title.toLowerCase().includes(q));
+        // If no results from title param, try broader search
+        if(!results.length){
+          const d2=await shopFetch(`/products.json?limit=250&status=${status}&fields=id,title,product_type,status,variants,created_at`);
+          results=(d2.products||[]).filter(p=>p.title.toLowerCase().includes(q));
+        }
       }
       // Apply stock filter
       if(filter!=='all'){
