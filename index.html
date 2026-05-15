@@ -648,10 +648,9 @@ async function refreshAll(){
 
 // ═══════════ SHOPIFY ═══════════
 async function shopFetch(ep){
-  // Route through Cloudflare Worker proxy to avoid CORS
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  const url=`${WORKER_URL}?store=${encodeURIComponent(STORE)}&token=${encodeURIComponent(TOKEN)}&ep=${encodeURIComponent(ep)}`;
-  const r=await fetch(url);
+  const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep);
+  const r=await fetch(workerUrl);
   if(!r.ok)throw new Error('Shopify proxy error '+r.status);
   return r.json();
 }
@@ -771,7 +770,8 @@ async function loadProducts(){
   try{
     let all=[];let page=1;let more=true;
     while(more){
-      const d=await shopFetch(`/products.json?limit=250&page=${page}`);
+      const ep='/products.json?limit=250&page='+page;
+      const d=await shopFetch(ep);
       const p=d.products||[];all=all.concat(p);
       if(p.length<250)more=false;else page++;
       if(page>20)more=false;
