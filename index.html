@@ -644,7 +644,9 @@ async function shopFetch(ep,method,body){
   const r=await fetch(workerUrl);
   console.log('Worker status:',r.status,'ep:',ep.slice(0,50));
   if(!r.ok){const t=await r.text();console.error('Worker error:',t);throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
-  return r.json();
+  const txt=await r.text();
+  try{return JSON.parse(txt);}
+  catch(e){console.error('JSON parse error:',txt.slice(0,200));throw new Error('Invalid JSON from Shopify');}
 }
 // ═══════════ DATE RANGE STATE ═══════════
 let _preset='today', _customFrom=null, _customTo=null;
