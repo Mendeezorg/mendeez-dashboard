@@ -2231,13 +2231,16 @@ async function runSort(){
   if(cat!=='all'){
     // Fetch products directly from selected collection — no need for allProducts
     try{
-      let collUrl='/collections/'+cat+'/products.json?limit=250&fields=id,title,product_type,status,variants,created_at';
+      // Strip gid prefix if present — REST API needs numeric ID only
+      const collId=String(cat).replace('gid://shopify/Collection/','');
+      // Use /products.json?collection_id= — works for BOTH smart and custom collections
+      let collUrl='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,created_at';
       while(collUrl){
         const d=await shopFetch(collUrl);
         const batch=d.products||[];
         prods=prods.concat(batch);
         if(batch.length<250)collUrl=null;
-        else collUrl='/collections/'+cat+'/products.json?limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,created_at';
+        else collUrl='/products.json?collection_id='+collId+'&limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,created_at';
       }
     }catch(e){sortEl.innerHTML='<div class="nodata">Error: '+e.message+'</div>';return;}
   } else {
