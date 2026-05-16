@@ -651,14 +651,16 @@ async function connectAll(){
 }
 
 async function loadAll(){
-  // Products start immediately — don't wait for orders (they take too long)
-  // Use setTimeout to give the worker a moment before product requests start
-  setTimeout(()=>{loadProducts();loadCollections();fetchProductCounts();},2000);
-  // Orders + sheets load in parallel
+  // Sheets use Google (different server) — run in parallel with Shopify orders
+  // Products/collections use Cloudflare worker — start AFTER orders to avoid overload
   await Promise.allSettled([loadShopify(),fetchSheets()]);
   renderDailyStats();
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+  // Now worker is free — load products sequentially
+  await loadProducts();
+  fetchProductCounts();
+  loadCollections();
 }
 async function refreshAll(){
   if(!STORE&&!SHEET_ID)return;
@@ -867,7 +869,7 @@ async function loadShopify(){
     ordersData=allOrders;
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
-    loadWeeklyOrders();
+    loadWeeklyOrders(); // weekly orders use same worker but low volume
   }catch(e){
     console.error('loadShopify error:',e);
     setBadge('s','error',e.message.slice(0,30));
@@ -1575,8 +1577,6 @@ function processCS(rows){
     }
   }
 
-  setBadge('cs','live',csData.agents.length+' agents · '+currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1));
-
   // ── Detect all available months in sheet ──
   // Scans entire sheet for month CS section headers (e.g. "April CS Data", "May CS Data")
   // Each section boundary = from its header row to the row before the next month header
@@ -1620,9 +1620,9 @@ function processCS(rows){
   if(allCsMonths[currentLabel]){
     csData=JSON.parse(JSON.stringify(allCsMonths[currentLabel]));
   } else {
-    // Fallback: store whatever was parsed
     allCsMonths[currentLabel]=JSON.parse(JSON.stringify(csData));
   }
+  setBadge('cs','live',csData.agents.length+' agents · '+currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1));
 
   // Populate month selector dropdown
   const sel=document.getElementById('csMonthSel');
@@ -1647,7 +1647,7 @@ function processCS(rows){
   // ── Parse cancellation reasons ──
   // Look for rows with patterns like "Wrong Product", "High Price", reason label + count
   csData.cancelReasons=[];
-  for(let i=Math.max(0,sectionStart-120);i<scanEnd;i++){
+  for(let i=Math.max(0,sectionStart-120);i<Math.min(rows.length,sectionStart+400);i++){
     const r=rows[i];const a0=(r[0]||'').trim();const a0l=a0.toLowerCase();
     // Cancellation reason rows typically: [Reason label] [count] ...
     const isCancelSection=(a0l.includes('cancel')||a0l.includes('reason')||a0l.includes('wrong')||a0l.includes('price')||a0l.includes('size')||a0l.includes('cod')||a0l.includes('fake')||a0l.includes('duplicate')||a0l.includes('no answer')||a0l.includes('not interested'));
@@ -1734,7 +1734,6 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
   // Returns a csData-shaped object for the given month section
   const result={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
   const scanStart=Math.max(0,sectionStart-10);
-  const scanEnd=Math.min(rows.length,sectionStart+350);
 
   // Find date column for that month's "Dates" row
   let dateColIdx=-1;
