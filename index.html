@@ -836,7 +836,7 @@ async function reloadShopifyData(){
     document.getElementById('weeklyRange').textContent=rangeLabel();
     document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
     // Re-parse CS sheet for the new month if raw rows are available
-    if(_csRows.length) processCS(_csRows);
+    if(_csRows.length){try{processCS(_csRows);}catch(e){console.warn('processCS error:',e.message);}}
     renderDailyStats();
     renderWeeklyTop20();
     renderNoSaleDiagnosis();
@@ -1582,7 +1582,7 @@ function processCS(rows){
   // Scan for month section headers
   for(let i=0;i<rows.length;i++){
     const rowText=rows[i].join(' ').toLowerCase();
-    for(const mn of monthNames){
+    for(const mn of Object.keys(monthNames)){
       if(rowText.includes(mn)&&(rowText.includes('cs data')||rowText.includes('order status')||rowText.includes('operations data'))){
         const year=rowText.match(/20\d\d/)?.[0]||('20'+currentYear);
         const label=mn.charAt(0).toUpperCase()+mn.slice(1)+' '+year;
