@@ -869,10 +869,12 @@ async function loadShopify(){
 }
 async function loadProducts(){
   try{
+    // You have 3,243 products — need 14 pages. Guard set to 20 to be safe.
+    // fields param keeps responses lean (only what renderProducts needs)
     let allProds=[],sinceId=null,hasMore=true,guard=0;
-    while(hasMore&&guard<10){
+    while(hasMore&&guard<20){
       guard++;
-      let url='/products.json?limit=250';
+      let url='/products.json?limit=250&fields=id,title,product_type,status,variants';
       if(sinceId) url+=`&since_id=${sinceId}`;
       const d=await shopFetch(url);
       const batch=d.products||[];
@@ -881,8 +883,7 @@ async function loadProducts(){
     }
     allProducts=allProds;
     updateProductCounts();
-    // If products tab is active, render immediately
-    if(document.getElementById('panel-products')?.classList.contains('active')) renderProducts(); // will show empty state if no search term
+    if(document.getElementById('panel-products')?.classList.contains('active')) renderProducts();
   }catch(e){console.error('loadProducts:',e);}
 }
 
