@@ -2370,6 +2370,12 @@ window.addEventListener('load',()=>{
     document.getElementById('cfgAds').value=ADS_TAB;
     document.getElementById('cfgCrr').value=CRR_TAB;
     document.getElementById('cfgCS').value=CS_TAB;
+    // Auto-connect: credentials already saved — load dashboard immediately
+    const ov=document.getElementById('setupOverlay');
+    ov.innerHTML='<div class="setup-box" style="text-align:center"><div class="spinner"></div><div style="color:var(--accent);font-size:15px;font-weight:600">Connecting...</div><div style="color:var(--muted);font-size:12px;margin-top:6px">'+STORE+'</div></div>';
+    loadAll().then(()=>{ov.style.display='none';}).catch(e=>{
+      ov.innerHTML='<div class="setup-box"><div style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:10px">Connection failed</div><div style="color:var(--muted);font-size:12px;margin-bottom:20px">'+e.message+'</div><div style="color:var(--muted);font-size:11px;font-family:var(--mono);margin-bottom:20px">Store: '+STORE+'</div><button class="btn btn-s btn-full" onclick="location.reload()">Try Again</button></div>';
+    });
   }
   // Restore manual field values
   if(manualData.stock)document.getElementById('i-stock').value=manualData.stock;
