@@ -291,6 +291,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns MTD</div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-gross">—</div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-net">—</div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
+    <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts MTD · Shopify</div><div class="sv muted" id="s-shopify-discounts">—</div><div class="ssub" id="s-shopify-discounts-sub">Total discounts given</div></div>
   </div>
   <!-- WEEKLY TOP 20 -->
   <div class="sh" style="margin-top:4px">
@@ -757,8 +758,19 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
-    ordersData=d.orders||[];
+    // Fetch ALL orders with since_id pagination
+    let allOrders=[];
+    let ordUrl=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+    while(ordUrl){
+      const d=await shopFetch(ordUrl);
+      const batch=d.orders||[];
+      allOrders=allOrders.concat(batch);
+      if(batch.length<250)ordUrl=null;
+      else ordUrl=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&since_id=${batch[batch.length-1].id}`;
+      if(allOrders.length>5000)ordUrl=null; // safety
+    }
+    ordersData=allOrders;
+    setBadge('s','amber',ordersData.length+' orders loading...');
     // Calculate Shopify returns from refund transactions on orders
     // Sum all refund amounts from order.refunds[].transactions[].amount where kind='refund'
     let returnCount=0, returnValue=0;
@@ -1648,12 +1660,32 @@ function renderDailyStats(){
   }
   // Shopify cards
   if(STORE&&STORE!=='demo'&&TOKEN){
-    const landed=document.getElementById('s-shopify-landed');
     const gross=document.getElementById('s-shopify-gross');
     const net=document.getElementById('s-shopify-net');
-    if(landed){landed.textContent=ords>0?ords:'—';landed.className='sv amber';document.getElementById('s-shopify-landed-sub').textContent='Orders in range';}
-    if(gross){const g=ordersData.reduce((s,o)=>{return s+(o.line_items||[]).reduce((ls,li)=>ls+parseFloat(li.price||0)*parseInt(li.quantity||1),0);},0);gross.textContent=g>0?'PKR '+fmt(g):'—';gross.className='sv amber';document.getElementById('s-shopify-gross-sub').textContent='Before discounts';}
-    if(net){net.textContent=rev>0?'PKR '+fmt(rev):'—';net.className='sv green';document.getElementById('s-shopify-net-sub').textContent='After discounts';}
+    // Gross Sales = total_line_items_price (before any discounts) — matches Shopify analytics
+    if(gross){
+      const g=ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
+      gross.textContent=g>0?'PKR '+fmt(g):'—';
+      gross.className='sv amber';
+      const gs=document.getElementById('s-shopify-gross-sub');
+      if(gs)gs.textContent='Before discounts';
+    }
+    // Net Sales = subtotal_price (after discounts, before shipping) — matches Shopify analytics
+    if(net){
+      const n=ordersData.reduce((s,o)=>s+parseFloat(o.subtotal_price||0),0);
+      net.textContent=n>0?'PKR '+fmt(n):'—';
+      net.className='sv green';
+      const ns=document.getElementById('s-shopify-net-sub');
+      if(ns)ns.textContent='After discounts';
+    }
+    const discEl=document.getElementById('s-shopify-discounts');
+    if(discEl){
+      const disc=ordersData.reduce((s,o)=>s+parseFloat(o.total_discounts||0),0);
+      discEl.textContent=disc>0?'PKR '+fmt(disc):'—';
+      discEl.className=disc>0?'sv orange':'sv muted';
+      const ds=document.getElementById('s-shopify-discounts-sub');
+      if(ds)ds.textContent=disc>0?fmt(ordersData.filter(o=>parseFloat(o.total_discounts||0)>0).length)+' orders discounted':'No discounts';
+    }
   }
 
   renderSpark();
