@@ -878,27 +878,29 @@ async function loadShopify(){
 }
 async function loadProducts(){
   try{
-    // 3,243 products = 14 pages. Guard=20 with retry on error.
-    let allProds=[],sinceId=null,hasMore=true,guard=0,retries=0;
-    while(hasMore&&guard<25){
-      guard++;
-      let url='/products.json?limit=250';
-      if(sinceId) url+=`&since_id=${sinceId}`;
+    // Fetch ALL products using page-based pagination (more reliable than since_id)
+    // since_id can miss products if Shopify returns them out of order
+    let allProds=[],page=1,hasMore=true,retries=0;
+    while(hasMore&&page<=20){
+      const url=`/products.json?limit=250&page=${page}`;
       try{
         const d=await shopFetch(url);
         const batch=d.products||[];
+        if(batch.length===0){hasMore=false;break;}
         allProds=allProds.concat(batch);
         retries=0;
-        if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
-        // Update count progressively so user sees progress
-        if(allProds.length%500===0||!hasMore){allProducts=[...allProds];updateProductCounts();}
-        // Small delay every 5 pages to avoid worker rate limit
-        if(guard%5===0&&hasMore)await new Promise(r=>setTimeout(r,500));
+        if(batch.length<250){hasMore=false;}
+        else{page++;}
+        // Update count progressively
+        allProducts=[...allProds];
+        updateProductCounts();
+        // Pause every 4 pages to avoid worker rate limit
+        if(page%4===1&&hasMore)await new Promise(r=>setTimeout(r,600));
       }catch(pageErr){
-        console.warn('loadProducts page error:',pageErr.message,'retrying...');
+        console.warn('loadProducts page',page,'error:',pageErr.message);
         retries++;
-        if(retries>=3){console.error('loadProducts: too many retries at',allProds.length,'products');hasMore=false;}
-        else{await new Promise(r=>setTimeout(r,2000));guard--;} // wait 2s then retry
+        if(retries>=3){console.error('loadProducts gave up at',allProds.length,'products');hasMore=false;}
+        else{await new Promise(r=>setTimeout(r,2500));} // wait then retry same page
       }
     }
     allProducts=allProds;
@@ -1462,136 +1464,6 @@ function processCS(rows){
     }
   }
   // If no month label found at all, start from row 0 (graceful fallback)
-
-  // ── STEP 2: Within the current month section, find the Dates row ──
-  // The Dates row looks like: [..., "Dates", "1", "2", "3", ... "31", "Total"]
-  // or: ["Dates", "1", "2", ...]
-  let dateColIdx=-1;
-  for(let i=sectionStart;i<Math.min(sectionStart+60,rows.length);i++){
-    const r=rows[i];
-    const joined=r.join('|');
-    // Look for a row that has "Dates" and sequential numbers 1..5
-    if((r[0]==='Dates'||r[1]==='Dates'||r[8]==='Dates'||r[9]==='Dates')){
-      const datesPos=r.findIndex(c=>c.trim()==='Dates');
-      // Today's column is datesPos + todayDay
-      dateColIdx=datesPos+todayDay;
-      break;
-    }
-    // Also match pattern where cells are "1","2","3" sequentially after a label
-    if(r[2]==='1'&&r[3]==='2'&&r[4]==='3'){
-      dateColIdx=2+(todayDay-1);
-      break;
-    }
-  }
-
-  // ── STEP 3: Helper — get the Total column (last numeric cell) ──
-  const getTotCol=(row)=>{
-    // The Total column label exists — find it, or fall back to last numeric
-    const ti=row.findIndex(c=>c.trim().toLowerCase()==='total');
-    if(ti>0)return ti;
-    for(let k=row.length-1;k>=0;k--){if(row[k]&&row[k].trim()&&!isNaN(parseFloat(row[k].replace(/,/g,''))))return k;}
-    return row.length-1;
-  };
-
-  // ── STEP 4: Scan from sectionStart onwards for agents, EWH, order status ──
-  let i=sectionStart;
-  // We'll also capture the ORDER STATUS from the current month's section.
-  // Order Status rows appear BEFORE the CS section label in the sheet,
-  // so we also scan a window before sectionStart for "Landed MTD" etc.
-  // But actually the Landed MTD for May is the one right after "Operations Data For May"
-  // which is close to but before the CS section. Let's scan a wider range.
-  const scanStart=Math.max(0,sectionStart-5);
-  const scanEnd=sectionEnd||Math.min(rows.length,sectionStart+600);
-
-  // Track if we're inside current month's agent section
-  let inCurrentSection=false;
-
-  for(let i=scanStart;i<scanEnd;i++){
-    const r=rows[i];
-    const a0=(r[0]||'').trim();
-    const a0l=a0.toLowerCase();
-
-    // Detect when we enter the current month's section
-    const rowText=rows[i].join(' ').toLowerCase();
-    const matchesCurrent=(
-      rowText.includes(currentMonth)&&(rowText.includes('cs data')||rowText.includes('cs')||rowText.includes('26'))
-    )||(rowText.includes(currentMonthShort)&&rowText.includes('26'));
-    if(matchesCurrent&&i>=sectionStart-5){inCurrentSection=true;}
-
-    // Order Status rows — read from current month's "Operations Data For [Month]" section
-    // These rows have the pattern: "Landed MTD", value in col 3 (No Of Orders) or col 4 (Achieved Value)
-    const isOrderSection=rowText.includes('operations data for '+currentMonth)||rowText.includes('ecom mendeez')||rowText.includes('order status');
-    if(a0l.includes('landed mtd')){csData.orderStatus.landed=nc(r[4]);csData.orderStatus.landedVal=nc(r[4]);}
-    if(a0l.includes('total dispach')||a0l.includes('total dispatch')){csData.orderStatus.dispatched=nc(r[4]);}
-    if(a0l.includes('delivered to customer')){csData.orderStatus.delivered=nc(r[4]);}
-    if(a0l.includes('pending orders')){csData.orderStatus.pending=nc(r[3]);}
-    if(inCurrentSection){
-      if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){
-        csData.orderStatus.cancelMTD=nc(r[3]);
-        csData.orderStatus.cancelMTDVal=nc(r[4]);
-        csData.orderStatus.cancel=nc(r[3]);
-      }
-      if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){
-        csData.orderStatus.cancelCF=nc(r[3]);
-        csData.orderStatus.cancelCFVal=nc(r[4]);
-      }
-      if(a0l.includes('mtd returns')&&!a0l.includes('cf')){
-        csData.orderStatus.returnsMTD=nc(r[3]);
-        csData.orderStatus.returnsMTDVal=nc(r[4]);
-        csData.orderStatus.returns=nc(r[3]);
-      }
-      if(a0l.includes('cf returns')){
-        csData.orderStatus.returnsCF=nc(r[3]);
-        csData.orderStatus.returnsCFVal=nc(r[4]);
-      }
-    }
-
-    // Only read agent + EWH data from WITHIN the current month section
-    if(!inCurrentSection)continue;
-
-    // Agent block
-    if(a0l.includes('agent')||a0l.includes('nimra')||a0l.includes('abdullah')){
-      const agentName=a0;
-      const agentData={name:agentName,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
-      let j=i;
-      while(j<scanEnd&&j<i+8){
-        const row=rows[j];
-        const metric=((row[1]||row[0])||'').toLowerCase().trim();
-        const totCol=getTotCol(row);
-        const totVal=nc(row[totCol]);
-        const todayVal=dateColIdx>0&&dateColIdx<row.length?nc(row[dateColIdx]):0;
-        if(metric.includes('chat')){agentData.chats=totVal;agentData.todayChats=todayVal;}
-        else if(metric.includes('outbound')||metric.includes('out bound')){agentData.outbound=totVal;agentData.todayOut=todayVal;}
-        else if(metric.includes('inbound')){agentData.inbound=totVal;}
-        else if(metric.includes('r/ return')||metric.includes('r/return')){agentData.returns=totVal;}
-        else if(metric.includes('complaint')){agentData.complaints=totVal;}
-        j++;
-        if(j<scanEnd){const nxt=(rows[j][0]||'').trim();
-          if((nxt.toLowerCase().includes('agent')&&nxt!==a0)||nxt.toLowerCase().includes('ewh')||nxt.toLowerCase().includes('e.com'))break;}
-      }
-      if(agentData.chats>0||agentData.outbound>0||agentData.inbound>0)csData.agents.push(agentData);
-      i=j-1;continue;
-    }
-
-    // EWH / Warehouse — same logic, only from current month section
-    if(a0l.includes('e.com wh')||a0l==='ewh'||(a0l===''&&(r[1]||'').toLowerCase().includes('e.com wh'))){
-      // The EWH summary row is: [blank | "E.COM WH" | Exch Count | Total Dispatch | Total Disp unit | Rtrn Units]
-      // followed by a data row: [blank | blank | value | value | value | value]
-      const dataRow=rows[i+1]||[];
-      csData.ewh.exch=nc(dataRow[2]||r[2]);
-      csData.ewh.dispVal=nc(dataRow[3]||r[3]);
-      csData.ewh.dispUnits=nc(dataRow[4]||r[4]);
-      csData.ewh.returnUnits=nc(dataRow[5]||r[5]);
-      i++;continue;
-    }
-    // Also handle the inline EWH row: [blank | value | "5,772,966" | 2904 | 137]
-    if(a0===''&&(r[1]||'').trim()&&!isNaN(parseFloat((r[1]||'').replace(/,/g,'')))&&nc(r[3])>100){
-      if(!csData.ewh.dispVal){
-        csData.ewh.exch=nc(r[1]);csData.ewh.dispVal=nc(r[2]);
-        csData.ewh.dispUnits=nc(r[3]);csData.ewh.returnUnits=nc(r[4]);
-      }
-    }
-  }
 
   // ── Detect all available months in sheet ──
   // Scans entire sheet for month CS section headers (e.g. "April CS Data", "May CS Data")
