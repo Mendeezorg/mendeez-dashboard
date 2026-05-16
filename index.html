@@ -900,9 +900,14 @@ async function loadProducts(){
         retries=0;
         if(batch.length<250){hasMore=false;}
         else{page++;}
-        // Update count progressively
+        // Update count progressively and re-render if tab is active or search is typed
         allProducts=[...allProds];
         updateProductCounts();
+        const _s=(document.getElementById('prodSearch')?.value||'').trim();
+        const _sk=(document.getElementById('skuSearch')?.value||'').trim();
+        if(_s||_sk||document.getElementById('panel-products')?.classList.contains('active')){
+          renderProducts();
+        }
         // Pause every 4 pages to avoid worker rate limit
         if(page%4===1&&hasMore)await new Promise(r=>setTimeout(r,600));
       }catch(pageErr){
@@ -1692,9 +1697,19 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     if(anyCol.includes('mtd returns')&&!anyCol.includes('cf')){result.orderStatus.returnsMTD=nc(r[3]);result.orderStatus.returnsMTDVal=nc(r[4]);result.orderStatus.returns=nc(r[3]);}
     if(anyCol.includes('cf returns')){result.orderStatus.returnsCF=nc(r[3]);result.orderStatus.returnsCFVal=nc(r[4]);}
 
-    // Agents — name can be in ANY column (sheet has it in col 7/H)
-    if(firstCellL.includes('agent')||firstCellL.includes('nimra')||firstCellL.includes('abdullah')){
-      const agentData={name:firstCell,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
+    // Agents — agent name can be in ANY column (sheet often has it in col 7/H)
+    // Check all cells in the row for agent-like names, not just first cell
+    const agentNameCell=r.find(c=>{
+      const cl=(c||'').toLowerCase().trim();
+      return cl.includes('agent')||cl.includes('namra')||cl.includes('nimra')||cl.includes('abdullah')||
+             cl.includes('hira')||cl.includes('sana')||cl.includes('fatima')||
+             cl.includes('ali')||cl.includes('usman')||cl.includes('zara')||
+             cl.includes('sara')||cl.includes('ayesha')||cl.includes('maria');
+    })||'';
+    const isAgent=agentNameCell!==''||(firstCellL.includes('agent')&&firstCellL.length<40);
+    if(isAgent){
+      const agentDisplayName=agentNameCell||firstCell;
+      const agentData={name:agentDisplayName,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
       let j=i;
       while(j<scanEnd&&j<i+8){
         const row=rows[j];
@@ -1710,7 +1725,12 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
         else if(metric.includes('r/ return')||metric.includes('r/return')){agentData.returns=totVal;}
         else if(metric.includes('complaint')){agentData.complaints=totVal;}
         j++;
-        if(j<scanEnd){const nxt=(rows[j][0]||'').trim();if((nxt.toLowerCase().includes('agent')&&nxt!==a0)||nxt.toLowerCase().includes('ewh')||nxt.toLowerCase().includes('e.com'))break;}
+        if(j<scanEnd){
+          const nxtRow=rows[j];
+          const nxtHasAgent=nxtRow.some(c=>{const cl=(c||'').toLowerCase().trim();return cl.includes('agent')||cl.includes('nimra')||cl.includes('abdullah')||cl.includes('hira')||cl.includes('sana')||cl.includes('fatima')||cl.includes('ali')||cl.includes('usman')||cl.includes('sara')||cl.includes('ayesha')||cl.includes('maria');});
+          const nxt=(nxtRow[0]||'').trim().toLowerCase();
+          if((nxtHasAgent&&j>i)||nxt.includes('ewh')||nxt.includes('e.com'))break;
+        }
       }
       if(agentData.chats>0||agentData.outbound>0||agentData.inbound>0)result.agents.push(agentData);
       i=j-1;continue;
@@ -2257,19 +2277,10 @@ function renderProducts(){
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
   const skuSearch=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
 
-  // Show placeholder only while products are still loading; once loaded, show all
-  if(!search&&!skuSearch&&allProducts.length===0){
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px">⏳ Products still loading... please wait a moment</td></tr>`;
-    document.getElementById('prodCount').textContent=allProducts.length>0?allProducts.length+' products loaded':'';
-    return;
-  }
-  // If products haven't loaded yet — check API count to show accurate message
+  // If nothing loaded at all yet, show spinner
   if(allProducts.length===0){
-    const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
-    const msg=apiCount>0
-      ?`⏳ ${apiCount.toLocaleString()} products found on Shopify but still downloading... please wait and try again`
-      :'⏳ Products still loading... please wait and try again';
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px">${msg}</td></tr>`;
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>Products loading from Shopify...</td></tr>`;
+    document.getElementById('prodCount').textContent='';
     return;
   }
 
@@ -2348,8 +2359,11 @@ function renderProducts(){
     </tr>`);
   });
 
-  document.getElementById('prodTbl').innerHTML=rows.join('')||'<tr><td colspan="3" class="nodata">No products match filter</td></tr>';
-  document.getElementById('prodCount').textContent=filteredProds.length+' products';
+  const apiTotal=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
+  const stillLoading=apiTotal>0&&allProducts.length<apiTotal;
+  const loadingRow=stillLoading?`<tr><td colspan="3" style="text-align:center;padding:12px;font-family:var(--mono);font-size:11px;color:var(--muted)"><span class="si"></span>Downloading more… ${allProducts.length.toLocaleString()} of ${apiTotal.toLocaleString()} loaded</td></tr>`:'';
+  document.getElementById('prodTbl').innerHTML=(rows.join('')||'<tr><td colspan="3" class="nodata">No products match filter</td></tr>')+loadingRow;
+  document.getElementById('prodCount').textContent=filteredProds.length+' products'+(stillLoading?' (partial)':'');
 }
 function applyProdFilter(){renderProducts();}
 
