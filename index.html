@@ -835,6 +835,8 @@ async function reloadShopifyData(){
     document.getElementById('todayDate').textContent=rangeLabel();
     document.getElementById('weeklyRange').textContent=rangeLabel();
     document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
+    // Re-parse CS sheet for the new month if raw rows are available
+    if(_csRows.length) processCS(_csRows);
     renderDailyStats();
     renderWeeklyTop20();
     renderNoSaleDiagnosis();
@@ -880,7 +882,7 @@ async function loadProducts(){
     allProducts=allProds;
     updateProductCounts();
     // If products tab is active, render immediately
-    if(document.getElementById('panel-products')?.classList.contains('active')) renderProducts();
+    if(document.getElementById('panel-products')?.classList.contains('active')) renderProducts(); // will show empty state if no search term
   }catch(e){console.error('loadProducts:',e);}
 }
 
@@ -1400,8 +1402,10 @@ function processCS(rows){
   _csRows=rows; // save for switchCSMonth
   const now=new Date();
   const todayDay=now.getDate();
-  const currentMonth=now.toLocaleString('en-US',{month:'long'}).toLowerCase(); // e.g. "may"
-  const currentMonthShort=now.toLocaleString('en-US',{month:'short'}).toLowerCase(); // e.g. "may"
+  // Use selected date range month so previous month data loads correctly
+  const rangeDate=getRange().from;
+  const currentMonth=rangeDate.toLocaleString('en-US',{month:'long'}).toLowerCase();
+  const currentMonthShort=rangeDate.toLocaleString('en-US',{month:'short'}).toLowerCase();
   const currentYear=String(now.getFullYear()).slice(-2); // "26"
   csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
   let mtdProdRow=-1;
@@ -1501,23 +1505,25 @@ function processCS(rows){
     if(a0l.includes('total dispach')||a0l.includes('total dispatch')){csData.orderStatus.dispatched=nc(r[4]);}
     if(a0l.includes('delivered to customer')){csData.orderStatus.delivered=nc(r[4]);}
     if(a0l.includes('pending orders')){csData.orderStatus.pending=nc(r[3]);}
-    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){
-      csData.orderStatus.cancelMTD=nc(r[3]);  // count
-      csData.orderStatus.cancelMTDVal=nc(r[4]); // PKR value
-      csData.orderStatus.cancel=nc(r[3]);
-    }
-    if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){
-      csData.orderStatus.cancelCF=nc(r[3]);
-      csData.orderStatus.cancelCFVal=nc(r[4]);
-    }
-    if(a0l.includes('mtd returns')&&!a0l.includes('cf')){
-      csData.orderStatus.returnsMTD=nc(r[3]);
-      csData.orderStatus.returnsMTDVal=nc(r[4]);
-      csData.orderStatus.returns=nc(r[3]);
-    }
-    if(a0l.includes('cf returns')){
-      csData.orderStatus.returnsCF=nc(r[3]);
-      csData.orderStatus.returnsCFVal=nc(r[4]);
+    if(inCurrentSection){
+      if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){
+        csData.orderStatus.cancelMTD=nc(r[3]);
+        csData.orderStatus.cancelMTDVal=nc(r[4]);
+        csData.orderStatus.cancel=nc(r[3]);
+      }
+      if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){
+        csData.orderStatus.cancelCF=nc(r[3]);
+        csData.orderStatus.cancelCFVal=nc(r[4]);
+      }
+      if(a0l.includes('mtd returns')&&!a0l.includes('cf')){
+        csData.orderStatus.returnsMTD=nc(r[3]);
+        csData.orderStatus.returnsMTDVal=nc(r[4]);
+        csData.orderStatus.returns=nc(r[3]);
+      }
+      if(a0l.includes('cf returns')){
+        csData.orderStatus.returnsCF=nc(r[3]);
+        csData.orderStatus.returnsCFVal=nc(r[4]);
+      }
     }
 
     // Only read agent + EWH data from WITHIN the current month section
@@ -2316,6 +2322,14 @@ function renderProducts(){
   const status=document.getElementById('prodStatus')?.value||'active';
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
   const skuSearch=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
+
+  // Show empty state when nothing typed — user must search to see products
+  if(!search&&!skuSearch){
+    document.getElementById('prodTbl').innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU above to search</td></tr>';
+    document.getElementById('prodCount').textContent='';
+    return;
+  }
+
   let rows=[];
 
   // Group by product — one row per product, show all variants inline
@@ -2622,7 +2636,8 @@ function loadDemo(){
     ]
   };
   setBadge('s','live','87 orders (demo)');
-  renderDailyStats();renderProducts();renderWeeklyTop20();renderNoSaleDiagnosis();
+  renderDailyStats();renderWeeklyTop20();renderNoSaleDiagnosis();
+  // renderProducts() intentionally not called here — user must type to search
   // Fetch REAL sheet data — Ads, Courier, CS don't need Shopify credentials
   document.getElementById('lastUpd').textContent='Fetching sheet data...';
   fetchSheets().then(()=>{
@@ -2855,34 +2870,12 @@ function updateProductCounts(){
 }
 
 // ═══ SEARCH PRODUCTS ═══
-async function searchProducts(){
+function searchProducts(){
+  // Search locally from already-loaded allProducts — fast and works offline
   clearTimeout(_searchTimer);
-  _searchTimer=setTimeout(async()=>{
-    const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
-    const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
-    const status=document.getElementById('prodStatus')?.value||'active';
-    const tbl=document.getElementById('prodTbl');
-    if(!q&&!sku){if(tbl)tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU to search instantly</td></tr>';return;}
-    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching...</td></tr>';
-    try{
-      let results=[];
-      if(sku){
-        const gq={query:`{productVariants(first:20,query:"sku:${sku}"){edges{node{sku product{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}}`};
-        const gd=await shopFetch('/graphql.json','POST',gq);
-        const edges=(gd.data?.productVariants?.edges)||[];
-        const seen=new Set();
-        edges.forEach(e=>{const p=e.node?.product;if(p&&!seen.has(p.id)){seen.add(p.id);results.push({id:parseInt(p.id.replace('gid://shopify/Product/','')),title:p.title,product_type:p.productType||'',status:(p.status||'').toLowerCase(),variants:(p.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))});}});
-      } else {
-        const gq={query:`{products(first:20,query:"title:*${q}* status:${status}"){edges{node{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}`};
-        const gd=await shopFetch('/graphql.json','POST',gq);
-        results=(gd.data?.products?.edges||[]).map(e=>{const p=e.node;return{id:parseInt(p.id.replace('gid://shopify/Product/','')),title:p.title,product_type:p.productType||'',status:(p.status||'').toLowerCase(),variants:(p.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))};}).filter(p=>p.title.toLowerCase().includes(q));
-      }
-      const ce=document.getElementById('prodCount');if(ce)ce.textContent=results.length+' results';
-      renderProductRows(results,tbl);
-    }catch(e){if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Error: ${e.message}</td></tr>`;}
-  },400);
+  _searchTimer=setTimeout(()=>renderProducts(),200);
 }
-function applyProdFilter(){searchProducts();}
+function applyProdFilter(){renderProducts();}
 function renderProductRows(prods,tbl){
   if(!prods||!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
   tbl.innerHTML=prods.map(p=>{
