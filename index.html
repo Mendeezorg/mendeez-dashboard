@@ -761,13 +761,32 @@ async function loadShopify(){
     const {from,to}=getRange();
     const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
     ordersData=d.orders||[];
-    // Calculate Shopify returns from refunded orders
-    window._shopifyReturns=ordersData.filter(o=>o.financial_status==='refunded'||o.financial_status==='partially_refunded'||o.refunds?.length>0).length;
-    window._shopifyReturnValue=ordersData.reduce((s,o)=>{
-      return s+(o.refunds||[]).reduce((rs,r)=>{
-        return rs+(r.transactions||[]).reduce((ts,t)=>ts+parseFloat(t.amount||0),0);
-      },0);
-    },0);
+    // Calculate Shopify returns from refund transactions on orders
+    // Sum all refund amounts from order.refunds[].transactions[].amount where kind='refund'
+    let returnCount=0, returnValue=0;
+    ordersData.forEach(o=>{
+      const refunds=o.refunds||[];
+      if(refunds.length>0){
+        returnCount++;
+        refunds.forEach(ref=>{
+          (ref.transactions||[]).forEach(t=>{
+            if(t.kind==='refund'||t.kind==='suggested_refund'){
+              returnValue+=parseFloat(t.amount||0);
+            }
+          });
+          // Also count refund line items value
+          (ref.refund_line_items||[]).forEach(rli=>{
+            returnValue+=parseFloat(rli.subtotal||0);
+          });
+        });
+      }
+    });
+    // If no refund transactions found but orders have refunds, use order subtotal
+    if(returnCount>0&&returnValue===0){
+      returnValue=ordersData.filter(o=>(o.refunds||[]).length>0).reduce((s,o)=>s+parseFloat(o.total_price||0),0);
+    }
+    window._shopifyReturns=returnCount;
+    window._shopifyReturnValue=returnValue;
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
     fetchProductCounts();
@@ -1370,9 +1389,9 @@ function processCS(rows){
     // Order Status rows — read from current month's "Operations Data For [Month]" section
     // These rows have the pattern: "Landed MTD", value in col 3 (No Of Orders) or col 4 (Achieved Value)
     const isOrderSection=rowText.includes('operations data for '+currentMonth)||rowText.includes('ecom mendeez')||rowText.includes('order status');
-    if(a0l.includes('landed mtd')&&i>=sectionStart-80){csData.orderStatus.landed=nc(r[3]);csData.orderStatus.landedVal=nc(r[4]);}
-    if((a0l.includes('total dispach')||a0l.includes('total dispatch'))&&i>=sectionStart-80){csData.orderStatus.dispatched=nc(r[3]);}
-    if(a0l.includes('delivered to customer')&&i>=sectionStart-80){csData.orderStatus.delivered=nc(r[3]);}
+    if(a0l.includes('landed mtd')){csData.orderStatus.landed=nc(r[4]);csData.orderStatus.landedVal=nc(r[4]);}
+    if(a0l.includes('total dispach')||a0l.includes('total dispatch')){csData.orderStatus.dispatched=nc(r[4]);}
+    if(a0l.includes('delivered to customer')){csData.orderStatus.delivered=nc(r[4]);}
     if(a0l.includes('pending orders')){csData.orderStatus.pending=nc(r[3]);}
     if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){csData.orderStatus.cancelMTD=nc(r[3]);csData.orderStatus.cancel=nc(r[3]);}
     if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){csData.orderStatus.cancelCF=nc(r[3]);}
@@ -1610,9 +1629,9 @@ function renderDailyStats(){
   if(retEl){
     const ret=window._shopifyReturns||0;
     const retVal=window._shopifyReturnValue||0;
-    retEl.textContent=ret>0?ret:'—';
-    retEl.className=ret>0?'sv red':'sv muted';
-    if(retSub)retSub.textContent=ret>0?'PKR '+fmt(retVal)+' returned':'No returns';
+    retEl.textContent=retVal>0?'PKR '+fmt(retVal):'—';
+    retEl.className=retVal>0?'sv red':'sv muted';
+    if(retSub)retSub.textContent=ret>0?ret+' orders refunded':'No returns';
   }
   // Shopify cards
   if(STORE&&STORE!=='demo'&&TOKEN){
@@ -2632,28 +2651,31 @@ async function loadCollections(){
 
 function switchOverviewMonth(){
   const sel=document.getElementById('overviewMonthSel');
-  const val=sel?.value||'current';
-  const now=new Date();
-  if(val==='previous'){
-    // Set date range to previous month
-    const prev=new Date(now.getFullYear(), now.getMonth()-1, 1);
-    const prevEnd=new Date(now.getFullYear(), now.getMonth(), 0);
-    _preset='custom';
-    _customFrom=prev.toISOString().split('T')[0]+'T00:00:00';
-    _customTo=prevEnd.toISOString().split('T')[0]+'T23:59:59';
-    // Also switch CS to previous month
-    const csSel=document.getElementById('csMonthSel');
-    if(csSel&&csSel.options.length>1) csSel.selectedIndex=1;
-    switchCSMonth();
-  } else {
-    // Current month
-    _preset='mtd';
-    _customFrom=null;_customTo=null;
-    const csSel=document.getElementById('csMonthSel');
-    if(csSel) csSel.selectedIndex=0;
-    switchCSMonth();
+  const val=sel?.value||'';
+  if(!val)return;
+  
+  // Sync CS month selector
+  const csSel=document.getElementById('csMonthSel');
+  if(csSel){
+    const opt=Array.from(csSel.options).find(o=>o.value===val);
+    if(opt){opt.selected=true;switchCSMonth();}
   }
-  document.getElementById('todayDate').textContent=rangeLabel();
+  
+  // Parse month/year from label e.g. "May 2026"
+  const parts=val.split(' ');
+  const monthName=parts[0]?.toLowerCase();
+  const year=parseInt(parts[1])||new Date().getFullYear();
+  const monthIdx=['january','february','march','april','may','june','july','august','september','october','november','december'].indexOf(monthName);
+  
+  if(monthIdx>=0){
+    const from=new Date(year,monthIdx,1);
+    const to=new Date(year,monthIdx+1,0,23,59,59);
+    _preset='custom';
+    _customFrom=from.toISOString().split('T')[0]+'T00:00:00';
+    _customTo=to.toISOString().split('T')[0]+'T23:59:59';
+  }
+  
+  document.getElementById('todayDate').textContent=val;
   if(STORE&&STORE!=='demo'&&TOKEN) reloadShopifyData();
   else renderDailyStats();
 }
