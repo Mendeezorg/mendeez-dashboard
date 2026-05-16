@@ -280,19 +280,17 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <div id="alertsZone"></div>
   <div class="sg" id="statGrid">
-    <div class="sc"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div></div>
-    <div class="sc"><div class="sl">Total Orders</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Total Ad Spend</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div></div>
-    <div class="sc"><div class="sl">Total Dispatched</div><div class="sv shimmer" id="s-disp" style="height:26px;width:50%"></div></div>
-    <div class="sc"><div class="sl">Total Delivered</div><div class="sv shimmer" id="s-delivered" style="height:26px;width:50%"></div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="s-cancel-mtd" style="height:26px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="s-cancel-cf" style="height:26px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="s-returns-mtd" style="height:26px;width:45%"></div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="s-returns-cf" style="height:26px;width:45%"></div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns</div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refunded orders</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Landed Orders</div><div class="sv muted" id="s-shopify-landed">—</div><div class="ssub" id="s-shopify-landed-sub">Connect Shopify</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Gross Sales</div><div class="sv muted" id="s-shopify-gross">—</div><div class="ssub" id="s-shopify-gross-sub">Connect Shopify</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Net Sales</div><div class="sv muted" id="s-shopify-net">—</div><div class="ssub" id="s-shopify-net-sub">Connect Shopify</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue · Shopify</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div><div class="ssub">Net after discounts</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders · Shopify</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div><div class="ssub">Orders in selected range</div></div>
+    <div class="sc"><div class="sl">Total Ad Spend · Ads Sheet</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div><div class="ssub">Think Spendin PW 26</div></div>
+    <div class="sc"><div class="sl">Total Delivered · Perf Report</div><div class="sv shimmer" id="s-delivered" style="height:26px;width:50%"></div><div class="ssub">Achieved Value PKR</div></div>
+    <div class="sc"><div class="sl">Cancellations MTD · Perf Report</div><div class="sv shimmer" id="s-cancel-mtd" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Cancellations CF · Perf Report</div><div class="sv shimmer" id="s-cancel-cf" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns MTD · Perf Report</div><div class="sv shimmer" id="s-returns-mtd" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns CF · Perf Report</div><div class="sv shimmer" id="s-returns-cf" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns MTD</div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-gross">—</div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-net">—</div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
   </div>
   <!-- WEEKLY TOP 20 -->
   <div class="sh" style="margin-top:4px">
@@ -1393,10 +1391,24 @@ function processCS(rows){
     if(a0l.includes('total dispach')||a0l.includes('total dispatch')){csData.orderStatus.dispatched=nc(r[4]);}
     if(a0l.includes('delivered to customer')){csData.orderStatus.delivered=nc(r[4]);}
     if(a0l.includes('pending orders')){csData.orderStatus.pending=nc(r[3]);}
-    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){csData.orderStatus.cancelMTD=nc(r[3]);csData.orderStatus.cancel=nc(r[3]);}
-    if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){csData.orderStatus.cancelCF=nc(r[3]);}
-    if(a0l.includes('mtd returns')&&!a0l.includes('cf')){csData.orderStatus.returnsMTD=nc(r[3]);csData.orderStatus.returns=nc(r[3]);}
-    if(a0l.includes('cf returns')){csData.orderStatus.returnsCF=nc(r[3]);}
+    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){
+      csData.orderStatus.cancelMTD=nc(r[3]);  // count
+      csData.orderStatus.cancelMTDVal=nc(r[4]); // PKR value
+      csData.orderStatus.cancel=nc(r[3]);
+    }
+    if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){
+      csData.orderStatus.cancelCF=nc(r[3]);
+      csData.orderStatus.cancelCFVal=nc(r[4]);
+    }
+    if(a0l.includes('mtd returns')&&!a0l.includes('cf')){
+      csData.orderStatus.returnsMTD=nc(r[3]);
+      csData.orderStatus.returnsMTDVal=nc(r[4]);
+      csData.orderStatus.returns=nc(r[3]);
+    }
+    if(a0l.includes('cf returns')){
+      csData.orderStatus.returnsCF=nc(r[3]);
+      csData.orderStatus.returnsCFVal=nc(r[4]);
+    }
 
     // Only read agent + EWH data from WITHIN the current month section
     if(!inCurrentSection)continue;
@@ -1614,14 +1626,15 @@ function renderDailyStats(){
   setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
   setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
   setV('s-delivered',cntCrr.delivered>0?cntCrr.delivered:'—','green');
-  const cancelMTD=os.cancelMTD||0;
-  const cancelCF=os.cancelCF||0;
-  const returnsMTD=os.returnsMTD||0;
-  const returnsCF=os.returnsCF||0;
-  setV('s-cancel-mtd',cancelMTD>0?cancelMTD:'—',cancelMTD>50?'red':'');
-  setV('s-cancel-cf',cancelCF>0?cancelCF:'—',cancelCF>50?'red':'');
-  setV('s-returns-mtd',returnsMTD>0?returnsMTD:'—',returnsMTD>30?'red':'');
-  setV('s-returns-cf',returnsCF>0?returnsCF:'—',returnsCF>30?'red':'');
+  // From Perf Report — values not counts (col4 = achieved value)
+  const cancelMTD=os.cancelMTDVal||os.cancelMTD||0;
+  const cancelCF=os.cancelCFVal||os.cancelCF||0;
+  const returnsMTD=os.returnsMTDVal||os.returnsMTD||0;
+  const returnsCF=os.returnsCFVal||os.returnsCF||0;
+  setV('s-cancel-mtd',cancelMTD>0?fPKR(cancelMTD):'—','red');
+  setV('s-cancel-cf',cancelCF>0?fPKR(cancelCF):'—','red');
+  setV('s-returns-mtd',returnsMTD>0?fPKR(returnsMTD):'—','red');
+  setV('s-returns-cf',returnsCF>0?fPKR(returnsCF):'—','red');
 
   // Shopify returns
   const retEl=document.getElementById('s-shopify-returns');
