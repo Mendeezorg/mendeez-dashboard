@@ -567,7 +567,7 @@ let _csRows=[];       // raw sheet rows saved for re-parsing on month switch
 // ═══════════ HELPERS ═══════════
 const fmt=n=>Math.round(n).toLocaleString('en-PK');
 const fPKR=n=>(!n||n===0)?'—':'PKR '+fmt(n);
-const todayKey=()=>new Date().toISOString().split('T')[0];
+const todayKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const nc=v=>{if(!v)return 0;const s=String(v).replace(/Rs|PKR|,|\s/gi,'').trim();return parseFloat(s)||0;};
 const rcol=r=>r>=5?'green':r>=3?'amber':'red';
 
@@ -651,15 +651,14 @@ async function connectAll(){
 }
 
 async function loadAll(){
-  // Step 1: orders + sheets in parallel (both critical path)
+  // Products start immediately — don't wait for orders (they take too long)
+  // Use setTimeout to give the worker a moment before product requests start
+  setTimeout(()=>{loadProducts();loadCollections();fetchProductCounts();},2000);
+  // Orders + sheets load in parallel
   await Promise.allSettled([loadShopify(),fetchSheets()]);
   renderDailyStats();
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
-  // Step 2: products, collections, counts after orders done — worker is free now
-  loadProducts();
-  loadCollections();
-  fetchProductCounts();
 }
 async function refreshAll(){
   if(!STORE&&!SHEET_ID)return;
@@ -1417,14 +1416,8 @@ function processCS(rows){
   const currentMonthShort=rangeDate.toLocaleString('en-US',{month:'short'}).toLowerCase();
   const currentYear=String(now.getFullYear()).slice(-2); // "26"
   csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-  let mtdProdRow=-1;
-  for(let si=0;si<rows.length;si++){if(rows[si].join(' ').toLowerCase().includes('mtd productivity'))mtdProdRow=si;}
-  if(mtdProdRow>=0){
-    const a1=rows[mtdProdRow+2]||[],a2=rows[mtdProdRow+3]||[],ewh=rows[mtdProdRow+4]||[];
-    if(nc(a1[2])>0)csData.agents.push({name:'Agent 1',chats:nc(a1[2]),inbound:nc(a1[3]),outbound:nc(a1[4]),returns:nc(a1[5]),complaints:nc(a1[6]),todayChats:0,todayOut:0});
-    if(nc(a2[2])>0)csData.agents.push({name:'Agent 2',chats:nc(a2[2]),inbound:nc(a2[3]),outbound:nc(a2[4]),returns:nc(a2[5]),complaints:nc(a2[6]),todayChats:0,todayOut:0});
-    if(nc(ewh[3])>0)csData.ewh={exch:nc(ewh[2]),dispVal:nc(ewh[3]),dispUnits:nc(ewh[4]),returnUnits:nc(ewh[5])};
-  }
+  // Agent/EWH data is extracted per-month via extractCSDataForMonth below
+  // Do NOT read from fixed mtdProdRow — that always reads the same (current) month
 
   // ── STEP 1: Find the start row of the CURRENT month's CS section ──
   // The sheet labels each month's CS block with a cell like:
@@ -1612,9 +1605,14 @@ function processCS(rows){
     allCsMonths[m.label] = mData;
   }
 
-  // Store current month data
+  // Set csData from the correctly-parsed month section (agents, EWH, orderStatus all from right month)
   const currentLabel=currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1)+' 20'+currentYear;
-  allCsMonths[currentLabel]=JSON.parse(JSON.stringify(csData));
+  if(allCsMonths[currentLabel]){
+    csData=JSON.parse(JSON.stringify(allCsMonths[currentLabel]));
+  } else {
+    // Fallback: store whatever was parsed
+    allCsMonths[currentLabel]=JSON.parse(JSON.stringify(csData));
+  }
 
   // Populate month selector dropdown
   const sel=document.getElementById('csMonthSel');
@@ -1757,7 +1755,9 @@ function extractCSDataForMonth(rows, sectionStart, monthName){
     const rowText=rows[i].join(' ').toLowerCase();
     if(rowText.includes(monthName)&&(rowText.includes('cs data')||rowText.includes('cs')||rowText.includes('26'))&&i>=sectionStart-5)inSection=true;
 
-    // Order status
+    if(!inSection)continue;
+
+    // Order status — inside inSection so we only read from the correct month
     if(a0l.includes('landed mtd')){result.orderStatus.landed=nc(r[4]);result.orderStatus.landedVal=nc(r[4]);}
     if(a0l.includes('total dispach')||a0l.includes('total dispatch')){result.orderStatus.dispatched=nc(r[4]);}
     if(a0l.includes('delivered to customer')){result.orderStatus.delivered=nc(r[4]);}
@@ -1766,8 +1766,6 @@ function extractCSDataForMonth(rows, sectionStart, monthName){
     if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){result.orderStatus.cancelCF=nc(r[3]);result.orderStatus.cancelCFVal=nc(r[4]);}
     if(a0l.includes('mtd returns')&&!a0l.includes('cf')){result.orderStatus.returnsMTD=nc(r[3]);result.orderStatus.returnsMTDVal=nc(r[4]);result.orderStatus.returns=nc(r[3]);}
     if(a0l.includes('cf returns')){result.orderStatus.returnsCF=nc(r[3]);result.orderStatus.returnsCFVal=nc(r[4]);}
-
-    if(!inSection)continue;
 
     // Agents
     if(a0l.includes('agent')||a0l.includes('nimra')||a0l.includes('abdullah')){
@@ -2744,7 +2742,7 @@ window.addEventListener('load',()=>{
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   // Set default date inputs to today
   const _td=new Date();
-  const _tdStr=_td.toISOString().split('T')[0];
+  const _tdStr=todayKey();
   document.getElementById('dateFrom').value=_tdStr;
   document.getElementById('dateTo').value=_tdStr;
   document.getElementById('dActiveLbl').textContent='📅 Today';
@@ -3068,8 +3066,9 @@ function switchOverviewMonth(){
     const from=new Date(year,monthIdx,1);
     const to=new Date(year,monthIdx+1,0,23,59,59);
     _preset='custom';
-    _customFrom=from.toISOString().split('T')[0]+'T00:00:00';
-    _customTo=to.toISOString().split('T')[0]+'T23:59:59';
+    const _ld=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    _customFrom=_ld(from)+'T00:00:00';
+    _customTo=_ld(to)+'T23:59:59';
   }
   
   document.getElementById('todayDate').textContent=val;
