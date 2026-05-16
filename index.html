@@ -783,13 +783,17 @@ function getRange(){
 // Format date for Shopify API using LOCAL time (not UTC)
 // Prevents timezone offset issues (e.g. PKT = UTC+5)
 function toLocalISO(d){
+  // Format with local timezone offset for Shopify REST API
   const pad=n=>String(n).padStart(2,'0');
-  // Include local timezone offset so Shopify REST interprets dates correctly
-  const off=-d.getTimezoneOffset(); // e.g. +300 for PKT (UTC+5)
+  const off=-d.getTimezoneOffset();
   const sign=off>=0?'+':'-';
   const absOff=Math.abs(off);
   const tz=sign+pad(Math.floor(absOff/60))+':'+pad(absOff%60);
   return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())+tz;
+}
+function toUTCISO(d){
+  // Format as UTC ISO for GraphQL queries
+  return d.toISOString();
 }
 function rangeLabel(){
   const labels={today:'Today',yesterday:'Yesterday','2days':'Day Before Yesterday','7days':'Last 7 Days','30days':'Last 30 Days',mtd:'This Month (MTD)'};
@@ -1754,7 +1758,7 @@ function renderDailyStats(){
       if(retEl){retEl.textContent='…';retEl.className='sv muted';delete retEl.dataset.loaded;}
       if(retSub){retSub.textContent='Calculating...';delete retSub.dataset.loaded;}
     }
-    if(!_returnsFetching&&!retEl?.dataset.loaded) fetchReturnsByDate();
+    if(!_returnsFetching) fetchReturnsByDate();
   }
 
   // Ad spend from date range
@@ -1844,8 +1848,8 @@ async function fetchReturnsByDate(){
   const retEl=document.getElementById('s-shopify-returns');
   const retSub=document.getElementById('s-shopify-returns-sub');
   try{
-    const fromISO=toLocalISO(from);
-    const toISO=toLocalISO(to);
+    const fromISO=toUTCISO(from);
+    const toISO=toUTCISO(to);
     let returnValue=0, returnCount=0;
     let cursor=null, hasNextPage=true, guard=0;
 
@@ -1891,7 +1895,7 @@ async function fetchReturnsByDate(){
     if(retEl){
       retEl.textContent=returnValue>0?'PKR '+fmt(returnValue):'—';
       retEl.className=returnValue>0?'sv red':'sv muted';
-      retEl.dataset.loaded='1';
+      // loaded flag removed — _returnsRangeKey handles dedup
     }
     // Recalculate net sales now that returns are known
     const netEl=document.getElementById('s-shopify-net');
@@ -1904,7 +1908,7 @@ async function fetchReturnsByDate(){
     _returnsFetching=false;
     if(retSub){
       retSub.textContent=returnCount>0?returnCount+' return'+(returnCount!==1?'s':'')+' processed in range':'No returns in range';
-      retSub.dataset.loaded='1';
+      
     }
   }catch(e){
     _returnsFetching=false;
