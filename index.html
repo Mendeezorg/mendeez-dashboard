@@ -1150,8 +1150,9 @@ function renderAds(){
     }
     return false;
   });
-  // If no rows match the range (sheet may not cover the selected range), fall back to all rows
-  const rows=rangeRows.length>0?rangeRows:adsTrend;
+  // Only use rows that match the range — no fallback to all data
+  // If sheet doesn't cover the selected range, show zeros (not misleading totals)
+  const rows=rangeRows;
 
   // Sum all matched rows for each platform
   const sum=(col)=>rows.reduce((a,r)=>a+nc(r[col]),0);
@@ -1845,8 +1846,8 @@ function renderDailyStats(){
       if(parts.length===3){const dt2=new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`);if(!isNaN(dt2))return dt2>=from&&dt2<=to;}
       return false;
     });
-    const use=rows.length>0?rows:adsTrend;
-    adSpend=use.reduce((s,r)=>[adsIdx.mS,adsIdx.gS,adsIdx.tS,adsIdx.sS].reduce((a,ci)=>a+nc(r[ci]),s),0);
+    // Only sum rows that match the range — don't fall back to all data
+    adSpend=rows.reduce((s,r)=>[adsIdx.mS,adsIdx.gS,adsIdx.tS,adsIdx.sS].reduce((a,ci)=>a+nc(r[ci]),s),0);
   }
 
   // Update label
@@ -1878,11 +1879,17 @@ function renderDailyStats(){
       if(gs)gs.textContent='Before discounts';
     }
     if(net){
-      const n=ordersData.reduce((s,o)=>s+parseFloat(o.subtotal_price||0),0);
+      // net_sales = gross - discounts - returns (Shopify formula)
+      // Returns are fetched async — store gross+disc so we can recalculate when returns arrive
+      const g=ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
+      const disc=ordersData.reduce((s,o)=>s+parseFloat(o.total_discounts||0),0);
+      const returns=window._shopifyReturnValue||0;
+      const n=g-disc-returns;
+      window._netSalesBase={gross:g,disc:disc}; // store for recalc when returns load
       net.textContent=n>0?'PKR '+fmt(n):'—';
       net.className='sv green';
       const ns=document.getElementById('s-shopify-net-sub');
-      if(ns)ns.textContent='After discounts';
+      if(ns)ns.textContent='After discounts & returns';
     }
     const discEl=document.getElementById('s-shopify-discounts');
     if(discEl){
@@ -1961,6 +1968,14 @@ async function fetchReturnsByDate(){
       retEl.textContent=returnValue>0?'PKR '+fmt(returnValue):'—';
       retEl.className=returnValue>0?'sv red':'sv muted';
       retEl.dataset.loaded='1';
+    }
+    // Recalculate net sales now that returns are known
+    const netEl=document.getElementById('s-shopify-net');
+    const base=window._netSalesBase;
+    if(netEl&&base){
+      const n=base.gross-base.disc-returnValue;
+      netEl.textContent=n>0?'PKR '+fmt(n):'—';
+      netEl.className='sv green';
     }
     _returnsFetching=false;
     if(retSub){
