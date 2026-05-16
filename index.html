@@ -1697,23 +1697,68 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     if(anyCol.includes('mtd returns')&&!anyCol.includes('cf')){result.orderStatus.returnsMTD=nc(r[3]);result.orderStatus.returnsMTDVal=nc(r[4]);result.orderStatus.returns=nc(r[3]);}
     if(anyCol.includes('cf returns')){result.orderStatus.returnsCF=nc(r[3]);result.orderStatus.returnsCFVal=nc(r[4]);}
 
-    // Agents — agent name can be in ANY column (sheet often has it in col 7/H)
-    // Check all cells in the row for agent-like names, not just first cell
+    // ── AGENT HEADER ROW ──
+    // Sheet layout: header row has "Chats | Inbound Calls | Outbound Calls | R/Returns | Solve Compl"
+    // Then each agent is ONE ROW: "Agent 1 (Abdullah) | 892 | 163 | 570 | 235 | -"
+    // Detect the header row by presence of "chats" and "inbound"
+    if(rowText.includes('chats')&&rowText.includes('inbound')&&rowText.includes('outbound')){
+      // This is the agent header row — parse column indices
+      const hdr=r.map(c=>(c||'').toLowerCase().trim());
+      const agentHdrIdx={
+        name:  hdr.findIndex(h=>h.includes('agent')||h.includes('name')),
+        chats: hdr.findIndex(h=>h.includes('chat')),
+        inbound: hdr.findIndex(h=>h.includes('inbound')),
+        outbound: hdr.findIndex(h=>h.includes('outbound')||h.includes('out bound')),
+        returns: hdr.findIndex(h=>h.includes('return')||h.includes('r/')),
+        complaints: hdr.findIndex(h=>h.includes('compl')||h.includes('solve')),
+      };
+      // Now read agent data rows immediately below this header
+      let ai=i+1;
+      while(ai<scanEnd&&ai<i+10){
+        const ar=rows[ai]||[];
+        // Find agent name cell in this row
+        const agentCell=ar.find(c=>{
+          const cl=(c||'').toLowerCase().trim();
+          return cl.includes('agent')||cl.includes('namra')||cl.includes('nimra')||
+                 cl.includes('abdullah')||cl.includes('hira')||cl.includes('sana')||
+                 cl.includes('fatima')||cl.includes('ali')||cl.includes('usman')||
+                 cl.includes('sara')||cl.includes('ayesha')||cl.includes('maria');
+        })||'';
+        if(!agentCell&&!ar.some(c=>(c||'').trim()))break; // empty row = end of agents
+        if(!agentCell){ai++;continue;} // skip non-agent rows
+        // Read values from the correct column positions based on header
+        const gv=(idx)=>idx>=0&&idx<ar.length?nc(ar[idx]):0;
+        result.agents.push({
+          name: agentCell.trim(),
+          chats:      gv(agentHdrIdx.chats),
+          inbound:    gv(agentHdrIdx.inbound),
+          outbound:   gv(agentHdrIdx.outbound),
+          returns:    gv(agentHdrIdx.returns),
+          complaints: gv(agentHdrIdx.complaints),
+          todayChats: 0,
+          todayOut:   0,
+        });
+        ai++;
+      }
+      i=ai-1;continue;
+    }
+
+    // Agents — fallback: agent name cell detected without a header row above
     const agentNameCell=r.find(c=>{
       const cl=(c||'').toLowerCase().trim();
-      return cl.includes('agent')||cl.includes('namra')||cl.includes('nimra')||cl.includes('abdullah')||
+      return (cl.includes('agent')&&cl.length>5)||cl.includes('namra')||cl.includes('nimra')||cl.includes('abdullah')||
              cl.includes('hira')||cl.includes('sana')||cl.includes('fatima')||
-             cl.includes('ali')||cl.includes('usman')||cl.includes('zara')||
-             cl.includes('sara')||cl.includes('ayesha')||cl.includes('maria');
+             cl.includes('usman')||cl.includes('zara')||
+             cl.includes('ayesha')||cl.includes('maria');
     })||'';
     const isAgent=agentNameCell!==''||(firstCellL.includes('agent')&&firstCellL.length<40);
-    if(isAgent){
+    if(isAgent&&!rowText.includes('chats')&&!rowText.includes('inbound')){
+      // Vertical fallback: read sub-rows below
       const agentDisplayName=agentNameCell||firstCell;
       const agentData={name:agentDisplayName,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
-      let j=i;
+      let j=i+1;
       while(j<scanEnd&&j<i+8){
         const row=rows[j];
-        // Metric label is the second non-empty cell in sub-rows
         const cells=row.filter(c=>c&&c.trim());
         const metric=(cells[1]||cells[0]||'').toLowerCase().trim();
         const totCol=getTotCol(row);
@@ -1727,7 +1772,7 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
         j++;
         if(j<scanEnd){
           const nxtRow=rows[j];
-          const nxtHasAgent=nxtRow.some(c=>{const cl=(c||'').toLowerCase().trim();return cl.includes('agent')||cl.includes('nimra')||cl.includes('abdullah')||cl.includes('hira')||cl.includes('sana')||cl.includes('fatima')||cl.includes('ali')||cl.includes('usman')||cl.includes('sara')||cl.includes('ayesha')||cl.includes('maria');});
+          const nxtHasAgent=nxtRow.some(c=>{const cl=(c||'').toLowerCase().trim();return cl.includes('agent')||cl.includes('namra')||cl.includes('nimra')||cl.includes('abdullah');});
           const nxt=(nxtRow[0]||'').trim().toLowerCase();
           if((nxtHasAgent&&j>i)||nxt.includes('ewh')||nxt.includes('e.com'))break;
         }
