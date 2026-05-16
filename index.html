@@ -733,15 +733,23 @@ async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
   try{
-    const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
-    ordersData=d.orders||[];
-    // If exactly 250 returned, try to get more (pagination)
-    if(ordersData.length===250){
-      try{
-        const d2=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&since_id=${ordersData[ordersData.length-1].id}`);
-        if(d2.orders&&d2.orders.length)ordersData=[...ordersData,...d2.orders];
-      }catch(e){}
+    // Fetch ALL orders with proper pagination
+    let allOrders=[];
+    let lastId=0;
+    let hasMore=true;
+    while(hasMore){
+      const url=lastId>0
+        ? `/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&since_id=${lastId}`
+        : `/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+      const d=await shopFetch(url);
+      const batch=d.orders||[];
+      allOrders=allOrders.concat(batch);
+      setBadge('s','amber',allOrders.length+' orders...');
+      if(batch.length<250){hasMore=false;}
+      else{lastId=batch[batch.length-1].id;}
+      if(allOrders.length>10000){hasMore=false;}
     }
+    ordersData=allOrders;
     setBadge('s','live',ordersData.length+' orders · '+rangeLabel());
     weeklyOrdersData=ordersData;
     document.getElementById('todayDate').textContent=rangeLabel();
@@ -754,6 +762,7 @@ async function reloadShopifyData(){
     document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
   }catch(e){setBadge('s','error','Error');console.error(e);}
 }
+
 
 async function loadShopify(){
   try{
