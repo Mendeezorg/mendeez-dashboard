@@ -665,7 +665,6 @@ async function refreshAll(){
 // ═══════════ SHOPIFY ═══════════
 async function shopFetch(ep,method,body){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-  // MUST encode ep — Worker uses decodeURIComponent(ep) to reconstruct full Shopify URL
   const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep);
   if(body&&(method==='POST'||method==='PUT')){
     const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopifyMethod:method,shopifyBody:body})});
@@ -676,8 +675,83 @@ async function shopFetch(ep,method,body){
   console.log('Worker status:',r.status,'ep:',ep.slice(0,50));
   if(!r.ok){const t=await r.text();console.error('Worker error:',t);throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
   const txt=await r.text();
-  try{return JSON.parse(txt);}
+  let parsed;
+  try{parsed=JSON.parse(txt);}
   catch(e){console.error('JSON parse error:',txt.slice(0,200));throw new Error('Invalid JSON from Shopify');}
+  // Try to extract page_info from Link header (if worker passes it through)
+  const link=r.headers.get('link')||r.headers.get('x-shopify-link')||'';
+  const nextMatch=link.match(/page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+  if(nextMatch) parsed._nextPageInfo=nextMatch[1];
+  return parsed;
+}
+
+// Fetch ALL orders for a date range — handles 1000+ orders correctly
+// Uses page_info cursor if worker passes Link header, falls back to created_at chunking
+async function fetchAllOrders(from, to, onProgress){
+  let allOrders=[];
+
+  // Strategy 1: Try page_info cursor pagination (needs worker to pass Link header)
+  try{
+    let pageInfo=null;
+    let hasMore=true;
+    let guard=0;
+    while(hasMore&&guard<40){
+      guard++;
+      let url;
+      if(pageInfo){
+        // page_info replaces all other params
+        url=`/orders.json?limit=250&page_info=${pageInfo}`;
+      } else {
+        url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+      }
+      const d=await shopFetch(url);
+      const batch=d.orders||[];
+      allOrders=allOrders.concat(batch);
+      if(onProgress) onProgress(allOrders.length);
+      if(d._nextPageInfo){
+        pageInfo=d._nextPageInfo;
+      } else if(batch.length<250){
+        hasMore=false;
+      } else {
+        // Worker not passing Link header — fall back to date chunking
+        throw new Error('NO_PAGE_INFO');
+      }
+    }
+    return allOrders;
+  } catch(e){
+    if(e.message!=='NO_PAGE_INFO') throw e;
+  }
+
+  // Strategy 2: Chunk by day — fetch each day separately, combine
+  // This works perfectly with date filters and has no pagination issues for 1-day chunks
+  console.log('Falling back to day-by-day chunking...');
+  allOrders=[];
+  const totalDays=Math.ceil((to-from)/(86400*1000))+1;
+
+  for(let d=0;d<totalDays;d++){
+    const dayFrom=new Date(from);dayFrom.setDate(dayFrom.getDate()+d);dayFrom.setHours(0,0,0,0);
+    const dayTo=new Date(dayFrom);dayTo.setHours(23,59,59,999);
+    // Don't go past the requested 'to' date
+    const effectiveTo=dayTo>to?to:dayTo;
+
+    let dayOrders=[];
+    let sinceId=null;
+    let hasMore=true;
+    let guard=0;
+    while(hasMore&&guard<10){
+      guard++;
+      let url=`/orders.json?status=any&created_at_min=${dayFrom.toISOString()}&created_at_max=${effectiveTo.toISOString()}&limit=250`;
+      if(sinceId) url+=`&since_id=${sinceId}`;
+      const data=await shopFetch(url);
+      const batch=data.orders||[];
+      dayOrders=dayOrders.concat(batch);
+      if(batch.length<250){hasMore=false;}
+      else{sinceId=batch[batch.length-1].id;}
+    }
+    allOrders=allOrders.concat(dayOrders);
+    if(onProgress) onProgress(allOrders.length);
+  }
+  return allOrders;
 }
 // ═══════════ DATE RANGE STATE ═══════════
 let _preset='today', _customFrom=null, _customTo=null;
@@ -747,24 +821,11 @@ function applyDateRange(){
 async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
+  setBadge('s','amber','Fetching orders...');
   try{
-    // Fetch ALL orders using since_id cursor pagination (page= is deprecated by Shopify)
-    let allOrders=[];
-    let sinceId=null;
-    let hasMore=true;
-    let guard=0;
-    while(hasMore&&guard<20){
-      guard++;
-      let url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
-      if(sinceId) url+=`&since_id=${sinceId}`;
-      const d=await shopFetch(url);
-      const batch=d.orders||[];
-      allOrders=allOrders.concat(batch);
-      setBadge('s','amber',allOrders.length+' orders...');
-      if(batch.length<250){hasMore=false;}
-      else{sinceId=batch[batch.length-1].id;}
-      if(allOrders.length>5000){hasMore=false;}
-    }
+    const allOrders=await fetchAllOrders(from,to,(n)=>{
+      setBadge('s','amber',n+' orders...');
+    });
     ordersData=allOrders;
     setBadge('s','live',ordersData.length+' orders · '+rangeLabel());
     weeklyOrdersData=ordersData;
@@ -783,23 +844,9 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    // Fetch ALL orders using since_id cursor pagination (page= is deprecated by Shopify)
-    let allOrders=[];
-    let sinceId=null;
-    let hasMore=true;
-    let guard=0;
-    while(hasMore&&guard<20){
-      guard++;
-      let url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
-      if(sinceId) url+=`&since_id=${sinceId}`;
-      const d=await shopFetch(url);
-      const batch=d.orders||[];
-      allOrders=allOrders.concat(batch);
-      setBadge('s','amber',allOrders.length+' orders...');
-      if(batch.length<250){hasMore=false;}
-      else{sinceId=batch[batch.length-1].id;}
-      if(allOrders.length>5000){hasMore=false;}
-    }
+    const allOrders=await fetchAllOrders(from,to,(n)=>{
+      setBadge('s','amber',n+' orders...');
+    });
     ordersData=allOrders;
     
     setBadge('s','live',ordersData.length+' orders');
