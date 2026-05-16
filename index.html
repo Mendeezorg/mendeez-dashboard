@@ -849,18 +849,17 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
+    // Start products + collections loading in parallel with orders — don't wait for orders first
+    loadProducts();
+    loadCollections();
+    fetchProductCounts();
     const allOrders=await fetchAllOrders(from,to,(n)=>{
       setBadge('s','amber',n+' orders...');
     });
     ordersData=allOrders;
-    
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
-    fetchProductCounts();
-    loadCollections();
     loadWeeklyOrders();
-    // Load products so Products tab and No-Sale diagnosis work immediately
-    loadProducts();
   }catch(e){
     console.error('loadShopify error:',e);
     setBadge('s','error',e.message.slice(0,30));
@@ -874,7 +873,7 @@ async function loadProducts(){
     let allProds=[],sinceId=null,hasMore=true,guard=0;
     while(hasMore&&guard<20){
       guard++;
-      let url='/products.json?limit=250&fields=id,title,product_type,status,variants';
+      let url='/products.json?limit=250';
       if(sinceId) url+=`&since_id=${sinceId}`;
       const d=await shopFetch(url);
       const batch=d.products||[];
@@ -2326,8 +2325,16 @@ function renderProducts(){
 
   // Show empty state when nothing typed — user must search to see products
   if(!search&&!skuSearch){
-    document.getElementById('prodTbl').innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU above to search</td></tr>';
-    document.getElementById('prodCount').textContent='';
+    const msg=allProducts.length===0
+      ?'⏳ Products still loading... please wait a moment then search'
+      :'🔍 Type a product name or SKU above to search';
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="6" class="nodata" style="padding:30px">${msg}</td></tr>`;
+    document.getElementById('prodCount').textContent=allProducts.length>0?allProducts.length+' products loaded':'';
+    return;
+  }
+  // If products haven't loaded yet, show message
+  if(allProducts.length===0){
+    document.getElementById('prodTbl').innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">⏳ Products still loading... try again in a moment</td></tr>';
     return;
   }
 
