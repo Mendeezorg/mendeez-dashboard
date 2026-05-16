@@ -266,8 +266,17 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <!-- ══ DAILY OVERVIEW ══ -->
 <div class="panel active" id="panel-daily">
   <div class="ds">
-    <div><div class="dt" id="todayDate">Today</div><div class="dsub">Shopify live · Ads, Courier & CS from Google Sheet · Manual flags only</div></div>
-    <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh All</button>
+    <div>
+      <div class="dt" id="todayDate">Overview</div>
+      <div class="dsub">Shopify · Ads · Courier · CS — all live</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select class="fi" id="overviewMonthSel" style="width:150px" onchange="switchOverviewMonth()">
+        <option value="current">Current Month</option>
+        <option value="previous">Previous Month</option>
+      </select>
+      <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh All</button>
+    </div>
   </div>
   <div id="alertsZone"></div>
   <div class="sg" id="statGrid">
@@ -383,8 +392,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <!-- ══ CS & CONFIRMATIONS ══ -->
 <div class="panel" id="panel-cs">
   <div class="ds">
-    <div><div class="dt">CS & Confirmations</div><div class="dsub">Live from Perf Report 26 · Current month data</div></div>
-    <button class="btn btn-s btn-sm" onclick="fetchSheets()">↻ Refresh</button>
+    <div><div class="dt">CS & Confirmations</div><div class="dsub">Live from Perf Report 26 · Select month below</div></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select class="fi" id="csMonthSel" style="width:150px" onchange="switchCSMonth()">
+        <option value="">Loading...</option>
+      </select>
+      <button class="btn btn-s btn-sm" onclick="fetchSheets()">↻ Refresh</button>
+    </div>
   </div>
   <div class="alert al-blue"><div>ℹ</div><div>Pulled automatically from your Perf Report sheet. Shows MTD agent performance and today's date column data.</div></div>
   <!-- MTD SUMMARY -->
@@ -1256,6 +1270,7 @@ function renderCrrTable(){
 // Then: EWH | Exch Count, Total Dispatch, Total Disp Unit, Return Units
 // Order Status section: "Landed MTD", "Total Dispatched", "Delivered", "Pending", "Cancellations MTD", "Returns MTD"
 function processCS(rows){
+  _csRows=rows;
   const now=new Date();
   const todayDay=now.getDate();
   const currentMonth=now.toLocaleString('en-US',{month:'long'}).toLowerCase(); // e.g. "may"
@@ -1358,9 +1373,11 @@ function processCS(rows){
     if(a0l.includes('landed mtd')&&i>=sectionStart-80){csData.orderStatus.landed=nc(r[3]);csData.orderStatus.landedVal=nc(r[4]);}
     if((a0l.includes('total dispach')||a0l.includes('total dispatch'))&&i>=sectionStart-80){csData.orderStatus.dispatched=nc(r[3]);}
     if(a0l.includes('delivered to customer')&&i>=sectionStart-80){csData.orderStatus.delivered=nc(r[3]);}
-    if(a0l.includes('pending orders')&&i>=sectionStart-80){csData.orderStatus.pending=nc(r[3]);}
-    if(a0l.includes('cancelations mtd')&&i>=sectionStart-80){csData.orderStatus.cancel=nc(r[3]);}
-    if(a0l.includes('mtd returns')&&i>=sectionStart-80){csData.orderStatus.returns=nc(r[3]);}
+    if(a0l.includes('pending orders')){csData.orderStatus.pending=nc(r[3]);}
+    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){csData.orderStatus.cancelMTD=nc(r[3]);csData.orderStatus.cancel=nc(r[3]);}
+    if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){csData.orderStatus.cancelCF=nc(r[3]);}
+    if(a0l.includes('mtd returns')&&!a0l.includes('cf')){csData.orderStatus.returnsMTD=nc(r[3]);csData.orderStatus.returns=nc(r[3]);}
+    if(a0l.includes('cf returns')){csData.orderStatus.returnsCF=nc(r[3]);}
 
     // Only read agent + EWH data from WITHIN the current month section
     if(!inCurrentSection)continue;
@@ -1410,6 +1427,60 @@ function processCS(rows){
   }
 
   setBadge('cs','live',csData.agents.length+' agents · '+currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1));
+
+  // ── Detect all available months in sheet ──
+  const monthNames=['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const availableMonths = [];
+  const monthSections = {};
+  
+  // Scan for month section headers
+  for(let i=0;i<rows.length;i++){
+    const rowText=rows[i].join(' ').toLowerCase();
+    for(const mn of monthNames){
+      if(rowText.includes(mn)&&(rowText.includes('cs data')||rowText.includes('order status')||rowText.includes('operations data'))){
+        const year=rowText.match(/20\d\d/)?.[0]||('20'+currentYear);
+        const label=mn.charAt(0).toUpperCase()+mn.slice(1)+' '+year;
+        if(!monthSections[label]){
+          monthSections[label]=i;
+          availableMonths.push({label,row:i,month:mn});
+        }
+      }
+    }
+  }
+
+  // Sort months chronologically
+  availableMonths.sort((a,b)=>b.row-a.row); // newest first
+
+  // Process each month's data
+  for(const m of availableMonths){
+    const mData = extractCSDataForMonth(rows, m.row, m.month);
+    allCsMonths[m.label] = mData;
+  }
+
+  // Store current month data
+  const currentLabel=currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1)+' 20'+currentYear;
+  allCsMonths[currentLabel]=JSON.parse(JSON.stringify(csData));
+
+  // Populate month selector dropdown
+  const sel=document.getElementById('csMonthSel');
+  if(sel&&availableMonths.length>0){
+    sel.innerHTML=availableMonths.map((m,i)=>
+      `<option value="${m.label}"${i===0?' selected':''}>${m.label}</option>`
+    ).join('');
+    const currentOpt=Array.from(sel.options).find(o=>o.value===currentLabel);
+    if(currentOpt)currentOpt.selected=true;
+  } else if(sel){
+    sel.innerHTML=`<option value="${currentLabel}">${currentLabel}</option>`;
+  }
+  // Also populate overview month selector
+  const ovSel=document.getElementById('overviewMonthSel');
+  if(ovSel&&availableMonths.length>0){
+    ovSel.innerHTML=availableMonths.map((m,i)=>
+      `<option value="${m.label}"${i===0?' selected':''}>${m.label}</option>`
+    ).join('');
+    const currentOpt=Array.from(ovSel.options).find(o=>o.value===currentLabel);
+    if(currentOpt)currentOpt.selected=true;
+  }
   // ── Parse cancellation reasons ──
   // Look for rows with patterns like "Wrong Product", "High Price", reason label + count
   csData.cancelReasons=[];
@@ -2025,6 +2096,9 @@ function switchTab(name,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
   el.classList.add('active');
+  // Hide date bar on overview, show on other tabs
+  const datebar=document.querySelector('.datebar');
+  if(datebar) datebar.style.display=name==='daily'?'none':'flex';
   if(name==='report')buildReport();
   if(name==='sorter'){
     const sel=document.getElementById('sortCat');
@@ -2554,6 +2628,35 @@ async function loadCollections(){
     }
     console.log('Loaded',allCollections.length,'collections');
   }catch(e){console.error('loadCollections error:',e.message);}
+}
+
+
+function switchOverviewMonth(){
+  const sel=document.getElementById('overviewMonthSel');
+  const val=sel?.value||'current';
+  const now=new Date();
+  if(val==='previous'){
+    // Set date range to previous month
+    const prev=new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const prevEnd=new Date(now.getFullYear(), now.getMonth(), 0);
+    _preset='custom';
+    _customFrom=prev.toISOString().split('T')[0]+'T00:00:00';
+    _customTo=prevEnd.toISOString().split('T')[0]+'T23:59:59';
+    // Also switch CS to previous month
+    const csSel=document.getElementById('csMonthSel');
+    if(csSel&&csSel.options.length>1) csSel.selectedIndex=1;
+    switchCSMonth();
+  } else {
+    // Current month
+    _preset='mtd';
+    _customFrom=null;_customTo=null;
+    const csSel=document.getElementById('csMonthSel');
+    if(csSel) csSel.selectedIndex=0;
+    switchCSMonth();
+  }
+  document.getElementById('todayDate').textContent=rangeLabel();
+  if(STORE&&STORE!=='demo'&&TOKEN) reloadShopifyData();
+  else renderDailyStats();
 }
 
 </script>
