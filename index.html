@@ -892,11 +892,13 @@ async function loadProducts(){
         if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
         // Update count progressively so user sees progress
         if(allProds.length%500===0||!hasMore){allProducts=[...allProds];updateProductCounts();}
+        // Small delay every 5 pages to avoid worker rate limit
+        if(guard%5===0&&hasMore)await new Promise(r=>setTimeout(r,500));
       }catch(pageErr){
         console.warn('loadProducts page error:',pageErr.message,'retrying...');
         retries++;
-        if(retries>=3){console.error('loadProducts: too many retries, stopping at',allProds.length,'products');hasMore=false;}
-        else{await new Promise(r=>setTimeout(r,1500));guard--;} // wait then retry same page
+        if(retries>=3){console.error('loadProducts: too many retries at',allProds.length,'products');hasMore=false;}
+        else{await new Promise(r=>setTimeout(r,2000));guard--;} // wait 2s then retry
       }
     }
     allProducts=allProds;
@@ -977,7 +979,7 @@ async function fetchSheetJSONP(sheetId, tab){
       delete window[cbName];
       try{document.body.removeChild(script);}catch(e){}
       reject(new Error('All methods failed for tab: '+tab+'. Check sheet is set to Anyone with link can view.'));
-    }, 20000);
+    }, 45000);
 
     window[cbName] = function(data){
       clearTimeout(timeout);
@@ -1060,7 +1062,12 @@ async function fetchSheets(){
   }
 
   if(csR.status==='fulfilled'&&csR.value.length){
-    processCS(csR.value);
+    try{
+      processCS(csR.value);
+    }catch(e){
+      console.error('processCS crash:',e);
+      setBadge('cs','error','Parse error: '+e.message.slice(0,30));
+    }
   }else{
     setBadge('cs','error',getErrHint(csR.reason));
     console.error('CS sheet error:',csR.reason?.message||csR.reason);
