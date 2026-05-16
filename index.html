@@ -784,7 +784,12 @@ function getRange(){
 // Prevents timezone offset issues (e.g. PKT = UTC+5)
 function toLocalISO(d){
   const pad=n=>String(n).padStart(2,'0');
-  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  // Include local timezone offset so Shopify REST interprets dates correctly
+  const off=-d.getTimezoneOffset(); // e.g. +300 for PKT (UTC+5)
+  const sign=off>=0?'+':'-';
+  const absOff=Math.abs(off);
+  const tz=sign+pad(Math.floor(absOff/60))+':'+pad(absOff%60);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())+tz;
 }
 function rangeLabel(){
   const labels={today:'Today',yesterday:'Yesterday','2days':'Day Before Yesterday','7days':'Last 7 Days','30days':'Last 30 Days',mtd:'This Month (MTD)'};
@@ -1627,6 +1632,7 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
   // Returns a csData-shaped object for the given month section
   const result={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
   const scanStart=Math.max(0,sectionStart-10);
+  const scanEnd=sectionEnd?Math.min(sectionEnd,rows.length):Math.min(rows.length,sectionStart+600);
 
   // Find date column for that month's "Dates" row
   let dateColIdx=-1;
