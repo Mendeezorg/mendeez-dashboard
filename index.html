@@ -1448,7 +1448,7 @@ function processCS(rows){
   const rangeDate=getRange().from;
   const currentMonth=rangeDate.toLocaleString('en-US',{month:'long'}).toLowerCase();
   const currentMonthShort=rangeDate.toLocaleString('en-US',{month:'short'}).toLowerCase();
-  const currentYear=String(now.getFullYear()).slice(-2); // "26"
+  const currentYear=String(rangeDate.getFullYear()).slice(-2); // "26" — use range year not today
   csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
   // Agent/EWH data is extracted per-month via extractCSDataForMonth below
   // Do NOT read from fixed mtdProdRow — that always reads the same (current) month
@@ -2257,12 +2257,9 @@ function renderProducts(){
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
   const skuSearch=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
 
-  // Show empty state when nothing typed — user must search to see products
-  if(!search&&!skuSearch){
-    const msg=allProducts.length===0
-      ?'⏳ Products still loading... please wait a moment then search'
-      :'🔍 Type a product name or SKU above to search';
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px">${msg}</td></tr>`;
+  // Show placeholder only while products are still loading; once loaded, show all
+  if(!search&&!skuSearch&&allProducts.length===0){
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px">⏳ Products still loading... please wait a moment</td></tr>`;
     document.getElementById('prodCount').textContent=allProducts.length>0?allProducts.length+' products loaded':'';
     return;
   }
@@ -2530,13 +2527,10 @@ function switchTab(name,el){
   }
   if(name==='products'){
     const tbl=document.getElementById('prodTbl');
-    const search=document.getElementById('prodSearch').value||'';
-    if(!search&&!document.getElementById('skuSearch').value){
-      if(allProducts.length>0){
-        renderProducts(); // show all loaded products immediately
-      } else {
-        if(tbl) tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU above to search instantly</td></tr>';
-      }
+    if(allProducts.length>0){
+      renderProducts(); // show all (or filtered) products immediately
+    } else {
+      if(tbl) tbl.innerHTML='<tr><td colspan="3" class="nodata" style="padding:30px">⏳ Products still loading... please wait</td></tr>';
     }
   }
 }
