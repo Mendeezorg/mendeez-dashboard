@@ -733,19 +733,22 @@ async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
   try{
-    // Fetch ALL orders using page parameter (respects date range correctly)
+    // Fetch ALL orders using since_id cursor pagination (page= is deprecated by Shopify)
     let allOrders=[];
-    let page=1;
+    let sinceId=null;
     let hasMore=true;
-    while(hasMore){
-      const url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&page=${page}`;
+    let guard=0;
+    while(hasMore&&guard<20){
+      guard++;
+      let url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+      if(sinceId) url+=`&since_id=${sinceId}`;
       const d=await shopFetch(url);
       const batch=d.orders||[];
       allOrders=allOrders.concat(batch);
       setBadge('s','amber',allOrders.length+' orders...');
       if(batch.length<250){hasMore=false;}
-      else{page++;}
-      if(page>20||allOrders.length>5000){hasMore=false;}
+      else{sinceId=batch[batch.length-1].id;}
+      if(allOrders.length>5000){hasMore=false;}
     }
     ordersData=allOrders;
     // Calculate returns from refund line items in fetched orders
@@ -782,19 +785,22 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    // Fetch ALL orders - use page parameter which respects date filters
+    // Fetch ALL orders using since_id cursor pagination (page= is deprecated by Shopify)
     let allOrders=[];
-    let page=1;
+    let sinceId=null;
     let hasMore=true;
-    while(hasMore){
-      const url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&page=${page}`;
+    let guard=0;
+    while(hasMore&&guard<20){
+      guard++;
+      let url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+      if(sinceId) url+=`&since_id=${sinceId}`;
       const d=await shopFetch(url);
       const batch=d.orders||[];
       allOrders=allOrders.concat(batch);
       setBadge('s','amber',allOrders.length+' orders...');
       if(batch.length<250){hasMore=false;}
-      else{page++;}
-      if(page>20||allOrders.length>5000){hasMore=false;}
+      else{sinceId=batch[batch.length-1].id;}
+      if(allOrders.length>5000){hasMore=false;}
     }
     ordersData=allOrders;
     
