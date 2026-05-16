@@ -707,7 +707,7 @@ async function fetchAllOrders(from, to, onProgress){
         // page_info replaces all other params
         url=`/orders.json?limit=250&page_info=${pageInfo}`;
       } else {
-        url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+        url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250`;
       }
       const d=await shopFetch(url);
       const batch=d.orders||[];
@@ -745,7 +745,7 @@ async function fetchAllOrders(from, to, onProgress){
     let guard=0;
     while(hasMore&&guard<10){
       guard++;
-      let url=`/orders.json?status=any&created_at_min=${dayFrom.toISOString()}&created_at_max=${effectiveTo.toISOString()}&limit=250`;
+      let url=`/orders.json?status=any&created_at_min=${toLocalISO(dayFrom)}&created_at_max=${toLocalISO(effectiveTo)}&limit=250`;
       if(sinceId) url+=`&since_id=${sinceId}`;
       const data=await shopFetch(url);
       const batch=data.orders||[];
@@ -778,6 +778,13 @@ function getRange(){
   return{from:f,to:t};
 }
 
+
+// Format date for Shopify API using LOCAL time (not UTC)
+// Prevents timezone offset issues (e.g. PKT = UTC+5)
+function toLocalISO(d){
+  const pad=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
 function rangeLabel(){
   const labels={today:'Today',yesterday:'Yesterday','2days':'Day Before Yesterday','7days':'Last 7 Days','30days':'Last 30 Days',mtd:'This Month (MTD)'};
   if(_preset==='custom'&&_customFrom&&_customTo){
@@ -1928,8 +1935,8 @@ async function fetchReturnsByDate(){
   const retEl=document.getElementById('s-shopify-returns');
   const retSub=document.getElementById('s-shopify-returns-sub');
   try{
-    const fromISO=from.toISOString();
-    const toISO=to.toISOString();
+    const fromISO=toLocalISO(from);
+    const toISO=toLocalISO(to);
     let returnValue=0, returnCount=0;
     let cursor=null, hasNextPage=true, guard=0;
 
@@ -2081,7 +2088,7 @@ async function loadWeeklyOrders(){
       let allOrders=[],sinceId=null,hasMore=true,guard=0;
       while(hasMore&&guard<10){
         guard++;
-        let url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+        let url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250`;
         if(sinceId) url+=`&since_id=${sinceId}`;
         const d=await shopFetch(url);
         const batch=d.orders||[];
