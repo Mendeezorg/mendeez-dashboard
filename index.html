@@ -651,12 +651,15 @@ async function connectAll(){
 }
 
 async function loadAll(){
-  // loadProducts runs in parallel — products are ready before orders finish
-  // loadShopify and fetchSheets run together
-  await Promise.allSettled([loadShopify(),fetchSheets(),loadProducts(),loadCollections(),fetchProductCounts()]);
+  // Step 1: orders + sheets in parallel (both critical path)
+  await Promise.allSettled([loadShopify(),fetchSheets()]);
   renderDailyStats();
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+  // Step 2: products, collections, counts after orders done — worker is free now
+  loadProducts();
+  loadCollections();
+  fetchProductCounts();
 }
 async function refreshAll(){
   if(!STORE&&!SHEET_ID)return;
