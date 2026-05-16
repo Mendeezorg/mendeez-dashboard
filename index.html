@@ -756,6 +756,8 @@ async function fetchAllOrders(from, to, onProgress){
 // ═══════════ DATE RANGE STATE ═══════════
 let _preset='today', _customFrom=null, _customTo=null;
 let _searchTimer=null;
+let _returnsFetching=false;
+let _returnsRangeKey='';
 
 function getRange(){
   const n=new Date();
@@ -1126,17 +1128,43 @@ function setAdsPlatform(p,el){
 
 function renderAds(){
   if(!adsLatest||!adsIdx){
-    // Show placeholder with platform name so buttons feel responsive
     const pName={all:'All Platforms',meta:'Meta',google:'Google',tiktok:'TikTok',snapchat:'Snapchat'}[_adsPlatform]||_adsPlatform;
     document.getElementById('platCards').innerHTML=`<div style="padding:20px;color:var(--muted);font-family:var(--mono);font-size:12px">No ads data loaded yet. Sheet data loads automatically — check the badge at the top. Selected: <strong style="color:var(--accent)">${pName}</strong></div>`;
     return;
   }
-  const r=adsLatest,i=adsIdx;
+  const i=adsIdx;
+
+  // Filter adsTrend rows to selected date range, then SUM — so cards show the full range
+  const {from,to}=getRange();
+  const rangeRows=adsTrend.filter(row=>{
+    const d=row[i.date];
+    if(!d)return false;
+    // Try parsing the sheet date string (supports dd/mm/yyyy, yyyy-mm-dd, MMM dd etc)
+    const dt=new Date(d);
+    if(!isNaN(dt))return dt>=from&&dt<=to;
+    // Try dd/mm/yyyy
+    const parts=d.split('/');
+    if(parts.length===3){
+      const dt2=new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`);
+      if(!isNaN(dt2))return dt2>=from&&dt2<=to;
+    }
+    return false;
+  });
+  // If no rows match the range (sheet may not cover the selected range), fall back to all rows
+  const rows=rangeRows.length>0?rangeRows:adsTrend;
+
+  // Sum all matched rows for each platform
+  const sum=(col)=>rows.reduce((a,r)=>a+nc(r[col]),0);
+  const mS=sum(i.mS),mR=sum(i.mR),mO=sum(i.mO);
+  const gS=sum(i.gS),gR=sum(i.gR),gO=sum(i.gO);
+  const tS2=sum(i.tS),tR=sum(i.tR),tO=sum(i.tO);
+  const sS=sum(i.sS),sR=sum(i.sR),sO=sum(i.sO);
+
   const allPlats=[
-    {key:'meta',    n:'Meta',     ic:'im',lt:'M',s:nc(r[i.mS]),o:nc(r[i.mO]),rv:nc(r[i.mR]),roas:nc(r[i.mRoas])},
-    {key:'google',  n:'Google',   ic:'ig',lt:'G',s:nc(r[i.gS]),o:nc(r[i.gO]),rv:nc(r[i.gR]),roas:nc(r[i.gRoas])},
-    {key:'tiktok',  n:'TikTok',   ic:'it',lt:'T',s:nc(r[i.tS]),o:nc(r[i.tO]),rv:nc(r[i.tR]),roas:nc(r[i.tRoas])},
-    {key:'snapchat',n:'Snapchat', ic:'is',lt:'S',s:nc(r[i.sS]),o:nc(r[i.sO]),rv:nc(r[i.sR]),roas:nc(r[i.sRoas])},
+    {key:'meta',    n:'Meta',     ic:'im',lt:'M',s:mS,o:mO,rv:mR,roas:mS>0?mR/mS:0},
+    {key:'google',  n:'Google',   ic:'ig',lt:'G',s:gS,o:gO,rv:gR,roas:gS>0?gR/gS:0},
+    {key:'tiktok',  n:'TikTok',   ic:'it',lt:'T',s:tS2,o:tO,rv:tR,roas:tS2>0?tR/tS2:0},
+    {key:'snapchat',n:'Snapchat', ic:'is',lt:'S',s:sS,o:sO,rv:sR,roas:sS>0?sR/sS:0},
   ];
   // Filter plats based on selection
   const plats=_adsPlatform==='all'?allPlats:allPlats.filter(p=>p.key===_adsPlatform);
@@ -1177,7 +1205,8 @@ function renderAds(){
     </div>`;
   }
   document.getElementById('platCards').innerHTML=html;
-  document.getElementById('adsTrendTitle').textContent='Trend — '+(_adsPlatform==='all'?'All Platforms':allPlats.find(p=>p.key===_adsPlatform)?.n||_adsPlatform);
+  const _rangeCtx=rangeRows.length>0?` (${rows.length} day${rows.length!==1?'s':''} in range)`:' (all data)';
+  document.getElementById('adsTrendTitle').textContent='Trend — '+(_adsPlatform==='all'?'All Platforms':allPlats.find(p=>p.key===_adsPlatform)?.n||_adsPlatform)+_rangeCtx;
 
   // Trend table — columns depend on selected platform
   const rc2=v=>`color:${v>=5?'var(--green)':v>=3?'var(--accent)':v>0?'var(--red)':'var(--muted2)'}`;
@@ -1190,7 +1219,7 @@ function renderAds(){
   const isAll=_adsPlatform==='all';
   if(isAll){
     document.getElementById('adsTblHead').innerHTML='<th>Date</th><th>Meta Spend</th><th>Meta ROAS</th><th>Google Spend</th><th>Google ROAS</th><th>TikTok Spend</th><th>TikTok ROAS</th><th>Snap Spend</th><th>Snap ROAS</th><th>Total Spend</th><th>Blended ROAS</th>';
-    document.getElementById('adsTbl').innerHTML=adsTrend.map(row=>{
+    document.getElementById('adsTbl').innerHTML=rows.map(row=>{
       const ms=nc(row[i.mS]),mr=nc(row[i.mRoas]),gs=nc(row[i.gS]),gr=nc(row[i.gRoas]);
       const ts=nc(row[i.tS]),tr=nc(row[i.tRoas]),ss=nc(row[i.sS]),sr=nc(row[i.sRoas]);
       const tS2=ms+gs+ts+ss,tRv2=nc(row[i.mR])+nc(row[i.gR])+nc(row[i.tR])+nc(row[i.sR]);
@@ -1200,7 +1229,7 @@ function renderAds(){
   } else {
     const cols=colMap[_adsPlatform]||colMap.meta;
     document.getElementById('adsTblHead').innerHTML=cols.map(c=>`<th>${c.h}</th>`).join('');
-    document.getElementById('adsTbl').innerHTML=adsTrend.map(row=>{
+    document.getElementById('adsTbl').innerHTML=rows.map(row=>{
       return'<tr>'+cols.map(col=>{
         if(col.h==='Date')return`<td style="font-weight:500">${row[i.date]||'—'}</td>`;
         if(col.calc==='cpa'){const s=nc(row[i[col.ks]]),o=nc(row[i[col.ko]]);return`<td class="tm tmut">${o>0?'PKR '+fmt(Math.round(s/o)):'—'}</td>`;}
@@ -1785,24 +1814,36 @@ function renderDailyStats(){
   const cntCrr=window._crrCnt||{dispatched:0,delivered:0,returned:0};
   const os=csData.orderStatus||{};
 
-  // Returns card — populated by fetchReturnsByDate() which filters by refund-processed-date
-  // This matches Shopify Analytics exactly (unlike reading refunds nested in created_at-filtered orders)
+  // Returns card — fetched separately by date of refund processing (matches Shopify Analytics)
   const retLblEl=document.getElementById('returns-range-lbl');
   if(retLblEl)retLblEl.textContent=rangeLabel();
   const retEl=document.getElementById('s-shopify-returns');
   const retSub=document.getElementById('s-shopify-returns-sub');
-  if(retEl&&!retEl.dataset.loaded){retEl.textContent='…';retEl.className='sv muted';}
-  if(retSub&&!retSub.dataset.loaded)retSub.textContent='Calculating...';
-  if(STORE&&STORE!=='demo'&&TOKEN) fetchReturnsByDate();
+  // Only re-fetch if date range changed or not yet fetched
+  const _rangeKey=rangeLabel();
+  if(STORE&&STORE!=='demo'&&TOKEN){
+    if(_rangeKey!==_returnsRangeKey){
+      // Range changed — reset and re-fetch
+      _returnsRangeKey=_rangeKey;
+      _returnsFetching=false;
+      if(retEl){retEl.textContent='…';retEl.className='sv muted';delete retEl.dataset.loaded;}
+      if(retSub){retSub.textContent='Calculating...';delete retSub.dataset.loaded;}
+    }
+    if(!_returnsFetching&&!retEl?.dataset.loaded) fetchReturnsByDate();
+  }
 
   // Ad spend from date range
   let adSpend=0;
   if(adsIdx&&adsTrend.length){
     const {from,to}=getRange();
     const rows=adsTrend.filter(row=>{
-      const d=(row[0]||'').trim();
-      const p=new Date(d.replace(/(\d+)-([A-Za-z]+)-(\d+)/,'$2 $1 $3'));
-      return !isNaN(p)&&p>=from&&p<=to;
+      const d=row[adsIdx.date];
+      if(!d)return false;
+      const dt=new Date(d);
+      if(!isNaN(dt))return dt>=from&&dt<=to;
+      const parts=d.split('/');
+      if(parts.length===3){const dt2=new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`);if(!isNaN(dt2))return dt2>=from&&dt2<=to;}
+      return false;
     });
     const use=rows.length>0?rows:adsTrend;
     adSpend=use.reduce((s,r)=>[adsIdx.mS,adsIdx.gS,adsIdx.tS,adsIdx.sS].reduce((a,ci)=>a+nc(r[ci]),s),0);
@@ -1860,51 +1901,60 @@ function renderDailyStats(){
 
 
 // ── Fetch returns by refund-processed-date (matches Shopify Analytics / ShopifyQL) ──
-// Key facts from live Shopify data:
-// 1. Your returns are RTO — total_refunded=0, transactions=empty, refund_line_items have real subtotals
-// 2. ShopifyQL "returns" = sum of refund_line_items.subtotal where refund.created_at in range
-// 3. Can't use since_id + updated_at (Shopify bug — since_id ignores date filter on next pages)
-// Fix: chunk by month, fetch only refunded orders (financial_status filter), filter refund.created_at
+// Confirmed by Shopify support:
+// - Field: refundLineItems[].subtotalSet (totalRefundedSet=0 on COD — expected)
+// - Date: filter by refund.createdAt (the processed date), not order date
+// - No financial_status filter — count ALL statuses
+// - Strategy: GraphQL with updated_at filter + cursor pagination (most reliable)
 async function fetchReturnsByDate(){
+  if(_returnsFetching)return;
+  _returnsFetching=true;
   const {from,to}=getRange();
   const retEl=document.getElementById('s-shopify-returns');
   const retSub=document.getElementById('s-shopify-returns-sub');
   try{
-    // Look back up to 2 years — old orders may have been refunded recently
-    const lookbackStart=new Date(from);lookbackStart.setFullYear(lookbackStart.getFullYear()-2);
-    let allRelevantOrders=[];
-    // Chunk by MONTH — avoids since_id+date filter bug, keeps each page count low
-    const cursor=new Date(lookbackStart);cursor.setDate(1);cursor.setHours(0,0,0,0);
-    let guard=0;
-    while(cursor<=to&&guard<30){
+    const fromISO=from.toISOString();
+    const toISO=to.toISOString();
+    let returnValue=0, returnCount=0;
+    let cursor=null, hasNextPage=true, guard=0;
+
+    while(hasNextPage && guard<50){
       guard++;
-      const monthEnd=new Date(cursor.getFullYear(),cursor.getMonth()+1,0,23,59,59,999);
-      const effectiveEnd=monthEnd>to?to:monthEnd;
-      let sinceId=null,hasMore=true,pg=0;
-      while(hasMore&&pg<10){
-        pg++;
-        // financial_status=voided covers your RTO returns; refunded/partially_refunded for cash refunds
-        let url=`/orders.json?status=any&financial_status=voided,refunded,partially_refunded&created_at_min=${cursor.toISOString()}&created_at_max=${effectiveEnd.toISOString()}&limit=250`;
-        if(sinceId)url+=`&since_id=${sinceId}`;
-        const d=await shopFetch(url);
-        const batch=d.orders||[];
-        allRelevantOrders=allRelevantOrders.concat(batch);
-        if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
-      }
-      cursor.setMonth(cursor.getMonth()+1);
-    }
-    // Sum refund_line_items.subtotal where refund.created_at is within selected range
-    // This exactly matches ShopifyQL: FROM sales SHOW returns
-    let returnCount=0,returnValue=0;
-    allRelevantOrders.forEach(o=>{
-      (o.refunds||[]).forEach(ref=>{
-        const refDate=new Date(ref.created_at);
-        if(refDate<from||refDate>to)return;
-        let rv=0;
-        (ref.refund_line_items||[]).forEach(rli=>{rv+=parseFloat(rli.subtotal||0);});
-        if(rv>0){returnValue+=rv;returnCount++;}
+      const afterClause=cursor?`, after: "${cursor}"`:'';
+      const gql=`{
+        orders(first:250${afterClause}, query:"updated_at:>='${fromISO}' updated_at:<='${toISO}'") {
+          edges { node {
+            refunds {
+              createdAt
+              refundLineItems(first:50){
+                edges { node { subtotalSet { shopMoney { amount } } } }
+              }
+            }
+          }}
+          pageInfo { hasNextPage endCursor }
+        }
+      }`;
+
+      const d=await shopFetch('/graphql.json','POST',{query:gql});
+      const ordersData=d?.data?.orders;
+      if(!ordersData) break;
+
+      ordersData.edges.forEach(({node:o})=>{
+        (o.refunds||[]).forEach(ref=>{
+          const refDate=new Date(ref.createdAt);
+          if(refDate<from||refDate>to)return;
+          let rv=0;
+          (ref.refundLineItems?.edges||[]).forEach(({node:rli})=>{
+            rv+=parseFloat(rli.subtotalSet?.shopMoney?.amount||0);
+          });
+          if(rv>0){returnValue+=rv;returnCount++;}
+        });
       });
-    });
+
+      hasNextPage=ordersData.pageInfo.hasNextPage;
+      cursor=ordersData.pageInfo.endCursor;
+    }
+
     window._shopifyReturns=returnCount;
     window._shopifyReturnValue=returnValue;
     if(retEl){
@@ -1912,14 +1962,16 @@ async function fetchReturnsByDate(){
       retEl.className=returnValue>0?'sv red':'sv muted';
       retEl.dataset.loaded='1';
     }
+    _returnsFetching=false;
     if(retSub){
       retSub.textContent=returnCount>0?returnCount+' return'+(returnCount!==1?'s':'')+' processed in range':'No returns in range';
       retSub.dataset.loaded='1';
     }
   }catch(e){
+    _returnsFetching=false;
     console.error('fetchReturnsByDate error:',e);
-    if(retEl){retEl.textContent='—';retEl.className='sv muted';}
-    if(retSub)retSub.textContent='Could not load returns';
+    if(retEl){retEl.textContent='ERR';retEl.className='sv red';}
+    if(retSub)retSub.textContent='Error: '+e.message.slice(0,60);
   }
 }
 
@@ -2343,14 +2395,13 @@ function buildReport(){
   const adT=window._adsTot||{};
   const i=adsIdx;
   let mS=0,mR=0,mRoas=0,mO=0,gS=0,gR=0,gRoas=0,gO=0,tS=0,tR=0,tRoas=0,tO=0,sS=0,sR=0,sRoas=0,sO=0;
-  if(adsLatest&&i){
-    mS=nc(adsLatest[i.mS]);mR=nc(adsLatest[i.mR]);mRoas=nc(adsLatest[i.mRoas]);mO=nc(adsLatest[i.mO]);
-    gS=nc(adsLatest[i.gS]);gR=nc(adsLatest[i.gR]);gRoas=nc(adsLatest[i.gRoas]);gO=nc(adsLatest[i.gO]);
-    tS=nc(adsLatest[i.tS]);tR=nc(adsLatest[i.tR]);tRoas=nc(adsLatest[i.tRoas]);tO=nc(adsLatest[i.tO]);
-    sS=nc(adsLatest[i.sS]);sR=nc(adsLatest[i.sR]);sRoas=nc(adsLatest[i.sRoas]);sO=nc(adsLatest[i.sO]);
+  // Use range-aggregated values from renderAds() via window._adsTot
+  // _adsTot is set by renderAds() which already filters and sums by selected date range
+  if(adT.spend!=null){
+    mS=adT.spend||0; // total across platforms — individual not needed in report
   }
-  const totS=mS+gS+tS+sS,totR=mR+gR+tR+sR,totO=mO+gO+tO+sO;
-  const totRoas=totS>0?totR/totS:0;
+  const totS=adT.spend||0,totR=adT.rev||0,totO=adT.orders||0;
+  const totRoas=adT.roas||0;
   const cnt=window._crrCnt||{dispatched:0,delivered:0,returned:0,booked:0,total:0};
   const called=manualData.called||0,confirmed=manualData.confirmed||0;
   const confRate=called>0?Math.round(confirmed/called*100)+'%':'—';
