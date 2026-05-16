@@ -869,29 +869,17 @@ async function loadShopify(){
 }
 async function loadProducts(){
   try{
-    // Uses page_info cursor (preferred) with since_id fallback.
-    // Guard raised to 30 to safely cover 7,000+ products (30 × 250).
-    let allProds=[],pageInfo=null,sinceId=null,hasMore=true,guard=0;
-    while(hasMore&&guard<30){
+    // You have 3,243 products — need 14 pages. Guard set to 20 to be safe.
+    // fields param keeps responses lean (only what renderProducts needs)
+    let allProds=[],sinceId=null,hasMore=true,guard=0;
+    while(hasMore&&guard<20){
       guard++;
-      let url;
-      if(pageInfo){
-        url='/products.json?limit=250&fields=id,title,product_type,status,variants&page_info='+pageInfo;
-      } else {
-        url='/products.json?limit=250&fields=id,title,product_type,status,variants';
-        if(sinceId) url+='&since_id='+sinceId;
-      }
+      let url='/products.json?limit=250&fields=id,title,product_type,status,variants';
+      if(sinceId) url+=`&since_id=${sinceId}`;
       const d=await shopFetch(url);
       const batch=d.products||[];
       allProds=allProds.concat(batch);
-      if(d._nextPageInfo){
-        pageInfo=d._nextPageInfo;sinceId=null;
-      } else if(batch.length<250){
-        hasMore=false;
-      } else {
-        // Worker not forwarding Link header — fall back to since_id
-        pageInfo=null;sinceId=batch[batch.length-1].id;
-      }
+      if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
     }
     allProducts=allProds;
     updateProductCounts();
@@ -2767,17 +2755,30 @@ window.addEventListener('load',()=>{
   if(manualData.confirmed)document.getElementById('i-confirmed').value=manualData.confirmed;
 });
 
-function vStock(v){return v.inventory_management?Math.max(0,v.inventory_quantity||0):999;}
+// ═══ PRODUCT COUNTS ═══
+async function fetchProductCounts(){
+  try{
+    const [pc,vc]=await Promise.all([shopFetch('/products/count.json?status=active'),shopFetch('/variants/count.json')]);
+    const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
+    if(e1&&pc.count)e1.textContent=pc.count.toLocaleString();
+    if(e2&&vc.count)e2.textContent=vc.count.toLocaleString();
+  }catch(e){console.log('counts:',e.message);}
+}
+function updateProductCounts(){
+  const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
+  if(e1)e1.textContent=allProducts.length.toLocaleString();
+  if(e2)e2.textContent=allProducts.reduce((s,p)=>s+(p.variants||[]).length,0).toLocaleString();
+}
+
 function renderProductRows(prods,tbl){
   if(!prods||!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
   tbl.innerHTML=prods.map(p=>{
     const variants=p.variants||[];
-    const totalStock=variants.reduce((s,v)=>s+vStock(v),0);
-    const sortedVars=[...variants].sort((a,b)=>vStock(b)-vStock(a));
-    const pills=sortedVars.map(v=>{const q=vStock(v);const l=v.title==='Default Title'?'Default':v.title;const lbl=q===999?'∞':q;const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="margin:2px;font-size:10px">${l}: ${lbl}</span>`;}).join('');
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
+    const pills=sortedVars.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const l=v.title==='Default Title'?'Default':v.title;const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="margin:2px;font-size:10px">${l}: ${q}</span>`;}).join('');
     const tp=totalStock===0?'pr':totalStock<10?'pa':'pg';
-    const dispStock=totalStock===0?'Out':totalStock>=999*variants.length?'Unlimited':totalStock+' units';
-    return`<tr><td style="font-weight:500">${p.title}</td><td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td><td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td><td class="tm">PKR ${fmt(parseFloat(sortedVars[0]?.price||0))}</td><td style="line-height:1.6">${pills}</td><td><span class="pill ${tp}">${dispStock}</span></td></tr>`;
+    return`<tr><td style="font-weight:500">${p.title}</td><td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td><td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td><td class="tm">PKR ${fmt(parseFloat(sortedVars[0]?.price||0))}</td><td style="line-height:1.6">${pills}</td><td><span class="pill ${tp}">${totalStock===0?'Out':totalStock+' units'}</span></td></tr>`;
   }).join('');
 }
 
@@ -2876,6 +2877,18 @@ function searchProducts(){
   _searchTimer=setTimeout(()=>renderProducts(),200);
 }
 function applyProdFilter(){renderProducts();}
+function renderProductRows(prods,tbl){
+  if(!prods||!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
+  tbl.innerHTML=prods.map(p=>{
+    const variants=p.variants||[];
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
+    const pills=sortedVars.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const l=v.title==='Default Title'?'Default':v.title;const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="margin:2px;font-size:10px">${l}:${q}</span>`;}).join('');
+    const tp=totalStock===0?'pr':totalStock<10?'pa':'pg';
+    const price=parseFloat(sortedVars[0]?.price||0);
+    return`<tr><td style="font-weight:500">${p.title}</td><td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td><td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td><td class="tm">PKR ${fmt(price)}</td><td style="line-height:1.6">${pills}</td><td><span class="pill ${tp}">${totalStock===0?'Out':totalStock+' units'}</span></td></tr>`;
+  }).join('');
+}
 
 // ═══ DRAG SORTER ═══
 async function loadSorterCollection(){
@@ -2905,13 +2918,12 @@ function renderSorterGrid(){
   el.innerHTML=_sorterProds.map((p,i)=>{
     const variants=p.variants||[];
     const img=(p.images&&p.images[0])?p.images[0].src:'';
-    const totalStock=variants.reduce((s,v)=>s+vStock(v),0);
-    const availV=variants.filter(v=>vStock(v)>0).length;
+    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+    const availV=variants.filter(v=>(v.inventory_quantity||0)>0).length;
     const totalV=variants.length;
     const sc=totalStock===0?'var(--red)':availV<totalV?'var(--accent)':'var(--green)';
     const si=totalStock===0?'🔴':availV===totalV?'✅':'⚠️';
-    const pills=variants.map(v=>{const q=vStock(v);const lbl=q>=999?'∞':q;const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="font-size:9px;margin:1px">${v.title==='Default Title'?'1':v.title}:${lbl}</span>`;}).join('');
-    const dispStock=totalStock===0?'0':totalStock>=999*totalV?'∞':String(totalStock);
+    const pills=variants.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="font-size:9px;margin:1px">${v.title==='Default Title'?'1':v.title}:${q}</span>`;}).join('');
     return`<div class="sorter-item" draggable="true" data-idx="${i}" ondragstart="sorterDragStart(event,${i})" ondragover="sorterDragOver(event)" ondrop="sorterDrop(event,${i})" ondragend="sorterDragEnd(event)" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:grab;user-select:none;transition:border-color .15s">
       <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted2);min-width:26px">${String(i+1).padStart(2,'0')}</div>
       <div style="color:var(--muted2);font-size:20px">⠿</div>
@@ -2923,7 +2935,7 @@ function renderSorterGrid(){
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:18px">${si}</div>
-        <div style="font-family:var(--mono);font-size:12px;color:${sc};font-weight:600">${dispStock}</div>
+        <div style="font-family:var(--mono);font-size:12px;color:${sc};font-weight:600">${totalStock}</div>
         <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">${availV}/${totalV} sizes</div>
       </div>
     </div>`;
@@ -2942,8 +2954,8 @@ function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style
 function runSort(){
   if(!_sorterProds.length){document.getElementById('sortSts').textContent='Select a collection first';return;}
   const rule=document.getElementById('sortRule').value;
-  const gT=p=>(p.variants||[]).reduce((s,v)=>s+vStock(v),0);
-  const gA=p=>(p.variants||[]).filter(v=>vStock(v)>0).length;
+  const gT=p=>(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+  const gA=p=>(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
   _sorterProds.sort((a,b)=>{
     if(rule==='stock_asc')return gT(a)-gT(b);
     if(rule==='variants_desc')return gA(b)-gA(a);
