@@ -733,23 +733,38 @@ async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
   try{
-    // Fetch ALL orders with proper pagination
+    // Fetch ALL orders using page parameter (respects date range correctly)
     let allOrders=[];
-    let lastId=0;
+    let page=1;
     let hasMore=true;
     while(hasMore){
-      const url=lastId>0
-        ? `/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&since_id=${lastId}`
-        : `/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+      const url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&page=${page}`;
       const d=await shopFetch(url);
       const batch=d.orders||[];
       allOrders=allOrders.concat(batch);
       setBadge('s','amber',allOrders.length+' orders...');
       if(batch.length<250){hasMore=false;}
-      else{lastId=batch[batch.length-1].id;}
-      if(allOrders.length>10000){hasMore=false;}
+      else{page++;}
+      if(page>20||allOrders.length>5000){hasMore=false;}
     }
     ordersData=allOrders;
+    // Calculate returns from refund line items in fetched orders
+    let returnCount=0,returnValue=0;
+    ordersData.forEach(o=>{
+      const refunds=o.refunds||[];
+      if(refunds.length>0){
+        returnCount++;
+        refunds.forEach(ref=>{
+          (ref.refund_line_items||[]).forEach(rli=>{returnValue+=parseFloat(rli.subtotal||0);});
+          if((ref.refund_line_items||[]).length===0){
+            (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')returnValue+=parseFloat(t.amount||0);});
+          }
+        });
+      }
+    });
+    window._shopifyReturns=returnCount;
+    window._shopifyReturnValue=returnValue;
+    console.log('Returns:',returnCount,'orders, PKR',returnValue);
     setBadge('s','live',ordersData.length+' orders · '+rangeLabel());
     weeklyOrdersData=ordersData;
     document.getElementById('todayDate').textContent=rangeLabel();
@@ -767,50 +782,49 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    // Fetch ALL orders using since_id pagination
+    // Fetch ALL orders - use page parameter which respects date filters
     let allOrders=[];
-    let lastId=0;
+    let page=1;
     let hasMore=true;
     while(hasMore){
-      const url=lastId>0
-        ? `/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&since_id=${lastId}`
-        : `/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+      const url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&page=${page}`;
       const d=await shopFetch(url);
       const batch=d.orders||[];
       allOrders=allOrders.concat(batch);
       setBadge('s','amber',allOrders.length+' orders...');
       if(batch.length<250){hasMore=false;}
-      else{lastId=batch[batch.length-1].id;}
-      if(allOrders.length>10000){hasMore=false;}
+      else{page++;}
+      if(page>20||allOrders.length>5000){hasMore=false;}
     }
     ordersData=allOrders;
-    setBadge('s','amber',ordersData.length+' orders loaded');
-    // Calculate Shopify returns from refund transactions on orders
-    // Sum all refund amounts from order.refunds[].transactions[].amount where kind='refund'
+    
+    // Calculate returns from refund line items in the orders we already fetched
+    // ordersData already contains refunds[] array per order
     let returnCount=0, returnValue=0;
     ordersData.forEach(o=>{
       const refunds=o.refunds||[];
       if(refunds.length>0){
         returnCount++;
         refunds.forEach(ref=>{
-          (ref.transactions||[]).forEach(t=>{
-            if(t.kind==='refund'||t.kind==='suggested_refund'){
-              returnValue+=parseFloat(t.amount||0);
-            }
-          });
-          // Also count refund line items value
+          // refund_line_items contains the actual returned product values
           (ref.refund_line_items||[]).forEach(rli=>{
             returnValue+=parseFloat(rli.subtotal||0);
+          });
+          // Also check transactions for cash refunds
+          (ref.transactions||[]).forEach(t=>{
+            if(t.kind==='refund'){
+              // Only add if no line items (avoid double counting)
+              if((ref.refund_line_items||[]).length===0){
+                returnValue+=parseFloat(t.amount||0);
+              }
+            }
           });
         });
       }
     });
-    // If no refund transactions found but orders have refunds, use order subtotal
-    if(returnCount>0&&returnValue===0){
-      returnValue=ordersData.filter(o=>(o.refunds||[]).length>0).reduce((s,o)=>s+parseFloat(o.total_price||0),0);
-    }
     window._shopifyReturns=returnCount;
     window._shopifyReturnValue=returnValue;
+    console.log('Returns calculated:',returnCount,'orders, PKR',returnValue);
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
     fetchProductCounts();
