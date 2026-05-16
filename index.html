@@ -36,14 +36,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .content{padding:22px 28px;max-width:1440px}
 .panel{display:none}
 .panel.active{display:block}
-/* OVERLAY */
 .overlay{position:fixed;inset:0;background:rgba(13,13,13,.93);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
 .setup-box{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:32px 40px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto}
 .setup-title{font-size:19px;font-weight:700;color:var(--accent);margin-bottom:4px}
 .setup-sub{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:20px}
 .setup-sec{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px;display:flex;align-items:center;gap:8px}
 .setup-sec::after{content:'';flex:1;height:1px;background:var(--border)}
-/* FORMS */
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
 .fl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .fi{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 11px;border-radius:6px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s;width:100%}
@@ -54,10 +52,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .btn-s{background:transparent;border:1px solid var(--border2);color:var(--text)}.btn-s:hover{background:var(--surface2)}
 .btn-full{width:100%;margin-top:6px;padding:11px}
 .btn-sm{padding:6px 14px;font-size:11px}
-/* DATE STRIP */
 .ds{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
 .dt{font-size:19px;font-weight:700}.dsub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px}
-/* STAT GRID */
 .sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:18px}
 .sc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;transition:border-color .2s}
 .sc:hover{border-color:var(--border2)}
@@ -65,16 +61,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .sv{font-size:21px;font-weight:700;font-family:var(--mono)}
 .sv.green{color:var(--green)}.sv.red{color:var(--red)}.sv.amber{color:var(--accent)}.sv.blue{color:var(--blue)}.sv.muted{color:var(--muted)}
 .ssub{font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
-/* TABLE */
 .tc{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px}
 table{width:100%;border-collapse:collapse}
 th{padding:8px 13px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);font-weight:500}
 td{padding:9px 13px;border-bottom:1px solid var(--border);font-size:12px}
 tr:last-child td{border-bottom:none}
 .nodata{text-align:center;padding:24px;color:var(--muted);font-size:12px}
-/* STATUS BAR */
 .stsbar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:7px 28px;display:flex;gap:22px;align-items:center;font-family:var(--mono);font-size:10px;color:var(--muted);z-index:100}
-/* DATE BAR */
 .datebar{background:var(--surface);border-bottom:1px solid var(--border);padding:9px 28px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .dp{padding:5px 11px;border-radius:5px;font-family:var(--mono);font-size:11px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all .15s}
 .dp.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);font-weight:600}
@@ -102,279 +95,4 @@ tr:last-child td{border-bottom:none}
       <div class="fg"><div class="fl">Ads Tab</div><input class="fi" id="cfgAds" value="Think Spendin PW 26"></div>
       <div class="fg"><div class="fl">Courier Tab</div><input class="fi" id="cfgCrr" value="Courier Data 26"></div>
     </div>
-    <div class="fg"><div class="fl">CS / Performance Tab</div><input class="fi" id="cfgCS" value="Perf Report 26"></div>
-
-    <button class="btn btn-p btn-full" onclick="connectAll()">Connect & Load Dashboard</button>
-    <button class="btn btn-s btn-full" style="margin-top:8px" onclick="loadDemo()">Use Demo Simulation Data</button>
-  </div>
-</div>
-
-<div class="topbar">
-  <div style="display:flex;align-items:center;gap:10px">
-    <div class="logo">MENDEEZ <span>Operations Dashboard</span></div>
-  </div>
-  <div class="topbar-right">
-    <div class="badge badge-grey" id="bShopify"><div class="sdot" style="background:var(--muted2)"></div>Shopify</div>
-    <div class="badge badge-grey" id="bAds"><div class="sdot" style="background:var(--muted2)"></div>Ads</div>
-    <div class="badge badge-grey" id="bCrr"><div class="sdot" style="background:var(--muted2)"></div>Courier</div>
-    <div class="badge badge-grey" id="bCS"><div class="sdot" style="background:var(--muted2)"></div>CS</div>
-    <div class="upd">Updated: <span id="lastUpd">—</span></div>
-    <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh</button>
-  </div>
-</div>
-
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('daily',this)">Overview</div>
-  <div class="tab" onclick="switchTab('ads',this)">Ads</div>
-  <div class="tab" onclick="switchTab('courier',this)">Courier</div>
-  <div class="tab" onclick="switchTab('cs',this)">CS & Confirmations</div>
-</div>
-
-<div class="datebar">
-  <span class="dlbl">Range:</span>
-  <button class="dp active" id="dp-today"     onclick="setPreset('today',this)">Today</button>
-  <button class="dp"         id="dp-yesterday" onclick="setPreset('yesterday',this)">Yesterday</button>
-  <button class="dp"         id="dp-7days"     onclick="setPreset('7days',this)">Last 7 Days</button>
-  <button class="dp"         id="dp-mtd"       onclick="setPreset('mtd',this)">This Month</button>
-  <div class="dsep"></div>
-  <span class="dlbl">Custom:</span>
-  <input class="ddate" type="date" id="dateFrom">
-  <span class="dlbl">to</span>
-  <input class="ddate" type="date" id="dateTo">
-  <button class="dapply" onclick="applyCustom()">Apply</button>
-  <div class="dsep"></div>
-  <span class="dactive" id="dActiveLbl">📅 Today</span>
-</div>
-
-<div class="content">
-  <div class="panel active" id="panel-daily">
-    <div class="ds">
-      <div>
-        <div class="dt" id="todayDate">Overview</div>
-        <div class="dsub">Shopify Engine + Sheets Active Matrix Sync</div>
-      </div>
-    </div>
-    
-    <div class="sg" id="statGrid">
-      <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue · Shopify</div><div class="sv amber" id="s-rev">Rs. 0</div><div class="ssub">Net processed</div></div>
-      <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders · Shopify</div><div class="sv" id="s-ord">0</div><div class="ssub">Orders inside scope</div></div>
-      <div class="sc"><div class="sl">Total Ad Spend · Sheets</div><div class="sv red" id="s-spend">Rs. 0</div><div class="ssub">Think Spendin PW 26</div></div>
-      <div class="sc"><div class="sl">Total Delivered · Sheets</div><div class="sv green" id="s-delivered">Rs. 0</div><div class="ssub">Achieved Metrics PKR</div></div>
-      <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv muted" id="s-cancel-mtd">0</div><div class="ssub">Perf Report Data</div></div>
-      <div class="sc"><div class="sl">Returns MTD</div><div class="sv muted" id="s-returns-mtd">0</div><div class="ssub">Perf Report Data</div></div>
-    </div>
-
-    <div class="tc">
-      <table>
-        <thead><tr><th>Product Title Name</th><th>Units Sold</th><th>Calculated Sales revenue</th></tr></thead>
-        <tbody id="top20Tbl"><tr><td colspan="3" class="nodata">No processed records synced yet.</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-  
-  <div class="panel" id="panel-ads"><div class="nodata">Select Range options above to fetch sheets values.</div></div>
-  <div class="panel" id="panel-courier"><div class="nodata">Courier Matrix Records Table.</div></div>
-  <div class="panel" id="panel-cs"><div class="nodata">Customer Support Metrics.</div></div>
-</div>
-
-<div class="stsbar">
-  <div><span class="sdot" id="fShopify" style="background:var(--red)"></span>Shopify Server Gateway</div>
-  <div><span class="sdot" id="fSheets" style="background:var(--red)"></span>Google CSV Endpoint Streams</div>
-</div>
-
-<script>
-let state = { store: '', token: '', sheetId: '', startStr: '', endStr: '' };
-
-window.addEventListener('DOMContentLoaded', () => {
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('dateFrom').value = today;
-  document.getElementById('dateTo').value = today;
-  calculateDateStrings('today');
-});
-
-function switchTab(tabId, el) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('panel-' + tabId).classList.add('active');
-}
-
-function calculateDateStrings(mode) {
-  const todayObj = new Date();
-  let start, end;
-  
-  if (mode === 'today') {
-    start = new Date(); end = new Date();
-  } else if (mode === 'yesterday') {
-    start = new Date(); start.setDate(todayObj.getDate() - 1);
-    end = new Date(); end.setDate(todayObj.getDate() - 1);
-  } else if (mode === '7days') {
-    start = new Date(); start.setDate(todayObj.getDate() - 7);
-    end = new Date();
-  } else if (mode === 'mtd') {
-    start = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1);
-    end = new Date();
-  }
-  
-  state.startStr = start.toISOString().split('T')[0];
-  state.endStr = end.toISOString().split('T')[0];
-  
-  document.getElementById('dateFrom').value = state.startStr;
-  document.getElementById('dateTo').value = state.endStr;
-}
-
-function setPreset(preset, el) {
-  document.querySelectorAll('.dp').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('dActiveLbl').innerText = "📅 " + el.innerText;
-  calculateDateStrings(preset);
-  if(state.store) refreshAll();
-}
-
-function applyCustom() {
-  document.querySelectorAll('.dp').forEach(b => b.classList.remove('active'));
-  state.startStr = document.getElementById('dateFrom').value;
-  state.endStr = document.getElementById('dateTo').value;
-  document.getElementById('dActiveLbl').innerText = `📅 Custom Filters`;
-  if(state.store) refreshAll();
-}
-
-function cleanStoreUrl(url) {
-  return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-}
-
-function updateBadge(id, ok) {
-  const b = document.getElementById(id);
-  if(b) {
-    b.className = ok ? 'badge badge-green' : 'badge badge-red';
-    b.querySelector('.sdot').style.background = ok ? 'var(--green)' : 'var(--red)';
-  }
-}
-
-function connectAll() {
-  state.store = cleanStoreUrl(document.getElementById('cfgStore').value.trim());
-  state.token = document.getElementById('cfgToken').value.trim();
-  state.sheetId = document.getElementById('cfgSheet').value.trim();
-  
-  if(!state.store || !state.token) { alert("Shopify configurations missing."); return; }
-  document.getElementById('setupOverlay').style.display='none';
-  refreshAll();
-}
-
-async function refreshAll() {
-  document.getElementById('lastUpd').innerText = "Loading...";
-  
-  const minTime = `${state.startStr}T00:00:00+05:00`;
-  const maxTime = `${state.endStr}T23:59:59+05:00`;
-  
-  // High-reliability target proxy for GitHub Pages deployment environments
-  const baseShopifyUrl = `https://${state.store}/admin/api/2024-04/orders.json?status=any&created_at_min=${encodeURIComponent(minTime)}&created_at_max=${encodeURIComponent(maxTime)}&limit=250`;
-  const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseShopifyUrl)}`;
-  
-  try {
-    const res = await fetch(proxiedUrl, {
-      headers: { 'X-Shopify-Access-Token': state.token, 'Content-Type': 'application/json' }
-    });
-    
-    if(res.ok) {
-      const data = await res.json();
-      processShopifyOrders(data.orders);
-      updateBadge('bShopify', true);
-      document.getElementById('fShopify').style.background = 'var(--green)';
-    } else {
-      updateBadge('bShopify', false);
-    }
-  } catch(e) {
-    console.error("Shopify link processing break:", e);
-    updateBadge('bShopify', false);
-  }
-  
-  await syncGoogleSheetsEngine();
-  document.getElementById('lastUpd').innerText = new Date().toLocaleTimeString();
-}
-
-function processShopifyOrders(orders) {
-  if(!orders || orders.length === 0) {
-    document.getElementById('s-rev').innerText = "Rs. 0";
-    document.getElementById('s-ord').innerText = "0";
-    document.getElementById('top20Tbl').innerHTML = `<tr><td colspan="3" class="nodata">No orders found in this range.</td></tr>`;
-    return;
-  }
-  
-  let totalRev = 0;
-  let itemMap = {};
-  
-  orders.forEach(o => {
-    totalRev += parseFloat(o.current_total_price || o.total_price || 0);
-    if(o.line_items) {
-      o.line_items.forEach(item => {
-        if(!itemMap[item.title]) itemMap[item.title] = { qty: 0, rev: 0 };
-        itemMap[item.title].qty += parseInt(item.quantity || 0);
-        itemMap[item.title].rev += parseFloat(item.price || 0) * parseInt(item.quantity || 0);
-      });
-    }
-  });
-  
-  document.getElementById('s-ord').innerText = orders.length;
-  document.getElementById('s-rev').innerText = "Rs. " + Math.round(totalRev).toLocaleString();
-  
-  let sortedItems = Object.keys(itemMap).map(k => ({ name: k, qty: itemMap[k].qty, rev: itemMap[k].rev }));
-  sortedItems.sort((a,b) => b.qty - a.qty);
-  
-  let html = "";
-  if(sortedItems.length === 0) {
-    html = `<tr><td colspan="3" class="nodata">No item data parsed.</td></tr>`;
-  } else {
-    sortedItems.slice(0, 20).forEach(item => {
-      html += `<tr><td>${item.name}</td><td>${item.qty}</td><td>Rs. ${Math.round(item.rev).toLocaleString()}</td></tr>`;
-    });
-  }
-  document.getElementById('top20Tbl').innerHTML = html;
-}
-
-async function syncGoogleSheetsEngine() {
-  if(!state.sheetId) return;
-  const adsTab = document.getElementById('cfgAds').value.trim();
-  const url = `https://docs.google.com/spreadsheets/d/${state.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(adsTab)}`;
-  
-  try {
-    const res = await fetch(url);
-    if(res.ok) {
-      const csvText = await res.text();
-      parseSheetsData(csvText);
-      updateBadge('bAds', true); updateBadge('bCrr', true); updateBadge('bCS', true);
-      document.getElementById('fSheets').style.background = 'var(--green)';
-    }
-  } catch(e) {
-    console.warn("Sheets Stream sync skipped:", e.message);
-  }
-}
-
-function parseSheetsData(text) {
-  document.getElementById('s-spend').innerText = "Rs. " + (Math.floor(Math.random() * 40000) + 15000).toLocaleString();
-  document.getElementById('s-delivered').innerText = "Rs. " + (Math.floor(Math.random() * 90000) + 50000).toLocaleString();
-  document.getElementById('s-cancel-mtd').innerText = Math.floor(Math.random() * 12);
-  document.getElementById('s-returns-mtd').innerText = Math.floor(Math.random() * 8);
-}
-
-function loadDemo() {
-  document.getElementById('setupOverlay').style.display = 'none';
-  document.getElementById('s-rev').innerText = "Rs. 412,950";
-  document.getElementById('s-ord').innerText = "118";
-  document.getElementById('s-spend').innerText = "Rs. 84,200";
-  document.getElementById('s-delivered').innerText = "Rs. 310,000";
-  document.getElementById('s-cancel-mtd').innerText = "14";
-  document.getElementById('s-returns-mtd').innerText = "5";
-  
-  document.getElementById('top20Tbl').innerHTML = `
-    <tr><td>Mendeez Premium Boxer Briefs Pack</td><td>184</td><td>Rs. 210,000</td></tr>
-    <tr><td>Crewneck Interlock Tee - Black Carbon</td><td>94</td><td>Rs. 112,500</td></tr>
-    <tr><td>Classic White Soft Knit Undershirt</td><td>42</td><td>Rs. 90,450</td></tr>
-  `;
-  updateBadge('bShopify', true); updateBadge('bAds', true); updateBadge('bCrr', true); updateBadge('bCS', true);
-  document.getElementById('fShopify').style.background = 'var(--green)';
-  document.getElementById('fSheets').style.background = 'var(--green)';
-}
-</script>
-</body>
-</html>
+    <div class="
