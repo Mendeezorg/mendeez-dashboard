@@ -914,7 +914,12 @@ async function loadProducts(){
     }
     allProducts=allProds;
     updateProductCounts();
-    if(document.getElementById('panel-products')?.classList.contains('active')) renderProducts();
+    // Always re-render products tab — if user typed a search while loading, show results now
+    const search=(document.getElementById('prodSearch')?.value||'').trim();
+    const skuSearch=(document.getElementById('skuSearch')?.value||'').trim();
+    if(search||skuSearch||document.getElementById('panel-products')?.classList.contains('active')){
+      renderProducts();
+    }
   }catch(e){console.error('loadProducts fatal:',e);}
 }
 
@@ -1665,6 +1670,10 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     const a0=(r[0]||'').trim();
     const a0l=a0.toLowerCase();
     const rowText=rows[i].join(' ').toLowerCase();
+    // Find the first non-empty cell value (agent names can be in any column)
+    const firstCell=r.find(c=>c&&c.trim())||'';
+    const firstCellL=firstCell.toLowerCase().trim();
+
     if(i===sectionStart||(rowText.includes(monthName)&&(
       rowText.includes('cs data')||rowText.includes('cs')||
       rowText.includes('26')||rowText.includes('agent')||rowText.includes('dates')
@@ -1672,23 +1681,26 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
 
     if(!inSection)continue;
 
-    // Order status — inside inSection so we only read from the correct month
-    if(a0l.includes('landed mtd')){result.orderStatus.landed=nc(r[4]);result.orderStatus.landedVal=nc(r[4]);}
-    if(a0l.includes('total dispach')||a0l.includes('total dispatch')){result.orderStatus.dispatched=nc(r[4]);}
-    if(a0l.includes('delivered to customer')){result.orderStatus.delivered=nc(r[4]);}
-    if(a0l.includes('pending orders')){result.orderStatus.pending=nc(r[3]);}
-    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){result.orderStatus.cancelMTD=nc(r[3]);result.orderStatus.cancelMTDVal=nc(r[4]);result.orderStatus.cancel=nc(r[3]);}
-    if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){result.orderStatus.cancelCF=nc(r[3]);result.orderStatus.cancelCFVal=nc(r[4]);}
-    if(a0l.includes('mtd returns')&&!a0l.includes('cf')){result.orderStatus.returnsMTD=nc(r[3]);result.orderStatus.returnsMTDVal=nc(r[4]);result.orderStatus.returns=nc(r[3]);}
-    if(a0l.includes('cf returns')){result.orderStatus.returnsCF=nc(r[3]);result.orderStatus.returnsCFVal=nc(r[4]);}
+    // Order status — check first non-empty cell (can be in any column)
+    const anyCol=firstCellL;
+    if(anyCol.includes('landed mtd')){result.orderStatus.landed=nc(r[4]);result.orderStatus.landedVal=nc(r[4]);}
+    if(anyCol.includes('total dispach')||anyCol.includes('total dispatch')){result.orderStatus.dispatched=nc(r[4]);}
+    if(anyCol.includes('delivered to customer')){result.orderStatus.delivered=nc(r[4]);}
+    if(anyCol.includes('pending orders')){result.orderStatus.pending=nc(r[3]);}
+    if(anyCol.includes('cancelations mtd')&&!anyCol.includes('cf')){result.orderStatus.cancelMTD=nc(r[3]);result.orderStatus.cancelMTDVal=nc(r[4]);result.orderStatus.cancel=nc(r[3]);}
+    if(anyCol.includes('cancelations cf')||anyCol.includes('cancellations cf')){result.orderStatus.cancelCF=nc(r[3]);result.orderStatus.cancelCFVal=nc(r[4]);}
+    if(anyCol.includes('mtd returns')&&!anyCol.includes('cf')){result.orderStatus.returnsMTD=nc(r[3]);result.orderStatus.returnsMTDVal=nc(r[4]);result.orderStatus.returns=nc(r[3]);}
+    if(anyCol.includes('cf returns')){result.orderStatus.returnsCF=nc(r[3]);result.orderStatus.returnsCFVal=nc(r[4]);}
 
-    // Agents
-    if(a0l.includes('agent')||a0l.includes('nimra')||a0l.includes('abdullah')){
-      const agentData={name:a0,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
+    // Agents — name can be in ANY column (sheet has it in col 7/H)
+    if(firstCellL.includes('agent')||firstCellL.includes('nimra')||firstCellL.includes('abdullah')){
+      const agentData={name:firstCell,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
       let j=i;
       while(j<scanEnd&&j<i+8){
         const row=rows[j];
-        const metric=((row[1]||row[0])||'').toLowerCase().trim();
+        // Metric label is the second non-empty cell in sub-rows
+        const cells=row.filter(c=>c&&c.trim());
+        const metric=(cells[1]||cells[0]||'').toLowerCase().trim();
         const totCol=getTotCol(row);
         const totVal=nc(row[totCol]);
         const todayVal=dateColIdx>0&&dateColIdx<row.length?nc(row[dateColIdx]):0;
@@ -1704,8 +1716,8 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
       i=j-1;continue;
     }
 
-    // EWH
-    if(a0l.includes('e.com wh')||a0l==='ewh'||(a0l===''&&(r[1]||'').toLowerCase().includes('e.com wh'))){
+    // EWH — can be in any column
+    if(firstCellL.includes('e.com wh')||firstCellL==='ewh'||rowText.includes('e.com wh')){
       const dataRow=rows[i+1]||[];
       result.ewh.exch=nc(dataRow[2]||r[2]);result.ewh.dispVal=nc(dataRow[3]||r[3]);
       result.ewh.dispUnits=nc(dataRow[4]||r[4]);result.ewh.returnUnits=nc(dataRow[5]||r[5]);
