@@ -1599,14 +1599,19 @@ function processCS(rows){
   // Sort months chronologically
   availableMonths.sort((a,b)=>b.row-a.row); // newest first
 
+  console.log('[CS] Available months found:',availableMonths.map(m=>m.label+' @row'+m.row));
+  console.log('[CS] Looking for:',currentMonth,'sectionStart:',sectionStart);
+
   // Process each month's data
   for(const m of availableMonths){
     const mData = extractCSDataForMonth(rows, m.row, m.month);
     allCsMonths[m.label] = mData;
+    console.log('[CS]',m.label,'→ cancelMTD:',mData.orderStatus?.cancelMTDVal,'returnsMTD:',mData.orderStatus?.returnsMTDVal,'agents:',mData.agents?.length);
   }
 
   // Set csData from the correctly-parsed month section (agents, EWH, orderStatus all from right month)
   const currentLabel=currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1)+' 20'+currentYear;
+  console.log('[CS] currentLabel:',currentLabel,'exists in allCsMonths:',!!allCsMonths[currentLabel]);
   if(allCsMonths[currentLabel]){
     csData=JSON.parse(JSON.stringify(allCsMonths[currentLabel]));
   } else {
