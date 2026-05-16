@@ -468,8 +468,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- Products table with variants inline -->
   <div class="tc">
     <table>
-      <thead><tr><th style="width:35%">Product</th><th style="width:10%">Type</th><th style="width:8%">Status</th><th style="width:8%">Price</th><th>Variants & Stock</th><th style="width:10%">Total Stock</th></tr></thead>
-      <tbody id="prodTbl"><tr><td colspan="6" class="ldrow"><span class="si"></span>Loading...</td></tr></tbody>
+      <thead><tr><th style="width:45%">Product</th><th>Variants & Inventory</th><th style="width:140px;text-align:center">Total Units</th></tr></thead>
+      <tbody id="prodTbl"><tr><td colspan="3" class="ldrow"><span class="si"></span>Loading...</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -891,7 +891,7 @@ async function loadProducts(){
     // since_id can miss products if Shopify returns them out of order
     let allProds=[],page=1,hasMore=true,retries=0;
     while(hasMore&&page<=20){
-      const url=`/products.json?limit=250&page=${page}`;
+      const url=`/products.json?limit=250&page=${page}&fields=id,title,product_type,status,variants,images`;
       try{
         const d=await shopFetch(url);
         const batch=d.products||[];
@@ -1076,8 +1076,8 @@ async function fetchSheets(){
     try{
       processCS(csR.value);
     }catch(e){
-      console.error('processCS crash:',e);
-      setBadge('cs','error','Parse error: '+e.message.slice(0,30));
+      console.error('processCS crash:',e.stack||e);
+      setBadge('cs','error',e.message.slice(0,40));
     }
   }else{
     setBadge('cs','error',getErrHint(csR.reason));
@@ -2250,13 +2250,17 @@ function renderProducts(){
     const msg=allProducts.length===0
       ?'⏳ Products still loading... please wait a moment then search'
       :'🔍 Type a product name or SKU above to search';
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="6" class="nodata" style="padding:30px">${msg}</td></tr>`;
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px">${msg}</td></tr>`;
     document.getElementById('prodCount').textContent=allProducts.length>0?allProducts.length+' products loaded':'';
     return;
   }
-  // If products haven't loaded yet, show message
+  // If products haven't loaded yet — check API count to show accurate message
   if(allProducts.length===0){
-    document.getElementById('prodTbl').innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">⏳ Products still loading... try again in a moment</td></tr>';
+    const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
+    const msg=apiCount>0
+      ?`⏳ ${apiCount.toLocaleString()} products found on Shopify but still downloading... please wait and try again`
+      :'⏳ Products still loading... please wait and try again';
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px">${msg}</td></tr>`;
     return;
   }
 
@@ -2281,7 +2285,6 @@ function renderProducts(){
 
   filteredProds.forEach(p=>{
     const variants=p.variants||[];
-    // Apply stock filter
     const totalStock=variants.reduce((s,v)=>s+(v.inventory_quantity||0),0);
     if(filter==='out'&&totalStock!==0)return;
     if(filter==='low'&&(totalStock===0||totalStock>=10))return;
@@ -2289,30 +2292,54 @@ function renderProducts(){
 
     // Sort variants: highest stock first
     const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
-
-    // Build variant pills — each shows "size: qty"
-    const varPills=sortedVars.map(v=>{
-      const qty=v.inventory_quantity||0;
-      const lbl=v.title==='Default Title'?'Default':v.title;
-      const pillCls=qty===0?'pr':qty<5?'pa':qty<10?'po':'pg';
-      return`<span class="pill ${pillCls}" style="margin:2px;font-size:10px">${lbl}: ${qty}</span>`;
-    }).join('');
-
-    // Total stock pill
-    const totalPill=totalStock===0?'pr':totalStock<10?'pa':'pg';
     const price=parseFloat(sortedVars[0]?.price||0);
 
-    rows.push(`<tr>
-      <td style="font-weight:500;max-width:220px">${p.title}</td>
-      <td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td>
-      <td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td>
-      <td class="tm">PKR ${fmt(price)}</td>
-      <td style="max-width:400px;line-height:1.6">${varPills}</td>
-      <td><span class="pill ${totalPill}">${totalStock===0?'Out of stock':totalStock+' units'}</span></td>
+    // Product image
+    const imgSrc=(p.images&&p.images[0])?p.images[0].src:'';
+    const imgHtml=imgSrc
+      ?`<img src="${imgSrc}" style="width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0" onerror="this.style.display='none'">`
+      :`<div style="width:54px;height:54px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted);font-size:18px">📦</div>`;
+
+    // Variant rows — each variant on its own line with SKU and inventory
+    const varRows=sortedVars.map(v=>{
+      const qty=v.inventory_quantity||0;
+      const pillCls=qty===0?'pr':qty<5?'pa':qty<10?'po':'pg';
+      const lbl=v.title==='Default Title'?'Default':v.title;
+      const skuHtml=v.sku?`<span style="color:var(--muted);font-size:10px;font-family:var(--mono)"> · ${v.sku}</span>`:'';
+      return`<div style="display:flex;align-items:center;gap:8px;padding:2px 0;border-bottom:1px solid var(--border2)">
+        <span style="min-width:80px;font-size:11px;font-weight:500">${lbl}${skuHtml}</span>
+        <span class="pill ${pillCls}" style="font-size:10px;min-width:60px;text-align:center">${qty} units</span>
+      </div>`;
+    }).join('');
+
+    const totalPill=totalStock===0?'pr':totalStock<10?'pa':'pg';
+
+    rows.push(`<tr style="vertical-align:top">
+      <td style="padding:10px 8px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          ${imgHtml}
+          <div>
+            <div style="font-weight:600;font-size:13px;margin-bottom:3px">${p.title}</div>
+            <div style="font-size:11px;color:var(--muted)">${p.product_type||'—'}</div>
+            <div style="margin-top:4px;display:flex;gap:6px;align-items:center">
+              <span class="pill ${p.status==='active'?'pg':'pm'}" style="font-size:10px">${p.status}</span>
+              <span style="font-size:11px;color:var(--accent);font-family:var(--mono)">PKR ${fmt(price)}</span>
+            </div>
+          </div>
+        </div>
+      </td>
+      <td style="padding:10px 8px;min-width:280px">
+        ${varRows}
+      </td>
+      <td style="padding:10px 8px;text-align:center">
+        <span class="pill ${totalPill}" style="font-size:12px;padding:4px 10px;font-weight:600">
+          ${totalStock===0?'Out of stock':totalStock+' total units'}
+        </span>
+      </td>
     </tr>`);
   });
 
-  document.getElementById('prodTbl').innerHTML=rows.join('')||'<tr><td colspan="6" class="nodata">No products match filter</td></tr>';
+  document.getElementById('prodTbl').innerHTML=rows.join('')||'<tr><td colspan="3" class="nodata">No products match filter</td></tr>';
   document.getElementById('prodCount').textContent=filteredProds.length+' products';
 }
 function applyProdFilter(){renderProducts();}
