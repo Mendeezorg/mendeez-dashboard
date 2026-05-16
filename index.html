@@ -276,8 +276,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sc"><div class="sl">Total Ad Spend</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div></div>
     <div class="sc"><div class="sl">Total Dispatched</div><div class="sv shimmer" id="s-disp" style="height:26px;width:50%"></div></div>
     <div class="sc"><div class="sl">Total Delivered</div><div class="sv shimmer" id="s-delivered" style="height:26px;width:50%"></div></div>
-    <div class="sc"><div class="sl">Total Cancellations</div><div class="sv shimmer" id="s-cancel" style="height:26px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Total Returns</div><div class="sv shimmer" id="s-rto" style="height:26px;width:45%"></div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="s-cancel-mtd" style="height:26px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="s-cancel-cf" style="height:26px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="s-returns-mtd" style="height:26px;width:45%"></div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="s-returns-cf" style="height:26px;width:45%"></div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns</div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refunded orders</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Landed Orders</div><div class="sv muted" id="s-shopify-landed">—</div><div class="ssub" id="s-shopify-landed-sub">Connect Shopify</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Gross Sales</div><div class="sv muted" id="s-shopify-gross">—</div><div class="ssub" id="s-shopify-gross-sub">Connect Shopify</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Shopify Net Sales</div><div class="sv muted" id="s-shopify-net">—</div><div class="ssub" id="s-shopify-net-sub">Connect Shopify</div></div>
@@ -744,6 +747,13 @@ async function loadShopify(){
     const {from,to}=getRange();
     const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`);
     ordersData=d.orders||[];
+    // Calculate Shopify returns from refunded orders
+    window._shopifyReturns=ordersData.filter(o=>o.financial_status==='refunded'||o.financial_status==='partially_refunded'||o.refunds?.length>0).length;
+    window._shopifyReturnValue=ordersData.reduce((s,o)=>{
+      return s+(o.refunds||[]).reduce((rs,r)=>{
+        return rs+(r.transactions||[]).reduce((ts,t)=>ts+parseFloat(t.amount||0),0);
+      },0);
+    },0);
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
     fetchProductCounts();
@@ -949,12 +959,17 @@ function processAds(rows){
   // Date column: could be "April/Date", "May/Date", "Date", "date"
   let dateCol=hdr.findIndex(h=>/date/i.test(h));
 
+  // Fixed column positions confirmed from sheet debug:
+  // col15=Meta/Spend, col16=Meta/Orders, col17=Meta/CPA, col18=Meta/Revenue, col19=Meta/ROAS
+  // col20=Google/Spend, col21=Google/Orders, col22=Google/CPA, col23=Google/Revenue, col24=Google/ROAS
+  // col25=TikTok/Spend, col26=TikTok/Orders, col27=TikTok/CPA, col28=TikTok/Revenue, col29=TikTok/ROAS
+  // col30=Snapchat/Spend, col31=Snapchat/Orders, col32=Snapchat/CPA, col33=Snapchat/Revenue, col34=Snapchat/ROAS
   adsIdx={
-    date:dateCol,
-    mS:col('meta/spend'),mO:col('meta/orders'),mR:col('meta/revenue'),mRoas:col('meta/roas'),
-    gS:col('google/spend'),gO:col('google/orders'),gR:col('google/revenue'),gRoas:col('google/roas'),
-    tS:col('tiktok/spend'),tO:col('tiktok/orders'),tR:col('tiktok/revenue'),tRoas:col('tiktok/roas'),
-    sS:col('snapchat/spend'),sO:col('snapchat/orders'),sR:col('snapchat/revenue'),sRoas:col('snapchat/roas'),
+    date:0,
+    mS:15,mO:16,mR:18,mRoas:19,
+    gS:20,gO:21,gR:23,gRoas:24,
+    tS:25,tO:26,tR:28,tRoas:29,
+    sS:30,sO:31,sR:33,sRoas:34,
   };
 
   // Get all data rows after this header — filter for rows with a date and spend value
@@ -971,14 +986,18 @@ function processAds(rows){
 
   if(!dr.length){setBadge('a','error','No rows after header');return;}
 
-  // Filter to rows with actual spend data (not empty/zero rows)
+  // Filter to rows with actual spend data AND a real date in col0
   const validDr=dr.filter(r=>{
-    const s=r[adsIdx.mS]||'';
-    return s.trim()&&!s.includes('#DIV')&&!s.includes('#')&&nc(s)>0;
+    const d=(r[0]||'').trim();
+    // Must look like a date (e.g. "1-May-2026", "13-Apr-2026")
+    const isDate=/^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(d)||/^\d{1,2}\/\d{1,2}\/\d{4}/.test(d);
+    if(!isDate) return false;
+    // Must have spend in at least one platform
+    return [15,20,25,30].some(ci=>nc(r[ci])>0);
   });
 
   const finalDr=validDr.length>0?validDr:dr;
-  adsTrend=finalDr.slice(-7);
+  adsTrend=finalDr; // show all days
   adsLatest=finalDr[finalDr.length-1];
   document.getElementById('adsDateLbl').textContent='Most recent: '+(adsLatest[adsIdx.date]||'—');
   setBadge('a','live',finalDr.length+' days · '+hdr[dateCol]);
@@ -1506,9 +1525,25 @@ function renderDailyStats(){
   setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
   setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
   setV('s-delivered',cntCrr.delivered>0?cntCrr.delivered:'—','green');
-  setV('s-cancel',totalCancel>0?totalCancel:'—',totalCancel>50?'red':'');
-  setV('s-rto',totalReturns>0?totalReturns:'—',totalReturns>30?'red':'');
+  const cancelMTD=os.cancelMTD||0;
+  const cancelCF=os.cancelCF||0;
+  const returnsMTD=os.returnsMTD||0;
+  const returnsCF=os.returnsCF||0;
+  setV('s-cancel-mtd',cancelMTD>0?cancelMTD:'—',cancelMTD>50?'red':'');
+  setV('s-cancel-cf',cancelCF>0?cancelCF:'—',cancelCF>50?'red':'');
+  setV('s-returns-mtd',returnsMTD>0?returnsMTD:'—',returnsMTD>30?'red':'');
+  setV('s-returns-cf',returnsCF>0?returnsCF:'—',returnsCF>30?'red':'');
 
+  // Shopify returns
+  const retEl=document.getElementById('s-shopify-returns');
+  const retSub=document.getElementById('s-shopify-returns-sub');
+  if(retEl){
+    const ret=window._shopifyReturns||0;
+    const retVal=window._shopifyReturnValue||0;
+    retEl.textContent=ret>0?ret:'—';
+    retEl.className=ret>0?'sv red':'sv muted';
+    if(retSub)retSub.textContent=ret>0?'PKR '+fmt(retVal)+' returned':'No returns';
+  }
   // Shopify cards
   if(STORE&&STORE!=='demo'&&TOKEN){
     const landed=document.getElementById('s-shopify-landed');
