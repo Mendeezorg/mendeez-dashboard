@@ -449,13 +449,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <input class="tsrch" id="prodSearch" placeholder="🔍 Search by product name..." oninput="searchProducts()" style="width:240px">
     <input class="tsrch" id="skuSearch" placeholder="🔍 Search by SKU..." oninput="searchProducts()" style="width:200px">
-    <select class="fi" id="stockFilter" style="width:160px" onchange="searchProducts()">
+    <select class="fi" id="stockFilter" style="width:160px" onchange="renderProducts()">
       <option value="all">All stock levels</option>
       <option value="out">Out of stock</option>
       <option value="low">Low stock (&lt;10)</option>
       <option value="ok">In stock</option>
     </select>
-    <select class="fi" id="prodStatus" style="width:150px">
+    <select class="fi" id="prodStatus" style="width:150px" onchange="renderProducts()">
       <option value="active">Active only</option>
       <option value="all">All statuses</option>
     </select>
@@ -755,6 +755,7 @@ async function fetchAllOrders(from, to, onProgress){
 }
 // ═══════════ DATE RANGE STATE ═══════════
 let _preset='today', _customFrom=null, _customTo=null;
+let _searchTimer=null;
 
 function getRange(){
   const n=new Date();
@@ -1784,33 +1785,15 @@ function renderDailyStats(){
   const cntCrr=window._crrCnt||{dispatched:0,delivered:0,returned:0};
   const os=csData.orderStatus||{};
 
-  // Compute returns from the already-fetched ordersData (respects selected date range)
-  let returnCount=0, returnValue=0;
-  ordersData.forEach(o=>{
-    const refunds=o.refunds||[];
-    if(refunds.length>0){
-      returnCount++;
-      refunds.forEach(ref=>{
-        (ref.refund_line_items||[]).forEach(rli=>{returnValue+=parseFloat(rli.subtotal||0);});
-        if((ref.refund_line_items||[]).length===0){
-          (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')returnValue+=parseFloat(t.amount||0);});
-        }
-      });
-    }
-  });
-  window._shopifyReturns=returnCount;
-  window._shopifyReturnValue=returnValue;
-
-  // Returns card — label shows current range
+  // Returns card — populated by fetchReturnsByDate() which filters by refund-processed-date
+  // This matches Shopify Analytics exactly (unlike reading refunds nested in created_at-filtered orders)
   const retLblEl=document.getElementById('returns-range-lbl');
   if(retLblEl)retLblEl.textContent=rangeLabel();
   const retEl=document.getElementById('s-shopify-returns');
   const retSub=document.getElementById('s-shopify-returns-sub');
-  if(retEl){
-    retEl.textContent=returnValue>0?'PKR '+fmt(returnValue):'—';
-    retEl.className=returnValue>0?'sv red':'sv muted';
-  }
-  if(retSub)retSub.textContent=returnCount>0?returnCount+' order'+(returnCount!==1?'s':'')+' refunded':'No returns in range';
+  if(retEl&&!retEl.dataset.loaded){retEl.textContent='…';retEl.className='sv muted';}
+  if(retSub&&!retSub.dataset.loaded)retSub.textContent='Calculating...';
+  if(STORE&&STORE!=='demo'&&TOKEN) fetchReturnsByDate();
 
   // Ad spend from date range
   let adSpend=0;
@@ -1873,6 +1856,58 @@ function renderDailyStats(){
   renderDailyBreakdown();
   renderSpark();
   renderAlerts(rev,ords,0,cntCrr.returned);
+}
+
+// ── Fetch returns by refund-processed-date (matches Shopify Analytics) ──
+// Strategy: fetch orders updated within the range (they may have been created earlier),
+// then filter refunds whose created_at (= processed date) falls within the selected range.
+async function fetchReturnsByDate(){
+  const {from,to}=getRange();
+  const retEl=document.getElementById('s-shopify-returns');
+  const retSub=document.getElementById('s-shopify-returns-sub');
+  try{
+    // Fetch orders updated in the range — these are candidates that may have refunds processed now
+    // We go back 2 years for created_at to capture old orders refunded recently
+    const createdMin=new Date(from);createdMin.setFullYear(createdMin.getFullYear()-2);
+    let allOrders=[],sinceId=null,hasMore=true,guard=0;
+    while(hasMore&&guard<40){
+      guard++;
+      let url=`/orders.json?status=any&updated_at_min=${from.toISOString()}&updated_at_max=${to.toISOString()}&created_at_min=${createdMin.toISOString()}&limit=250`;
+      if(sinceId)url+=`&since_id=${sinceId}`;
+      const d=await shopFetch(url);
+      const batch=d.orders||[];
+      allOrders=allOrders.concat(batch);
+      if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
+    }
+    // Now filter: only count refunds whose created_at is within the selected range
+    let returnCount=0,returnValue=0;
+    allOrders.forEach(o=>{
+      (o.refunds||[]).forEach(ref=>{
+        const refDate=new Date(ref.created_at);
+        if(refDate<from||refDate>to)return; // refund processed outside our range — skip
+        let rv=0;
+        (ref.refund_line_items||[]).forEach(rli=>{rv+=parseFloat(rli.subtotal||0);});
+        if((ref.refund_line_items||[]).length===0)
+          (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')rv+=parseFloat(t.amount||0);});
+        if(rv>0){returnValue+=rv;returnCount++;}
+      });
+    });
+    window._shopifyReturns=returnCount;
+    window._shopifyReturnValue=returnValue;
+    if(retEl){
+      retEl.textContent=returnValue>0?'PKR '+fmt(returnValue):'—';
+      retEl.className=returnValue>0?'sv red':'sv muted';
+      retEl.dataset.loaded='1';
+    }
+    if(retSub){
+      retSub.textContent=returnCount>0?returnCount+' refund'+(returnCount!==1?'s':'')+' processed in range':'No returns in range';
+      retSub.dataset.loaded='1';
+    }
+  }catch(e){
+    console.error('fetchReturnsByDate error:',e);
+    if(retEl){retEl.textContent='—';retEl.className='sv muted';}
+    if(retSub)retSub.textContent='Could not load returns';
+  }
 }
 
 // ── Date-wise Shopify breakdown table ──
@@ -2202,16 +2237,22 @@ function renderProducts(){
   const filter=document.getElementById('stockFilter')?.value||'all';
   const status=document.getElementById('prodStatus')?.value||'active';
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
+  const skuSearch=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
   let rows=[];
 
   // Group by product — one row per product, show all variants inline
   const filteredProds=allProducts.filter(p=>{
     if(status==='active'&&p.status!=='active')return false;
-    // Search matches product title or any variant SKU/title
+    // Product name search
     if(search){
       const titleMatch=p.title.toLowerCase().includes(search);
-      const skuMatch=(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(search)||(v.title||'').toLowerCase().includes(search));
-      if(!titleMatch&&!skuMatch)return false;
+      const variantMatch=(p.variants||[]).some(v=>(v.title||'').toLowerCase().includes(search));
+      if(!titleMatch&&!variantMatch)return false;
+    }
+    // SKU search (separate box)
+    if(skuSearch){
+      const skuMatch=(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(skuSearch));
+      if(!skuMatch)return false;
     }
     return true;
   });
@@ -2635,51 +2676,6 @@ function updateProductCounts(){
   if(e1)e1.textContent=allProducts.length.toLocaleString();
   if(e2)e2.textContent=allProducts.reduce((s,p)=>s+(p.variants||[]).length,0).toLocaleString();
 }
-
-// ═══ SEARCH PRODUCTS ═══
-async function searchProducts(){
-  clearTimeout(_searchTimer);
-  _searchTimer=setTimeout(async()=>{
-    const q=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
-    const sku=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
-    const status=document.getElementById('prodStatus')?.value||'active';
-    const tbl=document.getElementById('prodTbl');
-    if(!q&&!sku){
-      if(tbl)tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU to search instantly</td></tr>';
-      return;
-    }
-    if(tbl)tbl.innerHTML='<tr><td colspan="6" class="ldrow"><span class="si"></span>Searching Shopify...</td></tr>';
-    try{
-      let results=[];
-      if(sku){
-        // GraphQL SKU search
-        const gq={query:`{productVariants(first:20,query:"sku:${sku}"){edges{node{sku inventoryQuantity price title product{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}}`};
-        const gd=await shopFetch('/graphql.json','POST',gq);
-        const edges=(gd.data?.productVariants?.edges)||[];
-        const seen=new Set();
-        edges.forEach(e=>{
-          const prod=e.node?.product;
-          if(prod&&!seen.has(prod.id)){
-            seen.add(prod.id);
-            results.push({id:parseInt(prod.id.replace('gid://shopify/Product/','')),title:prod.title,product_type:prod.productType||'',status:(prod.status||'').toLowerCase(),created_at:'',variants:(prod.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))});
-          }
-        });
-      } else if(q){
-        // GraphQL title search
-        const gq={query:`{products(first:20,query:"title:*${q}* status:${status}"){edges{node{id title productType status variants(first:20){edges{node{title sku inventoryQuantity price}}}}}}}`};
-        const gd=await shopFetch('/graphql.json','POST',gq);
-        results=(gd.data?.products?.edges||[]).map(e=>{
-          const p=e.node;
-          return{id:parseInt(p.id.replace('gid://shopify/Product/','')),title:p.title,product_type:p.productType||'',status:(p.status||'').toLowerCase(),created_at:'',variants:(p.variants?.edges||[]).map(ve=>({title:ve.node.title,sku:ve.node.sku||'',inventory_quantity:ve.node.inventoryQuantity||0,price:ve.node.price}))};
-        }).filter(p=>p.title.toLowerCase().includes(q));
-      }
-      const ce=document.getElementById('prodCount');
-      if(ce)ce.textContent=results.length+' results';
-      renderProductRows(results,tbl);
-    }catch(e){if(tbl)tbl.innerHTML=`<tr><td colspan="6" class="nodata">Error: ${e.message}</td></tr>`;}
-  },400);
-}
-function applyProdFilter(){searchProducts();}
 
 function renderProductRows(prods,tbl){
   if(!prods||!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
