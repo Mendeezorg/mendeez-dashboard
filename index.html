@@ -878,22 +878,31 @@ async function loadShopify(){
 }
 async function loadProducts(){
   try{
-    // You have 3,243 products — need 14 pages. Guard set to 20 to be safe.
-    // fields param keeps responses lean (only what renderProducts needs)
-    let allProds=[],sinceId=null,hasMore=true,guard=0;
-    while(hasMore&&guard<20){
+    // 3,243 products = 14 pages. Guard=20 with retry on error.
+    let allProds=[],sinceId=null,hasMore=true,guard=0,retries=0;
+    while(hasMore&&guard<25){
       guard++;
       let url='/products.json?limit=250';
       if(sinceId) url+=`&since_id=${sinceId}`;
-      const d=await shopFetch(url);
-      const batch=d.products||[];
-      allProds=allProds.concat(batch);
-      if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
+      try{
+        const d=await shopFetch(url);
+        const batch=d.products||[];
+        allProds=allProds.concat(batch);
+        retries=0;
+        if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
+        // Update count progressively so user sees progress
+        if(allProds.length%500===0||!hasMore){allProducts=[...allProds];updateProductCounts();}
+      }catch(pageErr){
+        console.warn('loadProducts page error:',pageErr.message,'retrying...');
+        retries++;
+        if(retries>=3){console.error('loadProducts: too many retries, stopping at',allProds.length,'products');hasMore=false;}
+        else{await new Promise(r=>setTimeout(r,1500));guard--;} // wait then retry same page
+      }
     }
     allProducts=allProds;
     updateProductCounts();
     if(document.getElementById('panel-products')?.classList.contains('active')) renderProducts();
-  }catch(e){console.error('loadProducts:',e);}
+  }catch(e){console.error('loadProducts fatal:',e);}
 }
 
 // ═══════════════════════════════════════════════════
@@ -1589,7 +1598,12 @@ function processCS(rows){
   for(let i=0;i<rows.length;i++){
     const rowText=rows[i].join(' ').toLowerCase();
     for(const mn of Object.keys(monthNames)){
-      if(rowText.includes(mn)&&(rowText.includes('cs data')||rowText.includes('operations data'))){
+      if(rowText.includes(mn)&&(
+        rowText.includes('cs data')||
+        rowText.includes('operations data')||
+        rowText.includes('ecom mendeez')||
+        rowText.includes('perf report')
+      )){
         const yrArr=rowText.match(/20(\d\d)/);
         const year=yrArr?'20'+yrArr[1]:'20'+currentYear;
         const label=mn.charAt(0).toUpperCase()+mn.slice(1)+' '+year;
@@ -1762,7 +1776,10 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     const a0=(r[0]||'').trim();
     const a0l=a0.toLowerCase();
     const rowText=rows[i].join(' ').toLowerCase();
-    if(rowText.includes(monthName)&&(rowText.includes('cs data')||rowText.includes('cs')||rowText.includes('26'))&&i>=sectionStart-5)inSection=true;
+    if(i===sectionStart||(rowText.includes(monthName)&&(
+      rowText.includes('cs data')||rowText.includes('cs')||
+      rowText.includes('26')||rowText.includes('agent')||rowText.includes('dates')
+    )&&i>=sectionStart))inSection=true;
 
     if(!inSection)continue;
 
@@ -2783,106 +2800,6 @@ async function fetchProductCounts(){
   try{
     const [pc,vc]=await Promise.all([shopFetch('/products/count.json?status=active'),shopFetch('/variants/count.json')]);
     const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
-    if(e1&&pc.count)e1.textContent=pc.count.toLocaleString();
-    if(e2&&vc.count)e2.textContent=vc.count.toLocaleString();
-  }catch(e){console.log('counts:',e.message);}
-}
-function updateProductCounts(){
-  const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
-  if(e1)e1.textContent=allProducts.length.toLocaleString();
-  if(e2)e2.textContent=allProducts.reduce((s,p)=>s+(p.variants||[]).length,0).toLocaleString();
-}
-
-function renderProductRows(prods,tbl){
-  if(!prods||!prods.length){tbl.innerHTML='<tr><td colspan="6" class="nodata">No products found</td></tr>';return;}
-  tbl.innerHTML=prods.map(p=>{
-    const variants=p.variants||[];
-    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
-    const sortedVars=[...variants].sort((a,b)=>(b.inventory_quantity||0)-(a.inventory_quantity||0));
-    const pills=sortedVars.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const l=v.title==='Default Title'?'Default':v.title;const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="margin:2px;font-size:10px">${l}: ${q}</span>`;}).join('');
-    const tp=totalStock===0?'pr':totalStock<10?'pa':'pg';
-    return`<tr><td style="font-weight:500">${p.title}</td><td class="tmut tm" style="font-size:11px">${p.product_type||'—'}</td><td><span class="pill ${p.status==='active'?'pg':'pm'}">${p.status}</span></td><td class="tm">PKR ${fmt(parseFloat(sortedVars[0]?.price||0))}</td><td style="line-height:1.6">${pills}</td><td><span class="pill ${tp}">${totalStock===0?'Out':totalStock+' units'}</span></td></tr>`;
-  }).join('');
-}
-
-// ═══ DRAG SORTER ═══
-let _sorterProds=[],_dragSrcIdx=null;
-
-async function loadSorterCollection(){
-  const cat=document.getElementById('sortCat').value;
-  if(!cat){document.getElementById('sortResults').innerHTML='';document.getElementById('sortSts').textContent='Select a collection to start';document.getElementById('applyToShopifyBtn').style.display='none';return;}
-  document.getElementById('sortSts').textContent='Loading collection...';
-  document.getElementById('sortResults').innerHTML='<div class="ldrow"><span class="si"></span>Loading products with images...</div>';
-  try{
-    const collId=String(cat).replace('gid://shopify/Collection/','');
-    let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
-    let prods=[];
-    while(url){
-      const d=await shopFetch(url);
-      const batch=d.products||[];
-      prods=prods.concat(batch);
-      if(batch.length<250)url=null;
-      else url='/products.json?collection_id='+collId+'&limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,images';
-    }
-    _sorterProds=prods;
-    document.getElementById('sortCount').textContent=prods.length+' products';
-    document.getElementById('sortSts').textContent='✓ Loaded '+prods.length+' products — drag to reorder or click Auto-Sort';
-    document.getElementById('applyToShopifyBtn').style.display='block';
-    renderSorterGrid();
-  }catch(e){document.getElementById('sortResults').innerHTML='<div class="nodata">Error: '+e.message+'</div>';}
-}
-
-function renderSorterGrid(){
-  const el=document.getElementById('sortResults');
-  if(!_sorterProds.length){el.innerHTML='<div class="nodata">No products</div>';return;}
-  el.innerHTML=_sorterProds.map((p,i)=>{
-    const variants=p.variants||[];
-    const img=(p.images&&p.images[0])?p.images[0].src:'';
-    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
-    const availV=variants.filter(v=>(v.inventory_quantity||0)>0).length;
-    const totalV=variants.length;
-    const stockColor=totalStock===0?'var(--red)':availV<totalV?'var(--accent)':'var(--green)';
-    const stockIcon=totalStock===0?'🔴':availV===totalV?'✅':'⚠️';
-    const pills=variants.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="font-size:9px;margin:1px">${v.title==='Default Title'?'1':v.title}:${q}</span>`;}).join('');
-    return`<div class="sorter-item" draggable="true" data-idx="${i}" ondragstart="sorterDragStart(event,${i})" ondragover="sorterDragOver(event)" ondrop="sorterDrop(event,${i})" ondragend="sorterDragEnd(event)" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:grab;user-select:none;transition:border-color .15s">
-      <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted2);min-width:26px">${String(i+1).padStart(2,'0')}</div>
-      <div style="color:var(--muted2);font-size:20px;cursor:grab">⠿</div>
-      <div style="width:52px;height:52px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--surface2)">
-        ${img?`<img src="${img}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted2);font-size:20px">📦</div>'}
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title}</div>
-        <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px">${p.product_type||'—'}</div>
-        <div style="margin-top:4px;flex-wrap:wrap;display:flex;gap:2px">${pills}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:20px">${stockIcon}</div>
-        <div style="font-family:var(--mono);font-size:12px;color:${stockColor};font-weight:600">${totalStock}</div>
-        <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">${availV}/${totalV} sizes</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function sorterDragStart(e,idx){_dragSrcIdx=idx;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
-function sorterDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.style.borderColor='var(--accent)';}
-function sorterDrop(e,targetIdx){
-  e.preventDefault();e.currentTarget.style.borderColor='';
-  if(_dragSrcIdx===null||_dragSrcIdx===targetIdx)return;
-  const moved=_sorterProds.splice(_dragSrcIdx,1)[0];
-  _sorterProds.splice(targetIdx,0,moved);
-  _dragSrcIdx=null;renderSorterGrid();
-  document.getElementById('sortSts').textContent='✓ Reordered — click Apply to Shopify to save';
-}
-function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style.borderColor='';_dragSrcIdx=null;document.querySelectorAll('.sorter-item').forEach(el=>el.style.borderColor='');}
-
-
-
-// ═══ PRODUCT COUNTS ═══
-async function fetchProductCounts(){
-  try{
-    const [pc,vc]=await Promise.all([shopFetch('/products/count.json?status=active'),shopFetch('/variants/count.json')]);
-    const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
     if(e1&&pc.count!=null)e1.textContent=pc.count.toLocaleString();
     if(e2&&vc.count!=null)e2.textContent=vc.count.toLocaleString();
   }catch(e){console.log('counts:',e.message);}
@@ -2895,7 +2812,6 @@ function updateProductCounts(){
 
 // ═══ SEARCH PRODUCTS ═══
 function searchProducts(){
-  // Search locally from already-loaded allProducts — fast and works offline
   clearTimeout(_searchTimer);
   _searchTimer=setTimeout(()=>renderProducts(),200);
 }
