@@ -1883,8 +1883,8 @@ async function fetchReturnsByDate(){
       let sinceId=null,hasMore=true,pg=0;
       while(hasMore&&pg<10){
         pg++;
-        // financial_status=refunded,partially_refunded drastically reduces result count
-        let url=`/orders.json?status=any&financial_status=refunded,partially_refunded&created_at_min=${cursor.toISOString()}&created_at_max=${effectiveEnd.toISOString()}&limit=250`;
+        // financial_status=voided covers your RTO returns; refunded/partially_refunded for cash refunds
+        let url=`/orders.json?status=any&financial_status=voided,refunded,partially_refunded&created_at_min=${cursor.toISOString()}&created_at_max=${effectiveEnd.toISOString()}&limit=250`;
         if(sinceId)url+=`&since_id=${sinceId}`;
         const d=await shopFetch(url);
         const batch=d.orders||[];
