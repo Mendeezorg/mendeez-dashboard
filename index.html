@@ -288,11 +288,24 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sc"><div class="sl">Cancellations CF · Perf Report</div><div class="sv shimmer" id="s-cancel-cf" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
     <div class="sc"><div class="sl">Returns MTD · Perf Report</div><div class="sv shimmer" id="s-returns-mtd" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
     <div class="sc"><div class="sl">Returns CF · Perf Report</div><div class="sv shimmer" id="s-returns-cf" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns MTD</div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns · <span id="returns-range-lbl">Selected Range</span></div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-gross">—</div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-net">—</div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
     <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts MTD · Shopify</div><div class="sv muted" id="s-shopify-discounts">—</div><div class="ssub" id="s-shopify-discounts-sub">Total discounts given</div></div>
   </div>
+  <!-- DATE-WISE SHOPIFY BREAKDOWN -->
+  <div class="sh" style="margin-top:4px">
+    <div class="st">📅 Date-wise Shopify Breakdown</div>
+    <div class="ss" id="dailyBreakdownRange">—</div>
+  </div>
+  <div class="tc" style="margin-bottom:18px">
+    <table>
+      <thead><tr><th>Date</th><th>Orders</th><th>Gross Sales</th><th>Discounts</th><th>Net Revenue</th><th>Refunds</th><th>AOV</th></tr></thead>
+      <tbody id="dailyBreakdownTbl"><tr><td colspan="7" class="ldrow"><span class="si"></span>Loading...</td></tr></tbody>
+    </table>
+    <div id="dailyBreakdownTotals" style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:24px;font-family:var(--mono);font-size:11px;color:var(--muted);flex-wrap:wrap"></div>
+  </div>
+
   <!-- WEEKLY TOP 20 -->
   <div class="sh" style="margin-top:4px">
     <div class="st">📈 Top 20 Products — Last 7 Days</div>
@@ -548,6 +561,8 @@ const PAGE=50;
 let adsLatest=null,adsTrend=[],adsIdx=null;
 let csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
 let _csDateMode='mtd'; // 'mtd' or 'custom'
+let allCsMonths={};   // keyed by "May 2026" label → csData snapshot
+let _csRows=[];       // raw sheet rows saved for re-parsing on month switch
 
 // ═══════════ HELPERS ═══════════
 const fmt=n=>Math.round(n).toLocaleString('en-PK');
@@ -751,23 +766,6 @@ async function reloadShopifyData(){
       if(allOrders.length>5000){hasMore=false;}
     }
     ordersData=allOrders;
-    // Calculate returns from refund line items in fetched orders
-    let returnCount=0,returnValue=0;
-    ordersData.forEach(o=>{
-      const refunds=o.refunds||[];
-      if(refunds.length>0){
-        returnCount++;
-        refunds.forEach(ref=>{
-          (ref.refund_line_items||[]).forEach(rli=>{returnValue+=parseFloat(rli.subtotal||0);});
-          if((ref.refund_line_items||[]).length===0){
-            (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')returnValue+=parseFloat(t.amount||0);});
-          }
-        });
-      }
-    });
-    window._shopifyReturns=returnCount;
-    window._shopifyReturnValue=returnValue;
-    console.log('Returns:',returnCount,'orders, PKR',returnValue);
     setBadge('s','live',ordersData.length+' orders · '+rangeLabel());
     weeklyOrdersData=ordersData;
     document.getElementById('todayDate').textContent=rangeLabel();
@@ -804,38 +802,13 @@ async function loadShopify(){
     }
     ordersData=allOrders;
     
-    // Calculate returns from refund line items in the orders we already fetched
-    // ordersData already contains refunds[] array per order
-    let returnCount=0, returnValue=0;
-    ordersData.forEach(o=>{
-      const refunds=o.refunds||[];
-      if(refunds.length>0){
-        returnCount++;
-        refunds.forEach(ref=>{
-          // refund_line_items contains the actual returned product values
-          (ref.refund_line_items||[]).forEach(rli=>{
-            returnValue+=parseFloat(rli.subtotal||0);
-          });
-          // Also check transactions for cash refunds
-          (ref.transactions||[]).forEach(t=>{
-            if(t.kind==='refund'){
-              // Only add if no line items (avoid double counting)
-              if((ref.refund_line_items||[]).length===0){
-                returnValue+=parseFloat(t.amount||0);
-              }
-            }
-          });
-        });
-      }
-    });
-    window._shopifyReturns=returnCount;
-    window._shopifyReturnValue=returnValue;
-    console.log('Returns calculated:',returnCount,'orders, PKR',returnValue);
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
     fetchProductCounts();
     loadCollections();
     loadWeeklyOrders();
+    // Load products so Products tab and No-Sale diagnosis work immediately
+    loadProducts();
   }catch(e){
     console.error('loadShopify error:',e);
     setBadge('s','error',e.message.slice(0,30));
@@ -843,11 +816,24 @@ async function loadShopify(){
   }
 }
 async function loadProducts(){
-  try{const d=await shopFetch('/products.json?limit=250');allProducts=d.products||[];renderProducts();}
-  catch(e){console.error(e);}
+  try{
+    let allProds=[],sinceId=null,hasMore=true,guard=0;
+    while(hasMore&&guard<10){
+      guard++;
+      let url='/products.json?limit=250';
+      if(sinceId) url+=`&since_id=${sinceId}`;
+      const d=await shopFetch(url);
+      const batch=d.products||[];
+      allProds=allProds.concat(batch);
+      if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
+    }
+    allProducts=allProds;
+    updateProductCounts();
+    // If products tab is active, render immediately
+    if(document.getElementById('panel-products')?.classList.contains('active')) renderProducts();
+  }catch(e){console.error('loadProducts:',e);}
 }
 
-// ═══════════ SHEETS CSV ═══════════
 // ═══════════════════════════════════════════════════
 // GOOGLE SHEETS FETCH
 // Tries 4 methods in order until one works:
@@ -1333,7 +1319,7 @@ function renderCrrTable(){
 // Then: EWH | Exch Count, Total Dispatch, Total Disp Unit, Return Units
 // Order Status section: "Landed MTD", "Total Dispatched", "Delivered", "Pending", "Cancellations MTD", "Returns MTD"
 function processCS(rows){
-  _csRows=rows;
+  _csRows=rows; // save for switchCSMonth
   const now=new Date();
   const todayDay=now.getDate();
   const currentMonth=now.toLocaleString('en-US',{month:'long'}).toLowerCase(); // e.g. "may"
@@ -1642,14 +1628,142 @@ function renderCS(){
   }
 }
 
-// ═══════════ DAILY STATS ═══════════
+// ═══════════ CS MONTH SWITCHING ═══════════
+function extractCSDataForMonth(rows, sectionStart, monthName){
+  // Returns a csData-shaped object for the given month section
+  const result={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
+  const scanStart=Math.max(0,sectionStart-80);
+  const scanEnd=Math.min(rows.length,sectionStart+150);
+
+  // Find date column for that month's "Dates" row
+  let dateColIdx=-1;
+  for(let i=sectionStart;i<Math.min(sectionStart+60,rows.length);i++){
+    const r=rows[i];
+    if(r[0]==='Dates'||r[1]==='Dates'||r[8]==='Dates'||r[9]==='Dates'){
+      const dp=r.findIndex(c=>c.trim()==='Dates');
+      // For historical months, use the last day (Total col) — use today's day for current month
+      const now=new Date();
+      const day=now.getDate();
+      dateColIdx=dp+day; break;
+    }
+    if(r[2]==='1'&&r[3]==='2'&&r[4]==='3'){dateColIdx=2+(new Date().getDate()-1);break;}
+  }
+
+  const getTotCol=(row)=>{
+    const ti=row.findIndex(c=>c.trim().toLowerCase()==='total');
+    if(ti>0)return ti;
+    for(let k=row.length-1;k>=0;k--){if(row[k]&&row[k].trim()&&!isNaN(parseFloat(row[k].replace(/,/g,''))))return k;}
+    return row.length-1;
+  };
+
+  let inSection=false;
+  for(let i=scanStart;i<scanEnd;i++){
+    const r=rows[i];
+    const a0=(r[0]||'').trim();
+    const a0l=a0.toLowerCase();
+    const rowText=rows[i].join(' ').toLowerCase();
+    if(rowText.includes(monthName)&&(rowText.includes('cs data')||rowText.includes('cs')||rowText.includes('26'))&&i>=sectionStart-5)inSection=true;
+
+    // Order status
+    if(a0l.includes('landed mtd')){result.orderStatus.landed=nc(r[4]);result.orderStatus.landedVal=nc(r[4]);}
+    if(a0l.includes('total dispach')||a0l.includes('total dispatch')){result.orderStatus.dispatched=nc(r[4]);}
+    if(a0l.includes('delivered to customer')){result.orderStatus.delivered=nc(r[4]);}
+    if(a0l.includes('pending orders')){result.orderStatus.pending=nc(r[3]);}
+    if(a0l.includes('cancelations mtd')&&!a0l.includes('cf')){result.orderStatus.cancelMTD=nc(r[3]);result.orderStatus.cancelMTDVal=nc(r[4]);result.orderStatus.cancel=nc(r[3]);}
+    if(a0l.includes('cancelations cf')||a0l.includes('cancellations cf')){result.orderStatus.cancelCF=nc(r[3]);result.orderStatus.cancelCFVal=nc(r[4]);}
+    if(a0l.includes('mtd returns')&&!a0l.includes('cf')){result.orderStatus.returnsMTD=nc(r[3]);result.orderStatus.returnsMTDVal=nc(r[4]);result.orderStatus.returns=nc(r[3]);}
+    if(a0l.includes('cf returns')){result.orderStatus.returnsCF=nc(r[3]);result.orderStatus.returnsCFVal=nc(r[4]);}
+
+    if(!inSection)continue;
+
+    // Agents
+    if(a0l.includes('agent')||a0l.includes('nimra')||a0l.includes('abdullah')){
+      const agentData={name:a0,chats:0,inbound:0,outbound:0,returns:0,complaints:0,todayChats:0,todayOut:0};
+      let j=i;
+      while(j<scanEnd&&j<i+8){
+        const row=rows[j];
+        const metric=((row[1]||row[0])||'').toLowerCase().trim();
+        const totCol=getTotCol(row);
+        const totVal=nc(row[totCol]);
+        const todayVal=dateColIdx>0&&dateColIdx<row.length?nc(row[dateColIdx]):0;
+        if(metric.includes('chat')){agentData.chats=totVal;agentData.todayChats=todayVal;}
+        else if(metric.includes('outbound')||metric.includes('out bound')){agentData.outbound=totVal;agentData.todayOut=todayVal;}
+        else if(metric.includes('inbound')){agentData.inbound=totVal;}
+        else if(metric.includes('r/ return')||metric.includes('r/return')){agentData.returns=totVal;}
+        else if(metric.includes('complaint')){agentData.complaints=totVal;}
+        j++;
+        if(j<scanEnd){const nxt=(rows[j][0]||'').trim();if((nxt.toLowerCase().includes('agent')&&nxt!==a0)||nxt.toLowerCase().includes('ewh')||nxt.toLowerCase().includes('e.com'))break;}
+      }
+      if(agentData.chats>0||agentData.outbound>0||agentData.inbound>0)result.agents.push(agentData);
+      i=j-1;continue;
+    }
+
+    // EWH
+    if(a0l.includes('e.com wh')||a0l==='ewh'||(a0l===''&&(r[1]||'').toLowerCase().includes('e.com wh'))){
+      const dataRow=rows[i+1]||[];
+      result.ewh.exch=nc(dataRow[2]||r[2]);result.ewh.dispVal=nc(dataRow[3]||r[3]);
+      result.ewh.dispUnits=nc(dataRow[4]||r[4]);result.ewh.returnUnits=nc(dataRow[5]||r[5]);
+      i++;continue;
+    }
+
+    // Cancel reasons
+    const isCancelSection=(a0l.includes('cancel')||a0l.includes('reason')||a0l.includes('wrong')||a0l.includes('price')||a0l.includes('size')||a0l.includes('cod')||a0l.includes('fake')||a0l.includes('duplicate')||a0l.includes('no answer')||a0l.includes('not interested'));
+    if(isCancelSection&&a0.length>2&&a0.length<60){
+      const nums=r.slice(1).map(v=>nc(v)).filter(v=>v>0);
+      if(nums.length>0)result.cancelReasons.push({reason:a0,count:nums[nums.length-1]});
+    }
+  }
+  return result;
+}
+
+function switchCSMonth(){
+  const sel=document.getElementById('csMonthSel');
+  if(!sel)return;
+  const label=sel.value;
+  if(!label)return;
+  if(allCsMonths[label]){
+    csData=JSON.parse(JSON.stringify(allCsMonths[label]));
+    renderCS();
+  } else if(_csRows.length){
+    // Try to re-parse if we have raw rows but no cached month
+    processCS(_csRows);
+  }
+}
+
+
 function renderDailyStats(){
   const rev=ordersData.reduce((s,o)=>s+parseFloat(o.total_price||0),0);
   const ords=ordersData.length;
   const cntCrr=window._crrCnt||{dispatched:0,delivered:0,returned:0};
   const os=csData.orderStatus||{};
-  const totalCancel=(os.cancelMTD||0)+(os.cancelCF||os.cancel||0);
-  const totalReturns=(os.returnsMTD||0)+(os.returnsCF||os.returns||0);
+
+  // Compute returns from the already-fetched ordersData (respects selected date range)
+  let returnCount=0, returnValue=0;
+  ordersData.forEach(o=>{
+    const refunds=o.refunds||[];
+    if(refunds.length>0){
+      returnCount++;
+      refunds.forEach(ref=>{
+        (ref.refund_line_items||[]).forEach(rli=>{returnValue+=parseFloat(rli.subtotal||0);});
+        if((ref.refund_line_items||[]).length===0){
+          (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')returnValue+=parseFloat(t.amount||0);});
+        }
+      });
+    }
+  });
+  window._shopifyReturns=returnCount;
+  window._shopifyReturnValue=returnValue;
+
+  // Returns card — label shows current range
+  const retLblEl=document.getElementById('returns-range-lbl');
+  if(retLblEl)retLblEl.textContent=rangeLabel();
+  const retEl=document.getElementById('s-shopify-returns');
+  const retSub=document.getElementById('s-shopify-returns-sub');
+  if(retEl){
+    retEl.textContent=returnValue>0?'PKR '+fmt(returnValue):'—';
+    retEl.className=returnValue>0?'sv red':'sv muted';
+  }
+  if(retSub)retSub.textContent=returnCount>0?returnCount+' order'+(returnCount!==1?'s':'')+' refunded':'No returns in range';
 
   // Ad spend from date range
   let adSpend=0;
@@ -1672,7 +1786,6 @@ function renderDailyStats(){
   setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
   setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
   setV('s-delivered',cntCrr.delivered>0?cntCrr.delivered:'—','green');
-  // From Perf Report — values not counts (col4 = achieved value)
   const cancelMTD=os.cancelMTDVal||os.cancelMTD||0;
   const cancelCF=os.cancelCFVal||os.cancelCF||0;
   const returnsMTD=os.returnsMTDVal||os.returnsMTD||0;
@@ -1682,21 +1795,10 @@ function renderDailyStats(){
   setV('s-returns-mtd',returnsMTD>0?fPKR(returnsMTD):'—','red');
   setV('s-returns-cf',returnsCF>0?fPKR(returnsCF):'—','red');
 
-  // Shopify returns
-  const retEl=document.getElementById('s-shopify-returns');
-  const retSub=document.getElementById('s-shopify-returns-sub');
-  if(retEl){
-    const ret=window._shopifyReturns||0;
-    const retVal=window._shopifyReturnValue||0;
-    retEl.textContent=retVal>0?'PKR '+fmt(retVal):'—';
-    retEl.className=retVal>0?'sv red':'sv muted';
-    if(retSub)retSub.textContent=ret>0?ret+' orders refunded':'No returns';
-  }
-  // Shopify cards
+  // Shopify cards (gross, net, discounts)
   if(STORE&&STORE!=='demo'&&TOKEN){
     const gross=document.getElementById('s-shopify-gross');
     const net=document.getElementById('s-shopify-net');
-    // Gross Sales = total_line_items_price (before any discounts) — matches Shopify analytics
     if(gross){
       const g=ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
       gross.textContent=g>0?'PKR '+fmt(g):'—';
@@ -1704,7 +1806,6 @@ function renderDailyStats(){
       const gs=document.getElementById('s-shopify-gross-sub');
       if(gs)gs.textContent='Before discounts';
     }
-    // Net Sales = subtotal_price (after discounts, before shipping) — matches Shopify analytics
     if(net){
       const n=ordersData.reduce((s,o)=>s+parseFloat(o.subtotal_price||0),0);
       net.textContent=n>0?'PKR '+fmt(n):'—';
@@ -1722,9 +1823,77 @@ function renderDailyStats(){
     }
   }
 
+  renderDailyBreakdown();
   renderSpark();
   renderAlerts(rev,ords,0,cntCrr.returned);
 }
+
+// ── Date-wise Shopify breakdown table ──
+function renderDailyBreakdown(){
+  const tbl=document.getElementById('dailyBreakdownTbl');
+  const totalsEl=document.getElementById('dailyBreakdownTotals');
+  const rangeEl=document.getElementById('dailyBreakdownRange');
+  if(!tbl)return;
+  if(!ordersData.length){
+    tbl.innerHTML='<tr><td colspan="7" class="nodata">No orders in selected range</td></tr>';
+    if(totalsEl)totalsEl.innerHTML='';
+    return;
+  }
+
+  // Group orders by date (en-GB key: "16 May 2026")
+  const byDay={};
+  ordersData.forEach(o=>{
+    const d=new Date(o.created_at);
+    const key=d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    if(!byDay[key])byDay[key]={key,date:d,orders:0,gross:0,net:0,disc:0,refunds:0,refundOrders:0};
+    const day=byDay[key];
+    day.orders++;
+    day.gross+=parseFloat(o.total_line_items_price||o.total_price||0);
+    day.net+=parseFloat(o.subtotal_price||o.total_price||0);
+    day.disc+=parseFloat(o.total_discounts||0);
+    // Refunds within this order
+    (o.refunds||[]).forEach(ref=>{
+      let rv=0;
+      (ref.refund_line_items||[]).forEach(rli=>{rv+=parseFloat(rli.subtotal||0);});
+      if((ref.refund_line_items||[]).length===0)
+        (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')rv+=parseFloat(t.amount||0);});
+      if(rv>0){day.refunds+=rv;day.refundOrders++;}
+    });
+  });
+
+  // Sort by date ascending
+  const days=Object.values(byDay).sort((a,b)=>a.date-b.date);
+  if(rangeEl)rangeEl.textContent=days.length+' day'+(days.length!==1?'s':'');
+
+  // Totals row
+  const tot={orders:0,gross:0,net:0,disc:0,refunds:0,refundOrders:0};
+  days.forEach(d=>{tot.orders+=d.orders;tot.gross+=d.gross;tot.net+=d.net;tot.disc+=d.disc;tot.refunds+=d.refunds;tot.refundOrders+=d.refundOrders;});
+
+  tbl.innerHTML=days.map(d=>{
+    const aov=d.orders>0?d.net/d.orders:0;
+    const isToday=d.key===new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    return`<tr style="${isToday?'background:rgba(232,197,71,.04)':''}">
+      <td style="font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d.key}${isToday?' <span style="font-size:9px;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;font-family:var(--mono)">TODAY</span>':''}</td>
+      <td class="tm" style="font-weight:600">${d.orders}</td>
+      <td class="tm">${d.gross>0?'PKR '+fmt(d.gross):'—'}</td>
+      <td class="tm" style="color:${d.disc>0?'var(--orange)':'var(--muted2)'}">${d.disc>0?'−PKR '+fmt(d.disc):'—'}</td>
+      <td class="tm" style="color:var(--accent);font-weight:600">${d.net>0?'PKR '+fmt(d.net):'—'}</td>
+      <td class="tm" style="color:${d.refunds>0?'var(--red)':'var(--muted2)'}">${d.refunds>0?'PKR '+fmt(d.refunds)+'<span style="font-size:10px;color:var(--muted);margin-left:4px">('+d.refundOrders+')</span>':'—'}</td>
+      <td class="tm tmut">${aov>0?'PKR '+fmt(aov):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Totals footer
+  const totAov=tot.orders>0?tot.net/tot.orders:0;
+  if(totalsEl)totalsEl.innerHTML=`
+    <span style="color:var(--text);font-weight:600">${tot.orders} orders total</span>
+    <span>Gross: <span style="color:var(--accent)">${'PKR '+fmt(tot.gross)}</span></span>
+    <span>Discounts: <span style="color:var(--orange)">${tot.disc>0?'−PKR '+fmt(tot.disc):'—'}</span></span>
+    <span>Net: <span style="color:var(--green);font-weight:600">${'PKR '+fmt(tot.net)}</span></span>
+    <span>Refunds: <span style="color:${tot.refunds>0?'var(--red)':'var(--muted2)'}">${tot.refunds>0?'PKR '+fmt(tot.refunds)+' ('+tot.refundOrders+' orders)':'None'}</span></span>
+    <span>Avg AOV: <span style="color:var(--text)">${totAov>0?'PKR '+fmt(totAov):'—'}</span></span>`;
+}
+
 // ── weeklyOrdersData: stores last 7 days orders (loaded separately) ──
 let weeklyOrdersData = [];
 
@@ -1734,19 +1903,26 @@ function renderTopProds(){
 }
 
 async function loadWeeklyOrders(){
-  // Use the currently selected date range
-  const {from,to}=getRange();
-  try{
-    const d=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&fields=id,created_at,total_price,line_items`);
-    weeklyOrdersData=d.orders||[];
-    if(weeklyOrdersData.length===250){
-      try{
-        const d2=await shopFetch(`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250&fields=id,created_at,total_price,line_items&since_id=${weeklyOrdersData[weeklyOrdersData.length-1].id}`);
-        if(d2.orders&&d2.orders.length)weeklyOrdersData=[...weeklyOrdersData,...d2.orders];
-      }catch(e){}
-    }
-  }catch(e){
+  // Re-use ordersData already fetched by loadShopify (has full fields incl. refunds)
+  // Only re-fetch independently if ordersData is empty (e.g. different range)
+  if(ordersData.length>0){
     weeklyOrdersData=ordersData;
+  } else {
+    const {from,to}=getRange();
+    try{
+      let allOrders=[],sinceId=null,hasMore=true,guard=0;
+      while(hasMore&&guard<10){
+        guard++;
+        let url=`/orders.json?status=any&created_at_min=${from.toISOString()}&created_at_max=${to.toISOString()}&limit=250`;
+        if(sinceId) url+=`&since_id=${sinceId}`;
+        const d=await shopFetch(url);
+        const batch=d.orders||[];
+        allOrders=allOrders.concat(batch);
+        if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
+        if(allOrders.length>5000){hasMore=false;}
+      }
+      weeklyOrdersData=allOrders;
+    }catch(e){weeklyOrdersData=ordersData;}
   }
   renderWeeklyTop20();
   renderNoSaleDiagnosis();
@@ -2193,9 +2369,9 @@ function switchTab(name,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
   el.classList.add('active');
-  // Hide date bar on overview, show on other tabs
+  // Show date bar on all tabs (overview uses it for Shopify range)
   const datebar=document.querySelector('.datebar');
-  if(datebar) datebar.style.display=name==='daily'?'none':'flex';
+  if(datebar) datebar.style.display='flex';
   if(name==='report')buildReport();
   if(name==='sorter'){
     const sel=document.getElementById('sortCat');
@@ -2206,8 +2382,14 @@ function switchTab(name,el){
   }
   if(name==='products'){
     const tbl=document.getElementById('prodTbl');
-    if(tbl&&!document.getElementById('prodSearch').value)
-      tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU above to search instantly</td></tr>';
+    const search=document.getElementById('prodSearch').value||'';
+    if(!search&&!document.getElementById('skuSearch').value){
+      if(allProducts.length>0){
+        renderProducts(); // show all loaded products immediately
+      } else {
+        if(tbl) tbl.innerHTML='<tr><td colspan="6" class="nodata" style="padding:30px">🔍 Type a product name or SKU above to search instantly</td></tr>';
+      }
+    }
   }
 }
 
