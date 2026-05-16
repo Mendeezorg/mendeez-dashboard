@@ -651,7 +651,9 @@ async function connectAll(){
 }
 
 async function loadAll(){
-  await Promise.allSettled([loadShopify(),fetchSheets()]);
+  // loadProducts runs in parallel — products are ready before orders finish
+  // loadShopify and fetchSheets run together
+  await Promise.allSettled([loadShopify(),fetchSheets(),loadProducts(),loadCollections(),fetchProductCounts()]);
   renderDailyStats();
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
@@ -849,10 +851,7 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    // Start products + collections loading in parallel with orders — don't wait for orders first
-    loadProducts();
-    loadCollections();
-    fetchProductCounts();
+    // 1. Fetch orders first (critical path)
     const allOrders=await fetchAllOrders(from,to,(n)=>{
       setBadge('s','amber',n+' orders...');
     });
