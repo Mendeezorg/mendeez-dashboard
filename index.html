@@ -1858,37 +1858,50 @@ function renderDailyStats(){
   renderAlerts(rev,ords,0,cntCrr.returned);
 }
 
-// ── Fetch returns by refund-processed-date (matches Shopify Analytics) ──
-// Strategy: fetch orders updated within the range (they may have been created earlier),
-// then filter refunds whose created_at (= processed date) falls within the selected range.
+
+// ── Fetch returns by refund-processed-date (matches Shopify Analytics / ShopifyQL) ──
+// Key facts from live Shopify data:
+// 1. Your returns are RTO — total_refunded=0, transactions=empty, refund_line_items have real subtotals
+// 2. ShopifyQL "returns" = sum of refund_line_items.subtotal where refund.created_at in range
+// 3. Can't use since_id + updated_at (Shopify bug — since_id ignores date filter on next pages)
+// Fix: chunk by month, fetch only refunded orders (financial_status filter), filter refund.created_at
 async function fetchReturnsByDate(){
   const {from,to}=getRange();
   const retEl=document.getElementById('s-shopify-returns');
   const retSub=document.getElementById('s-shopify-returns-sub');
   try{
-    // Fetch orders updated in the range — these are candidates that may have refunds processed now
-    // We go back 2 years for created_at to capture old orders refunded recently
-    const createdMin=new Date(from);createdMin.setFullYear(createdMin.getFullYear()-2);
-    let allOrders=[],sinceId=null,hasMore=true,guard=0;
-    while(hasMore&&guard<40){
+    // Look back up to 2 years — old orders may have been refunded recently
+    const lookbackStart=new Date(from);lookbackStart.setFullYear(lookbackStart.getFullYear()-2);
+    let allRelevantOrders=[];
+    // Chunk by MONTH — avoids since_id+date filter bug, keeps each page count low
+    const cursor=new Date(lookbackStart);cursor.setDate(1);cursor.setHours(0,0,0,0);
+    let guard=0;
+    while(cursor<=to&&guard<30){
       guard++;
-      let url=`/orders.json?status=any&updated_at_min=${from.toISOString()}&updated_at_max=${to.toISOString()}&created_at_min=${createdMin.toISOString()}&limit=250`;
-      if(sinceId)url+=`&since_id=${sinceId}`;
-      const d=await shopFetch(url);
-      const batch=d.orders||[];
-      allOrders=allOrders.concat(batch);
-      if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
+      const monthEnd=new Date(cursor.getFullYear(),cursor.getMonth()+1,0,23,59,59,999);
+      const effectiveEnd=monthEnd>to?to:monthEnd;
+      let sinceId=null,hasMore=true,pg=0;
+      while(hasMore&&pg<10){
+        pg++;
+        // financial_status=refunded,partially_refunded drastically reduces result count
+        let url=`/orders.json?status=any&financial_status=refunded,partially_refunded&created_at_min=${cursor.toISOString()}&created_at_max=${effectiveEnd.toISOString()}&limit=250`;
+        if(sinceId)url+=`&since_id=${sinceId}`;
+        const d=await shopFetch(url);
+        const batch=d.orders||[];
+        allRelevantOrders=allRelevantOrders.concat(batch);
+        if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
+      }
+      cursor.setMonth(cursor.getMonth()+1);
     }
-    // Now filter: only count refunds whose created_at is within the selected range
+    // Sum refund_line_items.subtotal where refund.created_at is within selected range
+    // This exactly matches ShopifyQL: FROM sales SHOW returns
     let returnCount=0,returnValue=0;
-    allOrders.forEach(o=>{
+    allRelevantOrders.forEach(o=>{
       (o.refunds||[]).forEach(ref=>{
         const refDate=new Date(ref.created_at);
-        if(refDate<from||refDate>to)return; // refund processed outside our range — skip
+        if(refDate<from||refDate>to)return;
         let rv=0;
         (ref.refund_line_items||[]).forEach(rli=>{rv+=parseFloat(rli.subtotal||0);});
-        if((ref.refund_line_items||[]).length===0)
-          (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')rv+=parseFloat(t.amount||0);});
         if(rv>0){returnValue+=rv;returnCount++;}
       });
     });
@@ -1900,7 +1913,7 @@ async function fetchReturnsByDate(){
       retEl.dataset.loaded='1';
     }
     if(retSub){
-      retSub.textContent=returnCount>0?returnCount+' refund'+(returnCount!==1?'s':'')+' processed in range':'No returns in range';
+      retSub.textContent=returnCount>0?returnCount+' return'+(returnCount!==1?'s':'')+' processed in range':'No returns in range';
       retSub.dataset.loaded='1';
     }
   }catch(e){
@@ -1933,12 +1946,10 @@ function renderDailyBreakdown(){
     day.gross+=parseFloat(o.total_line_items_price||o.total_price||0);
     day.net+=parseFloat(o.subtotal_price||o.total_price||0);
     day.disc+=parseFloat(o.total_discounts||0);
-    // Refunds within this order
+    // Refunds — use line item subtotal (RTO returns have no transaction amount)
     (o.refunds||[]).forEach(ref=>{
       let rv=0;
       (ref.refund_line_items||[]).forEach(rli=>{rv+=parseFloat(rli.subtotal||0);});
-      if((ref.refund_line_items||[]).length===0)
-        (ref.transactions||[]).forEach(t=>{if(t.kind==='refund')rv+=parseFloat(t.amount||0);});
       if(rv>0){day.refunds+=rv;day.refundOrders++;}
     });
   });
