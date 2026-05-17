@@ -2847,20 +2847,50 @@ function renderProductRows(prods,tbl){
 async function loadSorterCollection(){
   const cat=document.getElementById('sortCat').value;
   if(!cat){document.getElementById('sortResults').innerHTML='';document.getElementById('sortSts').textContent='Select a collection to start';document.getElementById('applyToShopifyBtn').style.display='none';return;}
-  document.getElementById('sortSts').textContent='Loading...';
-  document.getElementById('sortResults').innerHTML='<div class="ldrow"><span class="si"></span>Loading products...</div>';
+  const sts=document.getElementById('sortSts');
+  sts.textContent='Loading...';
+  document.getElementById('sortResults').innerHTML='<div class="ldrow"><span class="si"></span>Loading products in current Shopify order...</div>';
   try{
     const collId=String(cat).replace('gid://shopify/Collection/','');
-    let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
+
+    // STEP 1: Fetch collects — this gives us product_id + position in correct Shopify order
+    sts.textContent='Fetching positions...';
+    let allCollects=[];
+    let cu='/collects.json?collection_id='+collId+'&limit=250';
+    while(cu){
+      const d=await shopFetch(cu);
+      const b=d.collects||[];
+      allCollects=allCollects.concat(b);
+      if(b.length<250)cu=null;
+      else cu='/collects.json?collection_id='+collId+'&limit=250&since_id='+b[b.length-1].id;
+    }
+    // Sort collects by position — this is the true Shopify order
+    allCollects.sort((a,b)=>a.position-b.position);
+    const positionMap={}; // product_id → position
+    allCollects.forEach(c=>positionMap[String(c.product_id)]=c.position);
+
+    // STEP 2: Fetch all products in this collection
+    sts.textContent='Loading products...';
     let prods=[];
+    let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
     while(url){
-      const d=await shopFetch(url);const batch=d.products||[];prods=prods.concat(batch);
+      const d=await shopFetch(url);
+      const batch=d.products||[];
+      prods=prods.concat(batch);
       if(batch.length<250)url=null;
       else url='/products.json?collection_id='+collId+'&limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,images';
     }
+
+    // STEP 3: Sort products by their Shopify position using the collects map
+    prods.sort((a,b)=>{
+      const posA=positionMap[String(a.id)]||9999;
+      const posB=positionMap[String(b.id)]||9999;
+      return posA-posB;
+    });
+
     _sorterProds=prods;
     document.getElementById('sortCount').textContent=prods.length+' products';
-    document.getElementById('sortSts').textContent='✓ '+prods.length+' products loaded — drag to reorder or Auto-Sort';
+    sts.textContent='✓ '+prods.length+' products — showing current Shopify order. Drag to reorder.';
     document.getElementById('applyToShopifyBtn').style.display='block';
     renderSorterGrid();
   }catch(e){document.getElementById('sortResults').innerHTML='<div class="nodata">Error: '+e.message+'</div>';}
@@ -2868,32 +2898,58 @@ async function loadSorterCollection(){
 function renderSorterGrid(){
   const el=document.getElementById('sortResults');
   if(!_sorterProds.length){el.innerHTML='<div class="nodata">No products</div>';return;}
-  el.innerHTML=_sorterProds.map((p,i)=>{
-    const variants=p.variants||[];
-    const img=(p.images&&p.images[0])?p.images[0].src:'';
-    const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
-    const availV=variants.filter(v=>(v.inventory_quantity||0)>0).length;
-    const totalV=variants.length;
-    const sc=totalStock===0?'var(--red)':availV<totalV?'var(--accent)':'var(--green)';
-    const si=totalStock===0?'🔴':availV===totalV?'✅':'⚠️';
-    const pills=variants.map(v=>{const q=Math.max(0,v.inventory_quantity||0);const pc=q===0?'pr':q<5?'pa':q<10?'po':'pg';return`<span class="pill ${pc}" style="font-size:9px;margin:1px">${v.title==='Default Title'?'1':v.title}:${q}</span>`;}).join('');
-    return`<div class="sorter-item" draggable="true" data-idx="${i}" ondragstart="sorterDragStart(event,${i})" ondragover="sorterDragOver(event)" ondrop="sorterDrop(event,${i})" ondragend="sorterDragEnd(event)" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:grab;user-select:none;transition:border-color .15s">
-      <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted2);min-width:26px">${String(i+1).padStart(2,'0')}</div>
-      <div style="color:var(--muted2);font-size:20px">⠿</div>
-      <div style="width:52px;height:52px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--surface2)">${img?`<img src="${img}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted2)">📦</div>'}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title}</div>
-        <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${p.product_type||'—'}</div>
-        <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:2px">${pills}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:18px">${si}</div>
-        <div style="font-family:var(--mono);font-size:12px;color:${sc};font-weight:600">${totalStock}</div>
-        <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">${availV}/${totalV} sizes</div>
-      </div>
+
+  // Website-style grid — exactly how collection looks to customers
+  // Products shown as cards in a grid, draggable to reorder
+  el.innerHTML=`
+    <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:11px;font-family:var(--mono);color:var(--muted)">
+      <span>👆 Drag cards to reorder — this is exactly how customers see your collection</span>
+      <span style="margin-left:auto">${_sorterProds.length} products</span>
+    </div>
+    <div id="sorterGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
+      ${_sorterProds.map((p,i)=>{
+        const variants=p.variants||[];
+        const img=(p.images&&p.images[0])?p.images[0].src:'';
+        const totalStock=variants.reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
+        const availV=variants.filter(v=>(v.inventory_quantity||0)>0).length;
+        const totalV=variants.length;
+        const allOut=totalStock===0;
+        const lowStock=!allOut&&availV<totalV;
+        // Stock badge color
+        const badgeCol=allOut?'var(--red)':lowStock?'var(--accent)':'var(--green)';
+        const badgeTxt=allOut?'Out of Stock':lowStock?`${availV}/${totalV} sizes`:'In Stock';
+        const price=parseFloat(variants[0]?.price||0);
+        return`<div class="sorter-card" draggable="true" data-idx="${i}"
+          ondragstart="sorterDragStart(event,${i})"
+          ondragover="sorterDragOver(event)"
+          ondrop="sorterDrop(event,${i})"
+          ondragend="sorterDragEnd(event)"
+          style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:grab;user-select:none;transition:border-color .15s,transform .15s;position:relative">
+          <!-- Position badge -->
+          <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.75);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;z-index:2">#${i+1}</div>
+          <!-- Out of stock overlay -->
+          ${allOut?'<div style="position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:1;display:flex;align-items:center;justify-content:center"><span style="background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:4px;font-family:var(--mono)">OUT OF STOCK</span></div>':''}
+          <!-- Product Image -->
+          <div style="width:100%;aspect-ratio:1;background:var(--surface2);overflow:hidden">
+            ${img
+              ?`<img src="${img}" style="width:100%;height:100%;object-fit:cover;${allOut?'opacity:.5':''}" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--muted2)\'>📦</div>'">`
+              :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--muted2)">📦</div>`
+            }
+          </div>
+          <!-- Product Info -->
+          <div style="padding:8px 10px">
+            <div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px" title="${p.title}">${p.title}</div>
+            <div style="font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:4px">PKR ${Math.round(price).toLocaleString()}</div>
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="width:7px;height:7px;border-radius:50%;background:${badgeCol};flex-shrink:0"></span>
+              <span style="font-size:10px;font-family:var(--mono);color:var(--muted)">${badgeTxt}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>`;
-  }).join('');
 }
+
 function sorterDragStart(e,idx){_dragSrcIdx=idx;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
 function sorterDragOver(e){e.preventDefault();e.currentTarget.style.borderColor='var(--accent)';}
 function sorterDrop(e,targetIdx){
@@ -2903,7 +2959,7 @@ function sorterDrop(e,targetIdx){
   _dragSrcIdx=null;renderSorterGrid();
   document.getElementById('sortSts').textContent='✓ Reordered — click Apply to Shopify to save';
 }
-function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style.borderColor='';_dragSrcIdx=null;document.querySelectorAll('.sorter-item').forEach(el=>el.style.borderColor='');}
+function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style.borderColor='';_dragSrcIdx=null;document.querySelectorAll('.sorter-card').forEach(el=>el.style.borderColor='');}
 function runSort(){
   if(!_sorterProds.length){document.getElementById('sortSts').textContent='Select a collection first';return;}
   const rule=document.getElementById('sortRule').value;
@@ -2922,18 +2978,34 @@ async function applyCollectionSort(){
   const cat=document.getElementById('sortCat').value;
   if(!cat||!_sorterProds.length)return;
   const btn=document.getElementById('applyToShopifyBtn');
+  const sts=document.getElementById('sortSts');
   btn.textContent='Applying...';btn.disabled=true;
   try{
     const collId=String(cat).replace('gid://shopify/Collection/','');
+    // Fetch all collects (collect_id maps product_id → position)
     let allC=[];let cu='/collects.json?collection_id='+collId+'&limit=250';
     while(cu){const d=await shopFetch(cu);const b=d.collects||[];allC=allC.concat(b);if(b.length<250)cu=null;else cu='/collects.json?collection_id='+collId+'&limit=250&since_id='+b[b.length-1].id;}
     const cm={};allC.forEach(col=>cm[String(col.product_id)]=col.id);
-    let ok=0;
-    for(let i=0;i<_sorterProds.length;i++){const cid=cm[String(_sorterProds[i].id)];if(cid){try{await shopFetch('/collects/'+cid+'.json','PUT',{collect:{id:cid,position:i+1}});ok++;}catch(e){}}}
+    // Send updates in batches of 5 concurrent requests — fast but doesn't hammer API
+    const BATCH=5;
+    let ok=0,fail=0;
+    for(let i=0;i<_sorterProds.length;i+=BATCH){
+      const slice=_sorterProds.slice(i,i+BATCH);
+      await Promise.all(slice.map(async(p,j)=>{
+        const cid=cm[String(p.id)];
+        if(!cid)return;
+        try{
+          await shopFetch('/collects/'+cid+'.json','PUT',{collect:{id:cid,position:i+j+1}});
+          ok++;
+        }catch(e){fail++;}
+      }));
+      sts.textContent=`Applying... ${Math.min(i+BATCH,_sorterProds.length)}/${_sorterProds.length}`;
+      await new Promise(r=>setTimeout(r,0)); // yield to UI
+    }
     btn.textContent='✓ Applied!';btn.style.background='var(--green)';
-    document.getElementById('sortSts').textContent=`✓ Done! ${ok}/${_sorterProds.length} reordered on Shopify.`;
-    setTimeout(()=>{btn.textContent='✓ Apply to Shopify';btn.disabled=false;},4000);
-  }catch(e){btn.textContent='✗ Error';btn.disabled=false;}
+    sts.textContent=`✓ Done! ${ok}/${_sorterProds.length} reordered on Shopify.${fail>0?' ('+fail+' skipped)':''}`;
+    setTimeout(()=>{btn.textContent='✓ Apply to Shopify';btn.style.background='';btn.disabled=false;},4000);
+  }catch(e){btn.textContent='✗ Error';btn.disabled=false;sts.textContent='Error: '+e.message;}
 }
 
 
