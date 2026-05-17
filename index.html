@@ -726,21 +726,22 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch ALL orders for a date range
-// Strategy: paginate using created_at_min only — shift the window forward after each page
-// This avoids since_id conflicts and works regardless of Shopify sort order
+// Strategy: use since_id pagination — keeps created_at_min/max fixed, pages forward using last order ID
+// Shopify returns orders oldest-first when using since_id, so this reliably fetches all pages
 const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fetchAllOrders(from, to, onProgress){
-  const toTime=new Date(to).getTime();
   let allOrders=[];
-  let windowStart=new Date(from);
-  windowStart.setMilliseconds(0);
+  let sinceId=0;
   let guard=0;
-  let seenIds=new Set();
+  const fromISO=toLocalISO(new Date(from));
+  const toISO=toLocalISO(new Date(to));
 
   while(guard<200){
     guard++;
     await _sleep(80);
-    const url=`/orders.json?status=any&created_at_min=${toLocalISO(windowStart)}&created_at_max=${toLocalISO(new Date(to))}&limit=250`;
+    const url=sinceId===0
+      ? `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`
+      : `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250&since_id=${sinceId}`;
     let batch=[];
     try{
       const d=await shopFetch(url);
@@ -752,30 +753,14 @@ async function fetchAllOrders(from, to, onProgress){
 
     if(batch.length===0) break;
 
-    // Deduplicate and collect
-    let newCount=0;
-    for(const o of batch){
-      if(!seenIds.has(o.id)){
-        seenIds.add(o.id);
-        allOrders.push(o);
-        newCount++;
-      }
-    }
+    allOrders=allOrders.concat(batch);
     if(onProgress) onProgress(allOrders.length);
 
-    // If we got fewer than 250, we have everything
+    // If fewer than 250 returned, we have all orders
     if(batch.length<250) break;
 
-    // If no new orders were added (all duplicates), we're stuck — stop
-    if(newCount===0) break;
-
-    // Advance window: set created_at_min to earliest timestamp in this batch
-    // (batch is newest-first by default, so last item is oldest)
-    const oldestInBatch=batch[batch.length-1].created_at;
-    const newStart=new Date(oldestInBatch);
-    // If window didn't advance, break to avoid infinite loop
-    if(newStart.getTime()<=windowStart.getTime()) break;
-    windowStart=newStart;
+    // Advance cursor to the last order id in this batch
+    sinceId=batch[batch.length-1].id;
   }
 
   return allOrders;
