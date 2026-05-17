@@ -754,26 +754,25 @@ async function fetchChunk(fromISO, toISO){
   return orders;
 }
 
-// Fetch ALL orders fast — splits range into parallel 3-day chunks
+// Fetch ALL orders fast — 1-day chunks so each stays under 250 orders (no second page)
 async function fetchAllOrders(from, to, onProgress){
   const start=new Date(from);
   const end=new Date(to);
   const totalDays=Math.ceil((end-start)/(86400*1000));
 
-  // For small ranges (<=3 days) just fetch directly — no need to split
-  if(totalDays<=3){
+  // Single day — fetch directly
+  if(totalDays<=1){
     const orders=await fetchChunk(toLocalISO(start), toLocalISO(end));
-    if(onProgress) onProgress(orders.length);
+    if(onProgress) onProgress(orders.length, orders);
     console.log('fetchAllOrders complete:',orders.length,'orders (single chunk)');
     return orders;
   }
 
-  // Split into ~3-day chunks and fetch ALL in parallel
+  // Split into 1-day chunks and fire ALL in parallel
   const chunks=[];
   let chunkStart=new Date(start);
   while(chunkStart<end){
     const chunkEnd=new Date(chunkStart);
-    chunkEnd.setDate(chunkEnd.getDate()+2);
     chunkEnd.setHours(23,59,59,999);
     if(chunkEnd>end) chunkEnd.setTime(end.getTime());
     chunks.push({from:new Date(chunkStart),to:new Date(chunkEnd)});
