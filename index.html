@@ -909,7 +909,7 @@ async function loadProducts(){
           renderProducts();
         }
         // Pause every 4 pages to avoid worker rate limit
-        if(page%4===1&&hasMore)await new Promise(r=>setTimeout(r,600));
+        if(page%4===1&&hasMore)await new Promise(r=>setTimeout(r,300));
       }catch(pageErr){
         console.warn('loadProducts page',page,'error:',pageErr.message);
         retries++;
@@ -1711,22 +1711,35 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     if(rl.includes('cf returns')||rl.includes('returns cf')){const v=achVal();result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}
 
     // ── AGENTS: horizontal layout ──
-    // Each agent row: [empty...] [Agent Name] [Chats] [Inbound Calls] [Outbound Calls] [R/Returns] [Solve Compl]
+    // Each agent row: [...] [Agent Name (Abdullah/Namra)] [Chats] [Inbound] [Outbound] [R/Returns] [Solve Compl]
+    // Skip header rows (rows that contain "chats" or "inbound" as text labels)
     const isAgentName=(c)=>{
       const cl=(c||'').toLowerCase().trim();
       return cl.includes('abdullah')||cl.includes('namra')||cl.includes('nimra')||
-             (cl.startsWith('agent')&&cl.length>7);
+             (cl.startsWith('agent')&&cl.length>7&&!cl.includes('agent performance'));
     };
-    const agentCellIdx=r.findIndex(c=>isAgentName(c));
+    // Only process if this row has numbers (not a header row)
+    const rowHasNumbers=r.some(c=>c&&!isNaN(parseFloat((c||'').replace(/,/g,'')))&&parseFloat((c||'').replace(/,/g,''))>0);
+    const agentCellIdx=rowHasNumbers?r.findIndex(c=>isAgentName(c)):-1;
     if(agentCellIdx>=0){
       const agentName=r[agentCellIdx].trim();
-      // Values are in the next 5 cells after the agent name cell
-      const chats=    nc(r[agentCellIdx+1])||0;
-      const inbound=  nc(r[agentCellIdx+2])||0;
-      const outbound= nc(r[agentCellIdx+3])||0;
-      const returns=  nc(r[agentCellIdx+4])||0;
-      const complaints=nc(r[agentCellIdx+5])||0;
-      result.agents.push({name:agentName,chats,inbound,outbound,returns,complaints,todayChats:0,todayOut:0});
+      // Read next 5 numeric cells after the agent name
+      let vals=[],k=agentCellIdx+1;
+      while(vals.length<5&&k<r.length){
+        const cell=(r[k]||'').trim();
+        // Push numeric value (0 for dash/empty)
+        vals.push(cell==='-'||cell==='—'||cell===''?0:nc(cell));
+        k++;
+      }
+      result.agents.push({
+        name:agentName,
+        chats:vals[0]||0,
+        inbound:vals[1]||0,
+        outbound:vals[2]||0,
+        returns:vals[3]||0,
+        complaints:vals[4]||0,
+        todayChats:0,todayOut:0
+      });
       continue;
     }
 
@@ -2277,7 +2290,8 @@ function renderProducts(){
 
   // If nothing loaded at all yet, show spinner
   if(allProducts.length===0){
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>Products loading from Shopify...</td></tr>`;
+    const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>${apiCount>0?apiCount.toLocaleString()+' products found — still downloading, results will appear as they load...':'Products loading from Shopify...'}</td></tr>`;
     document.getElementById('prodCount').textContent='';
     return;
   }
