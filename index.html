@@ -788,7 +788,7 @@ async function fetchAllOrders(from, to, onProgress){
   const results=await Promise.all(
     chunks.map(c=>fetchChunk(toLocalISO(c.from),toLocalISO(c.to)).then(orders=>{
       fetched+=orders.length;
-      if(onProgress) onProgress(fetched);
+      if(onProgress) onProgress(fetched,orders); // pass chunk orders for progressive render
       console.log('Chunk',c.from.toLocaleDateString(),'→',c.to.toLocaleDateString(),':',orders.length,'orders');
       return orders;
     }))
@@ -891,8 +891,17 @@ async function reloadShopifyData(){
   const days=Math.ceil((to-from)/(86400*1000))+1;
   if(days>1) setBadge('s','amber','Fetching '+days+' days...');
   try{
-    const allOrders=await fetchAllOrders(from,to,(n)=>{
+    // _liveOrders accumulates chunks as they arrive for progressive rendering
+    let _liveOrders=[];
+    const allOrders=await fetchAllOrders(from,to,(n,chunkOrders)=>{
       setBadge('s','amber',n+' orders...');
+      // Render dashboard immediately with each chunk — don't wait for all chunks
+      if(chunkOrders&&chunkOrders.length){
+        _liveOrders=_liveOrders.concat(chunkOrders).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+        ordersData=_liveOrders;
+        renderDailyStats();
+        renderSpark();
+      }
     });
     ordersData=allOrders;
     setBadge('s','live',ordersData.length+' orders · '+rangeLabel());
