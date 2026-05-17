@@ -726,41 +726,38 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch ALL orders for a date range
-// Strategy: use since_id pagination — keeps created_at_min/max fixed, pages forward using last order ID
-// Shopify returns orders oldest-first when using since_id, so this reliably fetches all pages
+// Strategy: page_info cursor pagination (Shopify's recommended approach for large datasets)
+// First page uses date filters, subsequent pages use page_info cursor from Link header
 const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fetchAllOrders(from, to, onProgress){
   let allOrders=[];
-  let sinceId=0;
   let guard=0;
+  let nextPageInfo=null;
   const fromISO=toLocalISO(new Date(from));
   const toISO=toLocalISO(new Date(to));
 
   while(guard<200){
     guard++;
-    await _sleep(80);
-    const url=sinceId===0
-      ? `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`
-      : `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250&since_id=${sinceId}`;
-    let batch=[];
+    await _sleep(120);
+    // First page: use date filters. Subsequent pages: use page_info cursor only
+    const url=nextPageInfo
+      ? `/orders.json?limit=250&page_info=${nextPageInfo}`
+      : `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
+    let d;
     try{
-      const d=await shopFetch(url);
-      batch=d.orders||[];
+      d=await shopFetch(url);
     }catch(e){
       console.error('fetchAllOrders error:',e.message);
       break;
     }
-
+    const batch=d.orders||[];
     if(batch.length===0) break;
-
     allOrders=allOrders.concat(batch);
     if(onProgress) onProgress(allOrders.length);
-
-    // If fewer than 250 returned, we have all orders
-    if(batch.length<250) break;
-
-    // Advance cursor to the last order id in this batch
-    sinceId=batch[batch.length-1].id;
+    // Check if worker passed back a next page_info via x-shopify-link header
+    nextPageInfo=d._nextPageInfo||null;
+    // If no next cursor and fewer than 250, we're done
+    if(!nextPageInfo) break;
   }
 
   return allOrders;
