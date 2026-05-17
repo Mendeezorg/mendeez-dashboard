@@ -1455,264 +1455,238 @@ function renderCrrTable(){
 // Order Status section: "Landed MTD", "Total Dispatched", "Delivered", "Pending", "Cancellations MTD", "Returns MTD"
 function processCS(rows){
   console.log('[CS] processCS called, rows:', rows.length);
-  // Log ALL rows to see exact structure — critical for debugging
-  console.log('[CS] FULL SHEET DUMP:');
-  rows.forEach((r,i)=>{
-    const filled=r.filter(c=>c&&String(c).trim());
-    if(filled.length>0) console.log('[CS] row'+i+':', JSON.stringify(r.slice(0,15)));
-  });
   _csRows=rows;
 
   const now=new Date();
   const rangeDate=getRange().from;
   const currentMonth=rangeDate.toLocaleString('en-US',{month:'long'}).toLowerCase();
-  const currentYear=rangeDate.getFullYear(); // full year e.g. 2026
+  const currentYear=rangeDate.getFullYear();
   csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
 
-  // ── Sheet structure (confirmed from screenshot) ──
-  // Row: "April 2026"          ← section header (month name + year in same row/cell)
-  // Row: "Operations Data"     ← subtitle (optional)
-  // Rows: ORDER STATUS table
-  // Rows: CANCELLATIONS table
-  // Row:  "MTD Productivity Tracking CS Data" ← agents header
-  // Rows: Agent 1 (Abdullah) | Chats | Inbound | Outbound | R/Returns | Solve Complaints
-  // Row:  "E.COM WH" row with Exch Count | Total Dispatch | Total Disp unit | Rtn Units
-  // Then blank rows, then next month: "May 2026"
+  // ── EXACT sheet structure from console log ──
+  // row3:  ["April 2026","\"","\"",...]  ← month header (col0 = "April 2026", rest are quoted empties)
+  // row10: ["Landed MTD","7,000,000","4,198","1,517","6,368,734",...]  ← order status rows (col0=label)
+  // row12: ["Delivered To Customer MTD","\"","\"","1,245","5,050,308",...,"Agent 1 A","Chats",...]
+  // row11-17: order status in col0-6, agent dates in col9+
+  // row29: ["MTD Productivity Tracking"]  ← agent section header
+  // row31: ["\"","\"","\"","\"","\"","235",...]  ← agent 1 totals (col5=R/Returns)
+  // row32: ["\"","\"","1047","54","481","\"","149",...]  ← agent 1: col2=Chats,col3=Inbound,col4=Outbound,col6=Complaints
+  // row24: ["Fake Order",...,"EWH","Exch Count",...]  ← EWH label in col8
+  // row33: ["\"","\"","21","5,772,966","2904","137",...]  ← EWH data: col2=Exch,col3=DispVal,col4=DispUnits,col5=RtnUnits
+  // Agent names are embedded in order-status rows: row12 col8="Agent 1 A", row18 col8="Agent 2 N"
+  // Agent metrics are in separate rows (row31=returns, row32=chats/inbound/outbound/complaints)
 
   const monthOrder={january:1,february:2,march:3,april:4,may:5,june:6,
     july:7,august:8,september:9,october:10,november:11,december:12};
   const monthNames=['january','february','march','april','may','june',
     'july','august','september','october','november','december'];
 
-  // ── STEP 1: Find ALL month section headers ──
-  // A section header row is one that contains ONLY a month name + year (e.g. "April 2026")
-  // with no other data keywords — keeps it tight so random data rows don't match
+  // Helper: clean a cell value (strip quotes, trim)
+  const clean=c=>(c||'').replace(/^"+|"+$/g,'').trim();
+  // Helper: is cell empty/quoted-empty
+  const isEmpty=c=>!c||clean(c)===''||c==='"';
+
+  // ── STEP 1: Find section headers ──
+  // Header row has col0 = "Month Year" (e.g. "April 2026" or "May 2026")
+  // The rest of the row is all quoted empties: ["April 2026","\"","\"",...]
   const sectionHeaders=[];
   for(let i=0;i<rows.length;i++){
-    const cells=rows[i].map(c=>(c||'').trim()).filter(c=>c);
-    if(cells.length===0)continue;
-    const rowText=cells.join(' ').toLowerCase();
-    // Must contain a year (20XX)
-    const yrMatch=rowText.match(/\b(20\d\d)\b/);
+    const col0=clean(rows[i][0]||'');
+    if(!col0)continue;
+    const col0l=col0.toLowerCase();
+    // Match "April 2026" or "May 2026" — month name + 4-digit year
+    const yrMatch=col0.match(/\b(20\d\d)\b/);
     if(!yrMatch)continue;
     const yr=parseInt(yrMatch[1]);
-    // Must contain a month name as a whole word
-    const mn=monthNames.find(m=>new RegExp('\\b'+m+'\\b').test(rowText));
+    const mn=monthNames.find(m=>col0l.includes(m));
     if(!mn)continue;
-    // The row should be short — a header row won't have 10+ filled cells
-    if(cells.length>6)continue;
-    // Also accept if row has "operations data" nearby (subtitle row on same row)
+    // Make sure it's ONLY a month+year label (not a data row with month in it)
+    // Check that all other cells in this row are empty
+    const otherCells=rows[i].slice(1).filter(c=>!isEmpty(c));
+    if(otherCells.length>0)continue; // data row, not a header
     const label=mn.charAt(0).toUpperCase()+mn.slice(1)+' '+yr;
-    // Only record first occurrence of each label
     if(!sectionHeaders.find(s=>s.label===label)){
       sectionHeaders.push({label,row:i,month:mn,year:yr,monthNum:monthOrder[mn]||0});
-      console.log('[CS] Found section header:',label,'at row',i,'cells:',cells.join('|'));
+      console.log('[CS] Found section header:',label,'at row',i);
     }
   }
-
-  // Sort by row number (sheet order)
   sectionHeaders.sort((a,b)=>a.row-b.row);
-  console.log('[CS] All section headers:',sectionHeaders.map(s=>s.label+'@'+s.row));
+  console.log('[CS] Section headers:',sectionHeaders.map(s=>s.label+'@'+s.row));
 
-  // ── STEP 2: Extract data for each month section ──
-  // Section = from its header row to the row before the next header
+  // ── STEP 2: Extract each month's data ──
   for(let mi=0;mi<sectionHeaders.length;mi++){
     const m=sectionHeaders[mi];
-    const sectionEnd=mi+1<sectionHeaders.length?sectionHeaders[mi+1].row:rows.length;
-    const mData=extractCSDataForMonth(rows,m.row,sectionEnd,m.month,m.year);
-    allCsMonths[m.label]=mData;
-    console.log('[CS] Extracted',m.label,'— agents:',mData.agents.length,'orderStatus keys:',Object.keys(mData.orderStatus).length,'ewh keys:',Object.keys(mData.ewh).length);
+    const sEnd=mi+1<sectionHeaders.length?sectionHeaders[mi+1].row:rows.length;
+    allCsMonths[m.label]=extractCSDataForMonth(rows,m.row,sEnd,m.month,m.year,clean,isEmpty);
+    console.log('[CS]',m.label,'→ agents:',allCsMonths[m.label].agents.length,
+      '| delivered:',allCsMonths[m.label].orderStatus.delivered,
+      '| ewh dispVal:',allCsMonths[m.label].ewh.dispVal);
   }
 
-  // ── STEP 3: Set csData for the currently-selected month ──
+  // ── STEP 3: Set active csData ──
   const currentLabel=currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1)+' '+currentYear;
   if(allCsMonths[currentLabel]){
     csData=JSON.parse(JSON.stringify(allCsMonths[currentLabel]));
   } else if(sectionHeaders.length>0){
-    // Fallback to most recent section
-    const newest=sectionHeaders[sectionHeaders.length-1];
+    const newest=[...sectionHeaders].sort((a,b)=>b.year!==a.year?b.year-a.year:b.monthNum-a.monthNum)[0];
     csData=JSON.parse(JSON.stringify(allCsMonths[newest.label]||{agents:[],orderStatus:{},ewh:{},cancelReasons:[]}));
+    console.log('[CS] currentLabel not found, using newest:',newest.label);
   }
-  console.log('[CS] Active month:',currentLabel,'| agents:',csData.agents.length,'| delivered:',csData.orderStatus.delivered);
-
+  console.log('[CS] Active:',currentLabel,'agents:',csData.agents.length,'delivered:',csData.orderStatus.delivered);
   setBadge('cs','live',csData.agents.length+' agents · '+currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1));
 
-  // ── STEP 4: Populate month dropdowns ──
-  // Sort newest first for the dropdown
+  // ── STEP 4: Populate dropdowns ──
   const dropdownMonths=[...sectionHeaders].sort((a,b)=>b.year!==a.year?b.year-a.year:b.monthNum-a.monthNum);
-
-  const populateDropdown=(selId)=>{
-    const sel=document.getElementById(selId);
+  ['csMonthSel','overviewMonthSel'].forEach(id=>{
+    const sel=document.getElementById(id);
     if(!sel)return;
-    if(dropdownMonths.length>0){
-      sel.innerHTML=dropdownMonths.map(m=>`<option value="${m.label}">${m.label}</option>`).join('');
-      // Select current month if available, else newest
-      const cur=Array.from(sel.options).find(o=>o.value===currentLabel);
-      if(cur)cur.selected=true;
-      else sel.options[0].selected=true;
-    } else {
-      sel.innerHTML=`<option value="${currentLabel}">${currentLabel}</option>`;
-    }
-  };
-  populateDropdown('csMonthSel');
-  populateDropdown('overviewMonthSel');
+    sel.innerHTML=dropdownMonths.length>0
+      ?dropdownMonths.map(m=>`<option value="${m.label}">${m.label}</option>`).join('')
+      :`<option value="${currentLabel}">${currentLabel}</option>`;
+    const cur=Array.from(sel.options).find(o=>o.value===currentLabel);
+    if(cur)cur.selected=true;
+    else if(sel.options.length)sel.options[0].selected=true;
+  });
 
   renderCS();
 }
 
 // ── CS DATA EXTRACTOR ──
-// Extracts orderStatus, agents, EWH, cancelReasons from a month's row range
-// sectionStart = row of the "April 2026" header
-// sectionEnd   = row of the NEXT month header (exclusive)
-function extractCSDataForMonth(rows, sectionStart, sectionEnd, monthName, year){
+// Based on exact structure from console log:
+// Order status: col0=label, col1=TotalTarget, col2=TargetTillDate, col3=NoOfOrders, col4=MTDAchValue, col5=Ach%, col6=Units
+// Agent names: embedded in order-status rows at col8 (e.g. "Agent 1 A", "Agent 2 N")
+// Agent metrics: in standalone rows after "MTD Productivity Tracking" / "CS Data"
+//   Row pattern: ["\"","\"",chats,inbound,outbound,"\"",complaints,...] for agent1
+//   Another row:  ["\"","\"",chats,inbound,outbound,"\"",complaints,...] for agent2
+// EWH label: "EWH" appears in col8 of a cancellation row
+// EWH data: a standalone row ["\"",...,exch,dispVal,dispUnits,rtnUnits,...]
+function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean,isEmpty){
   const result={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-  const scanStart=sectionStart;
-  const scanEnd=Math.min(rows.length,sectionEnd);
+  const nc2=v=>{if(!v)return 0;const s=String(v).replace(/^"+|"+$/g,'').replace(/[,\s]/g,'').trim();return parseFloat(s)||0;};
 
-  console.log('[CS extract]',monthName,year,'rows',scanStart,'→',scanEnd);
-
-  for(let i=scanStart;i<scanEnd;i++){
+  // Collect agent names from col8 of any row in this section
+  // From log: row12 col8="Agent 1 A", row18 col8="Agent 2 N"
+  const agentNames=[];
+  const agentNamePattern=/^agent\s*\d|^(abdullah|namra|nimra|hamza|usman|sara|sana|ayesha|kashif|waqas|bilal|noman)\b/i;
+  for(let i=sectionStart;i<sectionEnd;i++){
     const r=rows[i];
-    const rowText=r.join(' ').toLowerCase();
-    const cells=r.map(c=>(c||'').trim());
-
-    // ── ORDER STATUS rows ──
-    // Structure from screenshot: [Label][Total Target][Target Till Date][No Of Orders][MTD Ach Value][MTD T Ach%][Total Ach%][Units]
-    // We find the label in any column, then read col+3 = No Of Orders, col+4 = MTD Ach Value
-    const findLabelIdx=(keywords)=>{
-      return r.findIndex(c=>{
-        const cl=(c||'').toLowerCase().trim();
-        return keywords.some(k=>cl.includes(k));
-      });
-    };
-    const getVal=(li,offset)=>li>=0?nc(r[li+offset])||0:0;
-
-    if(rowText.includes('landed mtd')){
-      const li=findLabelIdx(['landed mtd']);
-      const v=getVal(li,4)||getVal(li,3);
-      if(v>0){result.orderStatus.landed=v;result.orderStatus.landedVal=v;}
-    }
-    if(rowText.includes('delivered to customer')||rowText.includes('delivered')){
-      const li=findLabelIdx(['delivered to customer','delivered']);
-      const v=getVal(li,4)||getVal(li,3);
-      if(v>0)result.orderStatus.delivered=v;
-    }
-    if(rowText.includes('cancelations mtd')||rowText.includes('cancellations mtd')){
-      if(!rowText.includes('cf')){
-        const li=findLabelIdx(['cancelations mtd','cancellations mtd']);
-        const v=getVal(li,4)||getVal(li,3);
-        if(v>0){result.orderStatus.cancelMTD=v;result.orderStatus.cancelMTDVal=v;result.orderStatus.cancel=v;}
+    // Check all columns for agent names
+    for(let ci=0;ci<Math.min(r.length,15);ci++){
+      const cell=clean(r[ci]||'');
+      if(cell.length>2&&cell.length<60&&agentNamePattern.test(cell)){
+        if(!agentNames.find(a=>a.name===cell)){
+          agentNames.push({name:cell,row:i,col:ci});
+          console.log('[CS extract] Found agent name:',cell,'at row',i,'col',ci);
+        }
       }
     }
-    if((rowText.includes('cancelations cf')||rowText.includes('cancellations cf'))){
-      const li=findLabelIdx(['cancelations cf','cancellations cf']);
-      const v=getVal(li,4)||getVal(li,3);
-      if(v>0){result.orderStatus.cancelCF=v;result.orderStatus.cancelCFVal=v;}
-    }
-    if(rowText.includes('mtd returns')||rowText.includes('returns mtd')){
-      if(!rowText.includes('cf')){
-        const li=findLabelIdx(['mtd returns','returns mtd']);
-        const v=getVal(li,4)||getVal(li,3);
-        if(v>0){result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}
-      }
-    }
-    if(rowText.includes('cf returns')||rowText.includes('returns cf')){
-      const li=findLabelIdx(['cf returns','returns cf']);
-      const v=getVal(li,4)||getVal(li,3);
-      if(v>0){result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}
-    }
-    if(rowText.includes('pending orders')||rowText.includes('pending')){
-      const li=findLabelIdx(['pending orders','pending']);
-      const v=getVal(li,3)||getVal(li,2);
-      if(v>0)result.orderStatus.pending=v;
-    }
-    if(rowText.includes('total dispatched')||rowText.includes('total dispatch')){
-      const li=findLabelIdx(['total dispatched','total dispatch']);
-      const v=getVal(li,3)||getVal(li,2);
-      if(v>0)result.orderStatus.dispatched=v;
-    }
+  }
 
-    // ── AGENTS ──
-    // From screenshot: row starts with "Agent 1 (Abdullah)" in col 0 or nearby
-    // Columns after name: Chats | Inbound Calls | Outbound Calls | R/Returns | Solve Complaints
-    // The agent name row IS the data row (not a header) — metrics are in same row
-    const agentMatch=cells.find((c,ci)=>{
-      const cl=c.toLowerCase();
-      return (cl.startsWith('agent ')||/^(abdullah|namra|nimra|hamza|usman|sara|sana|ayesha|kashif|waqas|bilal|noman)\b/i.test(c))&&c.length>2&&c.length<60;
+  // Find "MTD Productivity Tracking" row — agent metric rows come AFTER this
+  let productivityRow=-1;
+  for(let i=sectionStart;i<sectionEnd;i++){
+    const rt=rows[i].map(c=>clean(c)).join(' ').toLowerCase();
+    if(rt.includes('mtd productivity')||rt.includes('productivity tracking')){
+      productivityRow=i;
+      break;
+    }
+  }
+  // CS Data row follows MTD Productivity row
+  let csDataRow=productivityRow+1;
+  // The actual metric rows start after "CS Data" row
+  // From log April: row31=[returns col5=235], row32=[chats col2=1047,inbound col3=54,outbound col4=481,complaints col6=149]
+  // From log May:   row65=[chats col2=580,inbound col3=38,outbound col4=197,returns col5=117], row66=[chats col2=484,...]
+
+  // Strategy: after productivityRow, find rows that are mostly-empty but have 2-6 numbers
+  // These are the agent metric rows
+  const metricRows=[];
+  for(let i=Math.max(sectionStart,productivityRow);i<sectionEnd;i++){
+    const r=rows[i];
+    const nums=r.slice(0,10).map(nc2).filter(v=>v>0);
+    const nonEmpty=r.slice(0,10).filter(c=>!isEmpty(c));
+    // A metric row has 2-6 numbers and mostly empty/quoted cells
+    if(nums.length>=2&&nums.length<=7&&nonEmpty.length<=7){
+      metricRows.push({row:i,nums,cells:r});
+      console.log('[CS extract] Metric row',i,':',nums,'| raw:',r.slice(0,10).map(c=>clean(c)));
+    }
+  }
+  console.log('[CS extract]',monthName,year,'| agentNames:',agentNames.map(a=>a.name),'| metricRows:',metricRows.map(r=>r.row));
+
+  // EWH and agent metric rows
+  const ewhMetricRows=metricRows.filter(mr=>mr.nums.some(n=>n>50000));
+  const agentMetricRows=metricRows.filter(mr=>!mr.nums.some(n=>n>50000));
+
+  // Assign metric rows to agents using EXACT column positions from console log:
+  // Each agent has a "full" row: col2=Chats, col3=Inbound, col4=Outbound, col5=Returns, col6=Complaints
+  // April also has a preceding "partial" row with just returns in col5
+  // We identify full rows as those with >=3 numbers, partial rows as <3 numbers
+  const fullAgentRows=agentMetricRows.filter(mr=>mr.nums.length>=3);
+  const partialRows=agentMetricRows.filter(mr=>mr.nums.length<3);
+
+  console.log('[CS extract] fullAgentRows:',fullAgentRows.map(r=>r.row+':'+JSON.stringify(r.nums)));
+  console.log('[CS extract] partialRows:',partialRows.map(r=>r.row+':'+JSON.stringify(r.nums)));
+
+  if(agentNames.length>0&&fullAgentRows.length>0){
+    agentNames.forEach((ag,idx)=>{
+      const fullRow=fullAgentRows[idx];
+      if(!fullRow)return;
+      const r=fullRow.cells;
+      // Extract by exact column positions confirmed from log
+      const chats  =nc2(r[2])||0;
+      const inbound=nc2(r[3])||0;
+      const outbound=nc2(r[4])||0;
+      const returnsInRow=nc2(r[5])||0;
+      const complaints=nc2(r[6])||0;
+      // If returns not in full row, check adjacent partial row
+      const prevPartial=partialRows.find(pr=>pr.row<fullRow.row&&fullRow.row-pr.row<=3);
+      const returns=returnsInRow||(prevPartial?prevPartial.nums[0]||0:0);
+      console.log('[CS extract] Agent',ag.name,'→ chats:',chats,'inbound:',inbound,'outbound:',outbound,'returns:',returns,'complaints:',complaints);
+      result.agents.push({name:ag.name,chats,inbound,outbound,returns,complaints,todayChats:0,todayOut:0});
     });
-    if(agentMatch){
-      const nameIdx=cells.findIndex(c=>c===agentMatch);
-      // Metrics are in subsequent columns after the name
-      // From screenshot columns after name: Chats, Inbound Calls, Outbound Calls, R/Returns, Solve Complaints
-      const nums=[];
-      for(let ci=nameIdx+1;ci<Math.min(cells.length,nameIdx+8);ci++){
-        const v=nc(cells[ci]);
-        if(v>0||cells[ci]==='0')nums.push(v);
-      }
-      // If metrics are in same row, use them directly
-      if(nums.length>=2){
-        result.agents.push({
-          name:agentMatch,
-          chats:nums[0]||0,
-          inbound:nums[1]||0,
-          outbound:nums[2]||0,
-          returns:nums[3]||0,
-          complaints:nums[4]||0,
-          todayChats:0,todayOut:0
-        });
-        continue;
-      }
-      // Fallback: metrics may be in next rows under the name (vertical layout)
-      const vals=[];
-      for(let k=1;k<=5;k++){
-        const nr=rows[i+k]||[];
-        const v=nc(nr[nameIdx])||nc(nr[nameIdx+1])||0;
-        vals.push(v);
-      }
-      if(vals.some(v=>v>0)){
-        result.agents.push({
-          name:agentMatch,
-          chats:vals[0],inbound:vals[1],outbound:vals[2],
-          returns:vals[3],complaints:vals[4],
-          todayChats:0,todayOut:0
-        });
-        i+=5;continue;
-      }
-    }
+  }
 
-    // ── EWH ROW ──
-    // From screenshot: "E.COM WH" row with: Exch Count | Total Dispatch | Total Disp unit | Rtn Units
-    if(rowText.includes('e.com wh')||rowText.includes('ecom wh')||rowText.includes('e.wh')||rowText.includes('f.com wh')){
-      // Values are on the SAME row or the next row
-      // From screenshot the row shows: [E.COM WH][ExchCount][TotalDispatch][TotalDispUnit][RtnUnits]
-      // Try same row first
-      const nums=cells.map(nc).filter(v=>v>0);
-      if(nums.length>=2){
-        result.ewh.exch=nums[0]||0;
-        result.ewh.dispVal=nums[1]||0;
-        result.ewh.dispUnits=nums[2]||0;
-        result.ewh.returnUnits=nums[3]||0;
-      } else {
-        // Try next row
-        const nr=rows[i+1]||[];
-        const nnums=nr.map(nc).filter(v=>v>0);
-        result.ewh.exch=nnums[0]||0;
-        result.ewh.dispVal=nnums[1]||0;
-        result.ewh.dispUnits=nnums[2]||0;
-        result.ewh.returnUnits=nnums[3]||0;
-        i++;
-      }
-      continue;
-    }
+  // EWH data — from EWH metric rows
+  // April row33: [21, 5772966, 2904, 137] → exch=21, dispVal=5772966, dispUnits=2904, rtnUnits=137
+  // May row67:   [11, 1679369, 916, 18]   → same layout
+  if(ewhMetricRows.length>0){
+    const en=ewhMetricRows[0].nums;
+    result.ewh.exch=en[0]||0;
+    result.ewh.dispVal=en[1]||0;
+    result.ewh.dispUnits=en[2]||0;
+    result.ewh.returnUnits=en[3]||0;
+    console.log('[CS extract] EWH:',result.ewh);
+  }
 
-    // ── CANCELLATION REASONS ──
+  // ORDER STATUS — col0=label, col4=MTD Ach Value, col3=No Of Orders
+  for(let i=sectionStart;i<sectionEnd;i++){
+    const r=rows[i];
+    const label=clean(r[0]||'').toLowerCase();
+    if(!label)continue;
+    const col3=nc2(r[3]);  // No Of Orders
+    const col4=nc2(r[4]);  // MTD Ach Value
+    if(label.includes('landed mtd')){
+      if(col4>0){result.orderStatus.landed=col4;result.orderStatus.landedVal=col4;}
+    } else if(label.includes('delivered to customer')){
+      if(col4>0)result.orderStatus.delivered=col4;
+    } else if(label.includes('cancelations mtd')||label.includes('cancellations mtd')){
+      if(col4>0){result.orderStatus.cancelMTD=col4;result.orderStatus.cancelMTDVal=col4;result.orderStatus.cancel=col4;}
+    } else if(label.includes('cancelations cf')||label.includes('cancellations cf')){
+      if(col4>0){result.orderStatus.cancelCF=col4;result.orderStatus.cancelCFVal=col4;}
+    } else if((label.includes('mtd returns')||label.includes('returns mtd'))&&!label.includes('cf')){
+      if(col4>0){result.orderStatus.returnsMTD=col4;result.orderStatus.returnsMTDVal=col4;result.orderStatus.returns=col4;}
+    } else if(label.includes('cf returns')||label.includes('returns cf')){
+      if(col4>0){result.orderStatus.returnsCF=col4;result.orderStatus.returnsCFVal=col4;}
+    } else if(label.includes('pending')){
+      if(col3>0)result.orderStatus.pending=col3;
+    } else if(label.includes('total dispach')||label.includes('total dispatch')){
+      if(col3>0)result.orderStatus.dispatched=col3;
+    }
+    // Cancellation reasons — col0=reason label, col1=count, col2=value
     const cancelKeywords=['call not answered','customer cancelled','duplicate order','fake order',
-      'invalid customer','non service area','payment issue','inventory constraint',
-      'wrong product','wrong size','price issue','cod issue'];
-    const cancelCell=cells.find(c=>cancelKeywords.some(k=>c.toLowerCase().includes(k)));
-    if(cancelCell){
-      const nums=cells.map(nc).filter(v=>v>0);
-      if(nums.length>0)result.cancelReasons.push({reason:cancelCell,count:nums[nums.length-1]});
+      'invalid customer','non service area','payment issue','inventory constraint'];
+    if(cancelKeywords.some(k=>label.includes(k))){
+      const cnt=nc2(r[1]);
+      if(cnt>0)result.cancelReasons.push({reason:clean(r[0]),count:cnt});
     }
   }
   return result;
