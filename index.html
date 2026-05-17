@@ -762,22 +762,24 @@ async function fetchAllOrders(from, to, onProgress){
     if(e.message!=='NO_PAGE_INFO') throw e;
   }
 
-  // Strategy 2: Chunk by day — fetch each day separately, combine
-  // This works perfectly with date filters and has no pagination issues for 1-day chunks
-  console.log('Falling back to day-by-day chunking...');
+  // Strategy 2: Parallel day chunking — fetch multiple days simultaneously
+  // Much faster than sequential: 18 days at 3 parallel = 6 rounds instead of 18
+  console.log('Falling back to day-by-day chunking (parallel)...');
   allOrders=[];
   const totalDays=Math.ceil((to-from)/(86400*1000))+1;
 
+  // Build all day ranges first
+  const dayRanges=[];
   for(let d=0;d<totalDays;d++){
     const dayFrom=new Date(from);dayFrom.setDate(dayFrom.getDate()+d);dayFrom.setHours(0,0,0,0);
     const dayTo=new Date(dayFrom);dayTo.setHours(23,59,59,999);
-    // Don't go past the requested 'to' date
     const effectiveTo=dayTo>to?to:dayTo;
+    dayRanges.push({dayFrom,effectiveTo});
+  }
 
-    let dayOrders=[];
-    let sinceId=null;
-    let hasMore=true;
-    let guard=0;
+  // Fetch one day's orders
+  const fetchDay=async({dayFrom,effectiveTo})=>{
+    let dayOrders=[],sinceId=null,hasMore=true,guard=0;
     while(hasMore&&guard<10){
       guard++;
       let url=`/orders.json?status=any&created_at_min=${toLocalISO(dayFrom)}&created_at_max=${toLocalISO(effectiveTo)}&limit=250`;
@@ -788,7 +790,15 @@ async function fetchAllOrders(from, to, onProgress){
       if(batch.length<250){hasMore=false;}
       else{sinceId=batch[batch.length-1].id;}
     }
-    allOrders=allOrders.concat(dayOrders);
+    return dayOrders;
+  };
+
+  // Process in parallel batches of 5 days at a time (safe for rate limits)
+  const BATCH=5;
+  for(let i=0;i<dayRanges.length;i+=BATCH){
+    const chunk=dayRanges.slice(i,i+BATCH);
+    const results=await Promise.all(chunk.map(fetchDay));
+    results.forEach(r=>allOrders=allOrders.concat(r));
     if(onProgress) onProgress(allOrders.length);
   }
   return allOrders;
@@ -881,6 +891,9 @@ async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
   setBadge('s','amber','Fetching orders...');
+  // Show day count so user knows how long it will take
+  const days=Math.ceil((to-from)/(86400*1000))+1;
+  if(days>1) setBadge('s','amber','Fetching '+days+' days...');
   try{
     const allOrders=await fetchAllOrders(from,to,(n)=>{
       setBadge('s','amber',n+' orders...');
