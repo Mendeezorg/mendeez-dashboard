@@ -726,50 +726,53 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch ALL orders for a date range
+// Strategy: chunk by week — each week fetches ≤250 orders per call, no pagination needed
+// This avoids all since_id + order= conflicts and the 1000-order REST API limit
 async function fetchAllOrders(from, to, onProgress){
   let allOrders=[];
-  let sinceId=null;
-  let hasMore=true;
-  let guard=0;
 
-  while(hasMore && guard<100){
-    guard++;
-    let url;
-    if(sinceId){
-      // Shopify does NOT allow order= when since_id is present
-      url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250&since_id=${sinceId}`;
-    } else {
-      url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250&order=created_at+asc`;
-    }
+  // Build weekly chunks
+  const chunks=[];
+  let chunkStart=new Date(from);
+  while(chunkStart<=to){
+    const chunkEnd=new Date(chunkStart);
+    chunkEnd.setDate(chunkEnd.getDate()+6);
+    chunkEnd.setHours(23,59,59,999);
+    const effectiveEnd=chunkEnd>to?to:chunkEnd;
+    chunks.push({from:new Date(chunkStart),to:new Date(effectiveEnd)});
+    chunkStart=new Date(effectiveEnd);
+    chunkStart.setDate(chunkStart.getDate()+1);
+    chunkStart.setHours(0,0,0,0);
+  }
 
-    try{
-      const d=await shopFetch(url);
-      const batch=d.orders||[];
-      allOrders=allOrders.concat(batch);
-      if(onProgress) onProgress(allOrders.length);
-
-      if(batch.length<250){
-        hasMore=false;
-      } else {
-        sinceId=batch[batch.length-1].id;
-      }
-    }catch(e){
-      console.error('fetchAllOrders error at guard',guard,':',e.message);
-      // Wait and retry once on error
-      await new Promise(r=>setTimeout(r,1500));
+  // Fetch each chunk sequentially
+  for(const chunk of chunks){
+    let chunkOrders=[];
+    let sinceId=null;
+    let hasMore=true;
+    let guard=0;
+    while(hasMore&&guard<20){
+      guard++;
+      let url=`/orders.json?status=any&created_at_min=${toLocalISO(chunk.from)}&created_at_max=${toLocalISO(chunk.to)}&limit=250`;
+      if(sinceId) url+=`&since_id=${sinceId}`;
       try{
         const d=await shopFetch(url);
         const batch=d.orders||[];
-        allOrders=allOrders.concat(batch);
-        if(onProgress) onProgress(allOrders.length);
-        if(batch.length<250){hasMore=false;}
-        else{sinceId=batch[batch.length-1].id;}
-      }catch(e2){
-        console.error('fetchAllOrders retry failed:',e2.message);
+        chunkOrders=chunkOrders.concat(batch);
+        if(batch.length<250){
+          hasMore=false;
+        } else {
+          sinceId=batch[batch.length-1].id;
+        }
+      }catch(e){
+        console.error('fetchAllOrders chunk error:',e.message);
         hasMore=false;
       }
     }
+    allOrders=allOrders.concat(chunkOrders);
+    if(onProgress) onProgress(allOrders.length);
   }
+
   return allOrders;
 }
 // ═══════════ DATE RANGE STATE ═══════════
