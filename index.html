@@ -900,12 +900,18 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    ordersData=await fetchAllOrders(from,to,(n)=>{
+    ordersData=await fetchAllOrders(from,to,(n,partial)=>{
+      ordersData=partial;
       setBadge('s','amber',n+' orders...');
+      const el=document.getElementById('s-ord');
+      if(el){el.textContent=n;el.className='sv';}
     });
+    weeklyOrdersData=ordersData;
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
-    loadWeeklyOrders();
+    renderWeeklyTop20();
+    renderNoSaleDiagnosis();
+    renderSpark();
   }catch(e){
     console.error('loadShopify error:',e);
     setBadge('s','error',e.message.slice(0,30));
@@ -2124,27 +2130,8 @@ function renderTopProds(){
 }
 
 async function loadWeeklyOrders(){
-  // Re-use ordersData already fetched by loadShopify (has full fields incl. refunds)
-  // Only re-fetch independently if ordersData is empty (e.g. different range)
-  if(ordersData.length>0){
-    weeklyOrdersData=ordersData;
-  } else {
-    const {from,to}=getRange();
-    try{
-      let allOrders=[],sinceId=null,hasMore=true,guard=0;
-      while(hasMore&&guard<10){
-        guard++;
-        let url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250`;
-        if(sinceId) url+=`&since_id=${sinceId}`;
-        const d=await shopFetch(url);
-        const batch=d.orders||[];
-        allOrders=allOrders.concat(batch);
-        if(batch.length<250){hasMore=false;}else{sinceId=batch[batch.length-1].id;}
-        if(allOrders.length>5000){hasMore=false;}
-      }
-      weeklyOrdersData=allOrders;
-    }catch(e){weeklyOrdersData=ordersData;}
-  }
+  // weeklyOrdersData is already set by loadShopify — no separate fetch needed
+  weeklyOrdersData=ordersData;
   renderWeeklyTop20();
   renderNoSaleDiagnosis();
   renderSpark();
