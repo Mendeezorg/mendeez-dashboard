@@ -1069,6 +1069,7 @@ async function fetchSheets(){
   }
 
   if(adsR.status==='fulfilled'&&adsR.value.length){
+    console.log('[Sheets] Ads rows:', adsR.value.length);
     processAds(adsR.value);
   }else{
     setBadge('a','error',getErrHint(adsR.reason));
@@ -1076,6 +1077,7 @@ async function fetchSheets(){
   }
 
   if(crrR.status==='fulfilled'&&crrR.value.length){
+    console.log('[Sheets] Courier rows:', crrR.value.length);
     processCourier(crrR.value);
   }else{
     setBadge('c','error',getErrHint(crrR.reason));
@@ -1083,6 +1085,7 @@ async function fetchSheets(){
   }
 
   if(csR.status==='fulfilled'&&csR.value.length){
+    console.log('[Sheets] CS rows:', csR.value.length);
     try{
       processCS(csR.value);
     }catch(e){
@@ -1446,7 +1449,8 @@ function renderCrrTable(){
 // Then: EWH | Exch Count, Total Dispatch, Total Disp Unit, Return Units
 // Order Status section: "Landed MTD", "Total Dispatched", "Delivered", "Pending", "Cancellations MTD", "Returns MTD"
 function processCS(rows){
-  _csRows=rows; // save for switchCSMonth
+  console.log('[CS] processCS called, rows:', rows.length);
+  _csRows=rows;
   const now=new Date();
   const todayDay=now.getDate();
   // Use selected date range month so previous month data loads correctly
@@ -1516,6 +1520,9 @@ function processCS(rows){
   // Sort newest first for the dropdown selector
   availableMonths.sort((a,b)=>b.year!==a.year?b.year-a.year:b.monthNum-a.monthNum);
 
+  console.log('[CS] availableMonths found:', availableMonths.map(m=>m.label));
+  console.log('[CS] currentLabel:', currentLabel, '| sectionStart:', sectionStart);
+
   // Process each month using dynamic boundaries — next month header = end of current section
   // This means each month's scan window automatically grows as data is added
   const byRow=[...availableMonths].sort((a,b)=>a.row-b.row);
@@ -1534,6 +1541,7 @@ function processCS(rows){
   } else {
     allCsMonths[currentLabel]=JSON.parse(JSON.stringify(csData));
   }
+  console.log('[CS] csData after extract — agents:', csData.agents.length, '| orderStatus:', JSON.stringify(csData.orderStatus));
   setBadge('cs','live',csData.agents.length+' agents · '+currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1));
 
   // Populate month selector dropdown
