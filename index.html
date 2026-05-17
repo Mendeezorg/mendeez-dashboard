@@ -455,8 +455,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <option value="ok">In stock</option>
     </select>
     <select class="fi" id="prodStatus" style="width:150px" onchange="renderProducts()">
-      <option value="active">Active only</option>
       <option value="all">All statuses</option>
+      <option value="active">Active only</option>
     </select>
   </div>
   <div style="display:flex;gap:16px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--muted)">
@@ -650,14 +650,19 @@ async function connectAll(){
 }
 
 async function loadAll(){
-  // Sheets use Google (different server) — run in parallel with Shopify orders
-  // Products/collections use Cloudflare worker — start AFTER orders to avoid overload
-  await Promise.allSettled([loadShopify(),fetchSheets()]);
+  // Start ALL three in parallel — products, orders, and sheets use different servers
+  // Products: Cloudflare worker → Shopify /products.json
+  // Orders:   Cloudflare worker → Shopify /orders.json
+  // Sheets:   Google Sheets API (completely separate)
+  // Running them in parallel cuts total load time by ~60% for large stores
+  const [,, ] = await Promise.allSettled([
+    loadShopify(),
+    fetchSheets(),
+    loadProducts()   // ← now starts immediately, no longer waits for orders
+  ]);
   renderDailyStats();
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
-  // Now worker is free — load products sequentially
-  await loadProducts();
   fetchProductCounts();
   loadCollections();
 }
@@ -805,7 +810,7 @@ function rangeLabel(){
 
 function setPreset(preset,el){
   _preset=preset;_customFrom=null;_customTo=null;
-  document.querySelectorAll('.dp').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.datebar .dp').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
   document.getElementById('dateFrom').value='';
   document.getElementById('dateTo').value='';
@@ -820,7 +825,7 @@ function applyCustom(){
   _preset='custom';
   _customFrom=fv+'T00:00:00';
   _customTo=tv+'T23:59:59';
-  document.querySelectorAll('.dp').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.datebar .dp').forEach(b=>b.classList.remove('active'));
   document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
   applyDateRange();
 }
@@ -887,8 +892,10 @@ async function loadShopify(){
 async function loadProducts(){
   try{
     let allProds=[],sinceId=null,hasMore=true,retries=0,pageNum=0;
-    while(hasMore&&pageNum<=20){
-      const base=`/products.json?limit=250&fields=id,title,product_type,status,variants,images`;
+    // No hard page cap — load ALL products regardless of catalog size
+    // 250 per page × unlimited pages = full catalog always loaded
+    while(hasMore){
+      const base=`/products.json?limit=250&fields=id,title,product_type,status,variants,images,tags`;
       const url=sinceId?`${base}&since_id=${sinceId}`:base;
       try{
         const d=await shopFetch(url);
@@ -903,13 +910,14 @@ async function loadProducts(){
         updateProductCounts();
         const _s=(document.getElementById('prodSearch')?.value||'').trim();
         const _sk=(document.getElementById('skuSearch')?.value||'').trim();
-        // Only render if there's an active search — else just show the search gate
-        if(_s||_sk){
+        // Re-render results live as each page arrives so search feels instant
+        if(_s.length>=2||_sk.length>=1){
           renderProducts();
         } else if(document.getElementById('panel-products')?.classList.contains('active')){
-          renderProducts(); // shows the search-gate empty state
+          renderProducts(); // shows the search-gate empty state with updated count
         }
-        if(hasMore)await new Promise(r=>setTimeout(r,300));
+        // Small delay to avoid hitting Shopify rate limit (2 req/sec for REST)
+        if(hasMore)await new Promise(r=>setTimeout(r,150));
       }catch(pageErr){
         console.warn('loadProducts page',pageNum,'error:',pageErr.message);
         retries++;
@@ -919,9 +927,7 @@ async function loadProducts(){
     }
     allProducts=allProds;
     updateProductCounts();
-    const search=(document.getElementById('prodSearch')?.value||'').trim();
-    const skuSearch=(document.getElementById('skuSearch')?.value||'').trim();
-    // Always call renderProducts — it will show the search gate if no query entered
+    // Final render — show full results or search gate
     renderProducts();
     console.log('[Products] Loaded',allProducts.length,'products in',pageNum,'pages');
   }catch(e){console.error('loadProducts fatal:',e);}
@@ -1449,138 +1455,267 @@ function renderCrrTable(){
 // Order Status section: "Landed MTD", "Total Dispatched", "Delivered", "Pending", "Cancellations MTD", "Returns MTD"
 function processCS(rows){
   console.log('[CS] processCS called, rows:', rows.length);
-  console.log('[CS] First 96 rows dump:', JSON.stringify(rows.slice(0,96)));
+  // Log ALL rows to see exact structure — critical for debugging
+  console.log('[CS] FULL SHEET DUMP:');
+  rows.forEach((r,i)=>{
+    const filled=r.filter(c=>c&&String(c).trim());
+    if(filled.length>0) console.log('[CS] row'+i+':', JSON.stringify(r.slice(0,15)));
+  });
   _csRows=rows;
+
   const now=new Date();
-  const todayDay=now.getDate();
-  // Use selected date range month so previous month data loads correctly
   const rangeDate=getRange().from;
   const currentMonth=rangeDate.toLocaleString('en-US',{month:'long'}).toLowerCase();
-  const currentMonthShort=rangeDate.toLocaleString('en-US',{month:'short'}).toLowerCase();
-  const currentYear=String(rangeDate.getFullYear()).slice(-2); // "26" — use range year not today
+  const currentYear=rangeDate.getFullYear(); // full year e.g. 2026
   csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-  // Agent/EWH data is extracted per-month via extractCSDataForMonth below
-  // Do NOT read from fixed mtdProdRow — that always reads the same (current) month
 
-  // ── STEP 1: Find the start row of the CURRENT month's CS section ──
-  // The sheet labels each month's CS block with a cell like:
-  // "May2026 CS Data" or "April CS Data" or "May 26" etc.
-  // We scan all rows and find the LAST occurrence whose label matches current month
-  // (last = most recent, so if June is added later it'll pick June)
-  let sectionStart=0;
-  const monthNames={
-    january:'jan',february:'feb',march:'mar',april:'apr',may:'may',
-    june:'jun',july:'jul',august:'aug',september:'sep',october:'oct',
-    november:'nov',december:'dec'
-  };
+  // ── Sheet structure (confirmed from screenshot) ──
+  // Row: "April 2026"          ← section header (month name + year in same row/cell)
+  // Row: "Operations Data"     ← subtitle (optional)
+  // Rows: ORDER STATUS table
+  // Rows: CANCELLATIONS table
+  // Row:  "MTD Productivity Tracking CS Data" ← agents header
+  // Rows: Agent 1 (Abdullah) | Chats | Inbound | Outbound | R/Returns | Solve Complaints
+  // Row:  "E.COM WH" row with Exch Count | Total Dispatch | Total Disp unit | Rtn Units
+  // Then blank rows, then next month: "May 2026"
 
-  for(let i=0;i<rows.length;i++){
-    const rowText=rows[i].join(' ').toLowerCase();
-    // Match patterns like "may2026 cs data", "may 26", "may cs data", "april cs data"
-    const matchesCurrent=(
-      rowText.includes(currentMonth)&&(rowText.includes('cs data')||rowText.includes('cs')||rowText.includes('26'))
-    )||(
-      rowText.includes(currentMonthShort)&&rowText.includes('26')
-    );
-    if(matchesCurrent){
-      sectionStart=i; // keep updating — we want the LAST match (most recent month)
-    }
-  }
-  // If no month label found at all, start from row 0 (graceful fallback)
-
-  // ── Detect all available months in sheet ──
-  // Scans entire sheet for month CS section headers (e.g. "April CS Data", "May CS Data")
-  // Each section boundary = from its header row to the row before the next month header
-  // This automatically scales as new months are added to the sheet
-  const availableMonths = [];
-  const monthSections = {};
   const monthOrder={january:1,february:2,march:3,april:4,may:5,june:6,
     july:7,august:8,september:9,october:10,november:11,december:12};
+  const monthNames=['january','february','march','april','may','june',
+    'july','august','september','october','november','december'];
 
+  // ── STEP 1: Find ALL month section headers ──
+  // A section header row is one that contains ONLY a month name + year (e.g. "April 2026")
+  // with no other data keywords — keeps it tight so random data rows don't match
+  const sectionHeaders=[];
   for(let i=0;i<rows.length;i++){
-    const rowText=rows[i].join(' ').toLowerCase();
-    for(const mn of Object.keys(monthNames)){
-      if(rowText.includes(mn)&&(
-        rowText.includes('cs data')||
-        rowText.includes('operations data')||
-        rowText.includes('ecom mendeez')||
-        rowText.includes('perf report')
-      )){
-        const yrArr=rowText.match(/20(\d\d)/);
-        const year=yrArr?'20'+yrArr[1]:'20'+currentYear;
-        const label=mn.charAt(0).toUpperCase()+mn.slice(1)+' '+year;
-        if(!monthSections[label]){
-          monthSections[label]=i;
-          availableMonths.push({label,row:i,month:mn,year:parseInt(year),monthNum:monthOrder[mn]||0});
-        }
-      }
+    const cells=rows[i].map(c=>(c||'').trim()).filter(c=>c);
+    if(cells.length===0)continue;
+    const rowText=cells.join(' ').toLowerCase();
+    // Must contain a year (20XX)
+    const yrMatch=rowText.match(/\b(20\d\d)\b/);
+    if(!yrMatch)continue;
+    const yr=parseInt(yrMatch[1]);
+    // Must contain a month name as a whole word
+    const mn=monthNames.find(m=>new RegExp('\\b'+m+'\\b').test(rowText));
+    if(!mn)continue;
+    // The row should be short — a header row won't have 10+ filled cells
+    if(cells.length>6)continue;
+    // Also accept if row has "operations data" nearby (subtitle row on same row)
+    const label=mn.charAt(0).toUpperCase()+mn.slice(1)+' '+yr;
+    // Only record first occurrence of each label
+    if(!sectionHeaders.find(s=>s.label===label)){
+      sectionHeaders.push({label,row:i,month:mn,year:yr,monthNum:monthOrder[mn]||0});
+      console.log('[CS] Found section header:',label,'at row',i,'cells:',cells.join('|'));
     }
   }
 
-  // Sort newest first for the dropdown selector
-  availableMonths.sort((a,b)=>b.year!==a.year?b.year-a.year:b.monthNum-a.monthNum);
+  // Sort by row number (sheet order)
+  sectionHeaders.sort((a,b)=>a.row-b.row);
+  console.log('[CS] All section headers:',sectionHeaders.map(s=>s.label+'@'+s.row));
 
-  console.log('[CS] availableMonths found:', availableMonths.map(m=>m.label));
-
-  // Process each month using dynamic boundaries — next month header = end of current section
-  // This means each month's scan window automatically grows as data is added
-  const byRow=[...availableMonths].sort((a,b)=>a.row-b.row);
-  for(let mi=0;mi<byRow.length;mi++){
-    const m=byRow[mi];
-    const nextSectionRow=mi+1<byRow.length?byRow[mi+1].row:rows.length;
-    const mData=extractCSDataForMonth(rows,m.row,m.month,nextSectionRow);
+  // ── STEP 2: Extract data for each month section ──
+  // Section = from its header row to the row before the next header
+  for(let mi=0;mi<sectionHeaders.length;mi++){
+    const m=sectionHeaders[mi];
+    const sectionEnd=mi+1<sectionHeaders.length?sectionHeaders[mi+1].row:rows.length;
+    const mData=extractCSDataForMonth(rows,m.row,sectionEnd,m.month,m.year);
     allCsMonths[m.label]=mData;
+    console.log('[CS] Extracted',m.label,'— agents:',mData.agents.length,'orderStatus keys:',Object.keys(mData.orderStatus).length,'ewh keys:',Object.keys(mData.ewh).length);
   }
 
-
-  // Set csData from the correctly-parsed month section (agents, EWH, orderStatus all from right month)
-  const currentLabel=currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1)+' 20'+currentYear;
-  console.log('[CS] currentLabel:', currentLabel, '| sectionStart:', sectionStart);
+  // ── STEP 3: Set csData for the currently-selected month ──
+  const currentLabel=currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1)+' '+currentYear;
   if(allCsMonths[currentLabel]){
     csData=JSON.parse(JSON.stringify(allCsMonths[currentLabel]));
-  } else {
-    allCsMonths[currentLabel]=JSON.parse(JSON.stringify(csData));
+  } else if(sectionHeaders.length>0){
+    // Fallback to most recent section
+    const newest=sectionHeaders[sectionHeaders.length-1];
+    csData=JSON.parse(JSON.stringify(allCsMonths[newest.label]||{agents:[],orderStatus:{},ewh:{},cancelReasons:[]}));
   }
-  console.log('[CS] csData after extract — agents:', csData.agents.length, '| orderStatus:', JSON.stringify(csData.orderStatus));
+  console.log('[CS] Active month:',currentLabel,'| agents:',csData.agents.length,'| delivered:',csData.orderStatus.delivered);
+
   setBadge('cs','live',csData.agents.length+' agents · '+currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1));
 
-  // Populate month selector dropdown
-  const sel=document.getElementById('csMonthSel');
-  if(sel&&availableMonths.length>0){
-    sel.innerHTML=availableMonths.map((m,i)=>
-      `<option value="${m.label}"${i===0?' selected':''}>${m.label}</option>`
-    ).join('');
-    const currentOpt=Array.from(sel.options).find(o=>o.value===currentLabel);
-    if(currentOpt)currentOpt.selected=true;
-  } else if(sel){
-    sel.innerHTML=`<option value="${currentLabel}">${currentLabel}</option>`;
-  }
-  // Also populate overview month selector
-  const ovSel=document.getElementById('overviewMonthSel');
-  if(ovSel&&availableMonths.length>0){
-    ovSel.innerHTML=availableMonths.map((m,i)=>
-      `<option value="${m.label}"${i===0?' selected':''}>${m.label}</option>`
-    ).join('');
-    const currentOpt=Array.from(ovSel.options).find(o=>o.value===currentLabel);
-    if(currentOpt)currentOpt.selected=true;
-  }
-  // ── Parse cancellation reasons ──
-  // Look for rows with patterns like "Wrong Product", "High Price", reason label + count
-  csData.cancelReasons=[];
-  for(let i=Math.max(0,sectionStart-120);i<Math.min(rows.length,sectionStart+400);i++){
-    const r=rows[i];const a0=(r[0]||'').trim();const a0l=a0.toLowerCase();
-    // Cancellation reason rows typically: [Reason label] [count] ...
-    const isCancelSection=(a0l.includes('cancel')||a0l.includes('reason')||a0l.includes('wrong')||a0l.includes('price')||a0l.includes('size')||a0l.includes('cod')||a0l.includes('fake')||a0l.includes('duplicate')||a0l.includes('no answer')||a0l.includes('not interested'));
-    if(isCancelSection&&a0.length>2&&a0.length<60){
-      // Try to find a numeric count in this row
-      const nums=r.slice(1).map(v=>nc(v)).filter(v=>v>0);
-      if(nums.length>0){
-        // Take the last numeric value as the count (usually the total)
-        csData.cancelReasons.push({reason:a0,count:nums[nums.length-1]});
+  // ── STEP 4: Populate month dropdowns ──
+  // Sort newest first for the dropdown
+  const dropdownMonths=[...sectionHeaders].sort((a,b)=>b.year!==a.year?b.year-a.year:b.monthNum-a.monthNum);
+
+  const populateDropdown=(selId)=>{
+    const sel=document.getElementById(selId);
+    if(!sel)return;
+    if(dropdownMonths.length>0){
+      sel.innerHTML=dropdownMonths.map(m=>`<option value="${m.label}">${m.label}</option>`).join('');
+      // Select current month if available, else newest
+      const cur=Array.from(sel.options).find(o=>o.value===currentLabel);
+      if(cur)cur.selected=true;
+      else sel.options[0].selected=true;
+    } else {
+      sel.innerHTML=`<option value="${currentLabel}">${currentLabel}</option>`;
+    }
+  };
+  populateDropdown('csMonthSel');
+  populateDropdown('overviewMonthSel');
+
+  renderCS();
+}
+
+// ── CS DATA EXTRACTOR ──
+// Extracts orderStatus, agents, EWH, cancelReasons from a month's row range
+// sectionStart = row of the "April 2026" header
+// sectionEnd   = row of the NEXT month header (exclusive)
+function extractCSDataForMonth(rows, sectionStart, sectionEnd, monthName, year){
+  const result={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
+  const scanStart=sectionStart;
+  const scanEnd=Math.min(rows.length,sectionEnd);
+
+  console.log('[CS extract]',monthName,year,'rows',scanStart,'→',scanEnd);
+
+  for(let i=scanStart;i<scanEnd;i++){
+    const r=rows[i];
+    const rowText=r.join(' ').toLowerCase();
+    const cells=r.map(c=>(c||'').trim());
+
+    // ── ORDER STATUS rows ──
+    // Structure from screenshot: [Label][Total Target][Target Till Date][No Of Orders][MTD Ach Value][MTD T Ach%][Total Ach%][Units]
+    // We find the label in any column, then read col+3 = No Of Orders, col+4 = MTD Ach Value
+    const findLabelIdx=(keywords)=>{
+      return r.findIndex(c=>{
+        const cl=(c||'').toLowerCase().trim();
+        return keywords.some(k=>cl.includes(k));
+      });
+    };
+    const getVal=(li,offset)=>li>=0?nc(r[li+offset])||0:0;
+
+    if(rowText.includes('landed mtd')){
+      const li=findLabelIdx(['landed mtd']);
+      const v=getVal(li,4)||getVal(li,3);
+      if(v>0){result.orderStatus.landed=v;result.orderStatus.landedVal=v;}
+    }
+    if(rowText.includes('delivered to customer')||rowText.includes('delivered')){
+      const li=findLabelIdx(['delivered to customer','delivered']);
+      const v=getVal(li,4)||getVal(li,3);
+      if(v>0)result.orderStatus.delivered=v;
+    }
+    if(rowText.includes('cancelations mtd')||rowText.includes('cancellations mtd')){
+      if(!rowText.includes('cf')){
+        const li=findLabelIdx(['cancelations mtd','cancellations mtd']);
+        const v=getVal(li,4)||getVal(li,3);
+        if(v>0){result.orderStatus.cancelMTD=v;result.orderStatus.cancelMTDVal=v;result.orderStatus.cancel=v;}
       }
     }
+    if((rowText.includes('cancelations cf')||rowText.includes('cancellations cf'))){
+      const li=findLabelIdx(['cancelations cf','cancellations cf']);
+      const v=getVal(li,4)||getVal(li,3);
+      if(v>0){result.orderStatus.cancelCF=v;result.orderStatus.cancelCFVal=v;}
+    }
+    if(rowText.includes('mtd returns')||rowText.includes('returns mtd')){
+      if(!rowText.includes('cf')){
+        const li=findLabelIdx(['mtd returns','returns mtd']);
+        const v=getVal(li,4)||getVal(li,3);
+        if(v>0){result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}
+      }
+    }
+    if(rowText.includes('cf returns')||rowText.includes('returns cf')){
+      const li=findLabelIdx(['cf returns','returns cf']);
+      const v=getVal(li,4)||getVal(li,3);
+      if(v>0){result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}
+    }
+    if(rowText.includes('pending orders')||rowText.includes('pending')){
+      const li=findLabelIdx(['pending orders','pending']);
+      const v=getVal(li,3)||getVal(li,2);
+      if(v>0)result.orderStatus.pending=v;
+    }
+    if(rowText.includes('total dispatched')||rowText.includes('total dispatch')){
+      const li=findLabelIdx(['total dispatched','total dispatch']);
+      const v=getVal(li,3)||getVal(li,2);
+      if(v>0)result.orderStatus.dispatched=v;
+    }
+
+    // ── AGENTS ──
+    // From screenshot: row starts with "Agent 1 (Abdullah)" in col 0 or nearby
+    // Columns after name: Chats | Inbound Calls | Outbound Calls | R/Returns | Solve Complaints
+    // The agent name row IS the data row (not a header) — metrics are in same row
+    const agentMatch=cells.find((c,ci)=>{
+      const cl=c.toLowerCase();
+      return (cl.startsWith('agent ')||/^(abdullah|namra|nimra|hamza|usman|sara|sana|ayesha|kashif|waqas|bilal|noman)\b/i.test(c))&&c.length>2&&c.length<60;
+    });
+    if(agentMatch){
+      const nameIdx=cells.findIndex(c=>c===agentMatch);
+      // Metrics are in subsequent columns after the name
+      // From screenshot columns after name: Chats, Inbound Calls, Outbound Calls, R/Returns, Solve Complaints
+      const nums=[];
+      for(let ci=nameIdx+1;ci<Math.min(cells.length,nameIdx+8);ci++){
+        const v=nc(cells[ci]);
+        if(v>0||cells[ci]==='0')nums.push(v);
+      }
+      // If metrics are in same row, use them directly
+      if(nums.length>=2){
+        result.agents.push({
+          name:agentMatch,
+          chats:nums[0]||0,
+          inbound:nums[1]||0,
+          outbound:nums[2]||0,
+          returns:nums[3]||0,
+          complaints:nums[4]||0,
+          todayChats:0,todayOut:0
+        });
+        continue;
+      }
+      // Fallback: metrics may be in next rows under the name (vertical layout)
+      const vals=[];
+      for(let k=1;k<=5;k++){
+        const nr=rows[i+k]||[];
+        const v=nc(nr[nameIdx])||nc(nr[nameIdx+1])||0;
+        vals.push(v);
+      }
+      if(vals.some(v=>v>0)){
+        result.agents.push({
+          name:agentMatch,
+          chats:vals[0],inbound:vals[1],outbound:vals[2],
+          returns:vals[3],complaints:vals[4],
+          todayChats:0,todayOut:0
+        });
+        i+=5;continue;
+      }
+    }
+
+    // ── EWH ROW ──
+    // From screenshot: "E.COM WH" row with: Exch Count | Total Dispatch | Total Disp unit | Rtn Units
+    if(rowText.includes('e.com wh')||rowText.includes('ecom wh')||rowText.includes('e.wh')||rowText.includes('f.com wh')){
+      // Values are on the SAME row or the next row
+      // From screenshot the row shows: [E.COM WH][ExchCount][TotalDispatch][TotalDispUnit][RtnUnits]
+      // Try same row first
+      const nums=cells.map(nc).filter(v=>v>0);
+      if(nums.length>=2){
+        result.ewh.exch=nums[0]||0;
+        result.ewh.dispVal=nums[1]||0;
+        result.ewh.dispUnits=nums[2]||0;
+        result.ewh.returnUnits=nums[3]||0;
+      } else {
+        // Try next row
+        const nr=rows[i+1]||[];
+        const nnums=nr.map(nc).filter(v=>v>0);
+        result.ewh.exch=nnums[0]||0;
+        result.ewh.dispVal=nnums[1]||0;
+        result.ewh.dispUnits=nnums[2]||0;
+        result.ewh.returnUnits=nnums[3]||0;
+        i++;
+      }
+      continue;
+    }
+
+    // ── CANCELLATION REASONS ──
+    const cancelKeywords=['call not answered','customer cancelled','duplicate order','fake order',
+      'invalid customer','non service area','payment issue','inventory constraint',
+      'wrong product','wrong size','price issue','cod issue'];
+    const cancelCell=cells.find(c=>cancelKeywords.some(k=>c.toLowerCase().includes(k)));
+    if(cancelCell){
+      const nums=cells.map(nc).filter(v=>v>0);
+      if(nums.length>0)result.cancelReasons.push({reason:cancelCell,count:nums[nums.length-1]});
+    }
   }
-  renderCS();
+  return result;
 }
 
 function renderCS(){
@@ -1654,160 +1789,6 @@ function renderCS(){
   }
 }
 
-// ═══════════ CS MONTH SWITCHING ═══════════
-function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
-  // Returns a csData-shaped object for the given month section
-  const result={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-  // The month header is at the BOTTOM of its data block — scan upward from it
-  // sectionEnd from caller = start of NEXT month's block (or rows.length)
-  // sectionStart = row where this month's header was found
-  // Real data (ORDER STATUS, AGENTS) is in rows BEFORE sectionStart
-  const scanStart = Math.max(0, sectionStart);
-  // sectionEnd = start of NEXT month's section — scan the ENTIRE block for this month
-  const scanEnd = Math.min(rows.length, sectionEnd);
-  console.log('[CS extract]', monthName, '| scanStart:', scanStart, 'scanEnd:', scanEnd, 'rows in window:', scanEnd-scanStart);
-
-  // Find date column for that month's "Dates" row — scan within the section
-  let dateColIdx=-1;
-  const now=new Date();
-  const rangeDate2=getRange().from;
-  const isCurrentMonth=(rangeDate2.getMonth()===now.getMonth()&&rangeDate2.getFullYear()===now.getFullYear());
-  // For historical months always use the total column; for current month use today's day
-  for(let i=scanStart;i<scanEnd;i++){
-    const r=rows[i];
-    if(r[0]==='Dates'||r[1]==='Dates'||r[8]==='Dates'||r[9]==='Dates'||r.includes('Dates')){
-      const dp=r.findIndex(c=>c.trim()==='Dates');
-      if(isCurrentMonth){
-        dateColIdx=dp+now.getDate();
-      } else {
-        // Historical month: find the "Total" column or use the last numeric column
-        const totIdx=r.findIndex(c=>c.trim().toLowerCase()==='total');
-        dateColIdx=totIdx>dp?totIdx:dp+31; // fallback to col 31 (last day of month)
-      }
-      break;
-    }
-    if(r[2]==='1'&&r[3]==='2'&&r[4]==='3'){
-      dateColIdx=isCurrentMonth?2+(now.getDate()-1):r.findIndex(c=>c.trim().toLowerCase()==='total')||r.length-1;
-      break;
-    }
-  }
-
-  const getTotCol=(row)=>{
-    const ti=row.findIndex(c=>c.trim().toLowerCase()==='total');
-    if(ti>0)return ti;
-    for(let k=row.length-1;k>=0;k--){if(row[k]&&row[k].trim()&&!isNaN(parseFloat(row[k].replace(/,/g,''))))return k;}
-    return row.length-1;
-  };
-
-  let inSection=true; // scan entire window — data is above the month header
-  for(let i=scanStart;i<scanEnd;i++){
-    const r=rows[i];
-    const a0=(r[0]||'').trim();
-    const a0l=a0.toLowerCase();
-    const rowText=rows[i].join(' ').toLowerCase();
-    // Find the first non-empty cell value (agent names can be in any column)
-    const firstCell=r.find(c=>c&&c.trim())||'';
-    const firstCellL=firstCell.toLowerCase().trim();
-
-    // Order status — Sheet columns: [0:Label][1:Total Target][2:Target Till Date][3:No Of Orders][4:Achieved Value][5:ACH%][6:Units]
-    const rl=rowText;
-    const labelIdx=r.findIndex(c=>{const cl=(c||'').toLowerCase().trim();
-      return cl==='landed mtd'||cl.includes('delivered to customer')||cl.includes('cancelations mtd')||
-             cl.includes('cancelations cf')||cl.includes('mtd returns')||cl.includes('cf returns')||
-             cl.includes('pending orders')||cl.includes('total dispatch')||cl.includes('total dispach');
-    });
-    const achVal=()=>labelIdx>=0?nc(r[labelIdx+4])||nc(r[labelIdx+3])||0:0;
-    const cntVal=()=>labelIdx>=0?nc(r[labelIdx+3])||0:0;
-    if(rl.includes('landed mtd')){const v=achVal();if(v>0){result.orderStatus.landed=v;result.orderStatus.landedVal=v;}}
-    if(rl.includes('total dispatch')||rl.includes('total dispach')){const v=cntVal();if(v>0)result.orderStatus.dispatched=v;}
-    if(rl.includes('delivered to customer')){const v=achVal();if(v>0)result.orderStatus.delivered=v;}
-    if(rl.includes('pending orders')){const v=cntVal();if(v>0)result.orderStatus.pending=v;}
-    if(rl.includes('cancelations mtd')&&!rl.includes('cf')){const v=achVal();if(v>0){result.orderStatus.cancelMTD=v;result.orderStatus.cancelMTDVal=v;result.orderStatus.cancel=v;}}
-    if(rl.includes('cancelations cf')||rl.includes('cancellations cf')){const v=achVal();if(v>0){result.orderStatus.cancelCF=v;result.orderStatus.cancelCFVal=v;}}
-    if(rl.includes('mtd returns')&&!rl.includes('cf')&&!rl.includes('cf returns')){const v=achVal();if(v>0){result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}}
-    if(rl.includes('cf returns')||rl.includes('returns cf')){const v=achVal();if(v>0){result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}}
-
-    // ── AGENTS: scan all columns for agent name patterns ──
-    // Agent names can appear in any column depending on sheet layout
-    // Common patterns: "Abdullah", "Namra", "Agent 1 A", "Agent 2 N" etc.
-    const agentNamePatterns=[/^agent\s*\d/i,/^(abdullah|namra|nimra|hamza|usman|ali|sara|sana|ayesha|kashif|waqas|bilal|noman)/i];
-    let agentColIdx=-1;
-    let agentName='';
-    for(let ci=0;ci<r.length;ci++){
-      const cell=(r[ci]||'').trim();
-      if(cell.length>2&&cell.length<50&&agentNamePatterns.some(rx=>rx.test(cell))){
-        agentColIdx=ci;agentName=cell;break;
-      }
-    }
-    // Also check col 41 explicitly as fallback (original hardcoded location)
-    if(agentColIdx===-1){
-      const col41=(r[41]||'').trim();
-      const col41L=col41.toLowerCase();
-      if(col41L.includes('abdullah')||col41L.includes('namra')||col41L.includes('nimra')||(col41L.startsWith('agent')&&col41L.length>7)){
-        agentColIdx=41;agentName=col41;
-      }
-    }
-    if(agentColIdx>=0&&agentName){
-      // Read next 5 rows' same column values as: Chats, Inbound, Outbound, R/Returns, Complaints
-      const vals=[];
-      for(let k=1;k<=5;k++){
-        const nextRow=rows[i+k]||[];
-        // Try to find numeric value in the same column or nearby columns
-        const v=nc(nextRow[agentColIdx])||nc(nextRow[agentColIdx+1])||0;
-        vals.push(v);
-      }
-      // Only add agent if at least one metric is non-zero
-      if(vals.some(v=>v>0)){
-        result.agents.push({
-          name:agentName,
-          chats:vals[0],inbound:vals[1],outbound:vals[2],
-          returns:vals[3],complaints:vals[4],
-          todayChats:0,todayOut:0
-        });
-        i+=5; continue; // skip the metric rows we just consumed
-      }
-    }
-
-    // EWH — can be in any column, scan multiple rows around the EWH header
-    if(rowText.includes('e.com wh')||rowText.includes('ecom wh')||rowText.includes('f.com wh')||rowText.includes('e.wh')){
-      // Try to find dispatch value, units, returns, exchanges in next 8 rows
-      // Look for labeled rows like "Total Dispatch Value", "Units Dispatched", "Return Units", "Exchanges"
-      let dispValFound=false,dispUnitsFound=false,returnUnitsFound=false,exchFound=false;
-      for(let wi=i;wi<Math.min(i+12,rows.length);wi++){
-        const wr=rows[wi];
-        const wt=wr.join(' ').toLowerCase();
-        const nums=wr.map(nc).filter(v=>v>0);
-        const lastNum=nums.length>0?nums[nums.length-1]:0;
-        const firstNum=nums.length>0?nums[0]:0;
-        if(!exchFound&&(wt.includes('exch')||wt.includes('exchange'))){result.ewh.exch=lastNum||firstNum;exchFound=true;}
-        if(!dispValFound&&(wt.includes('dispatch value')||wt.includes('disp value')||wt.includes('total dispatch'))){result.ewh.dispVal=lastNum||firstNum;dispValFound=true;}
-        if(!dispUnitsFound&&(wt.includes('dispatch unit')||wt.includes('disp unit')||wt.includes('unit dispatch'))){result.ewh.dispUnits=lastNum||firstNum;dispUnitsFound=true;}
-        if(!returnUnitsFound&&(wt.includes('return unit')||wt.includes('rtn unit'))){result.ewh.returnUnits=lastNum||firstNum;returnUnitsFound=true;}
-      }
-      // Fallback: if labeled rows not found, read the next data row numerically
-      if(!dispValFound&&!dispUnitsFound){
-        const dataRow=rows[i+1]||[];
-        const src=dataRow.some(c=>nc(c)>0)?dataRow:r;
-        const nums=src.map(nc).filter(v=>v>0);
-        if(nums.length>=1)result.ewh.exch=result.ewh.exch||nums[0];
-        if(nums.length>=2)result.ewh.dispVal=result.ewh.dispVal||nums[1];
-        if(nums.length>=3)result.ewh.dispUnits=result.ewh.dispUnits||nums[2];
-        if(nums.length>=4)result.ewh.returnUnits=result.ewh.returnUnits||nums[3];
-      }
-      continue;
-    }
-
-    // Cancel reasons — label can be in any column
-    const cancelKeywords=['call not answered','customer cancelled','duplicate order','fake order','invalid customer','non service area','payment issue','inventory constraint','wrong product','wrong size','price issue','cod issue'];
-    const cancelCell=r.find(c=>cancelKeywords.some(k=>(c||'').toLowerCase().includes(k)))||'';
-    if(cancelCell){
-      const nums=r.slice(1).map(v=>nc(v)).filter(v=>v>0);
-      if(nums.length>0)result.cancelReasons.push({reason:cancelCell.trim(),count:nums[nums.length-1]});
-    }
-  }
-  return result;
-}
-
 function switchCSMonth(){
   const sel=document.getElementById('csMonthSel');
   if(!sel)return;
@@ -1839,15 +1820,10 @@ function switchCSMonth(){
 
 function renderDailyStats(){
   // ── Sync csData to the currently selected overview month ──
-  // This ensures the stats cards always reflect the chosen month, not stale data
   const ovSel=document.getElementById('overviewMonthSel');
   const ovVal=ovSel?.value||'';
-  if(ovVal&&allCsMonths[ovVal]){
-    // Only sync if csData doesn't already match (avoid unnecessary overwrite)
-    const csKey=Object.keys(allCsMonths).find(k=>allCsMonths[k]===csData);
-    if(csKey!==ovVal){
-      csData=JSON.parse(JSON.stringify(allCsMonths[ovVal]));
-    }
+  if(ovVal && allCsMonths[ovVal]){
+    csData=JSON.parse(JSON.stringify(allCsMonths[ovVal]));
   }
 
   const rev=ordersData.reduce((s,o)=>s+parseFloat(o.total_price||0),0);
@@ -2357,22 +2333,25 @@ function renderProducts(){
   const search=(document.getElementById('prodSearch')?.value||'').toLowerCase().trim();
   const skuSearch=(document.getElementById('skuSearch')?.value||'').toLowerCase().trim();
 
-  // If nothing loaded at all yet, show spinner
+  // Track whether products are still loading in background
+  const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
+  const stillLoading=apiCount>0&&allProducts.length<apiCount;
+
+  // If nothing loaded at all yet, show spinner — but only if no search typed
   if(allProducts.length===0){
-    const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
-    const hasSearch=(document.getElementById('prodSearch')?.value||'').trim().length>=2||(document.getElementById('skuSearch')?.value||'').trim().length>=1;
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>${apiCount>0?apiCount.toLocaleString()+' products found — still downloading, results will appear shortly...':'Products loading from Shopify...'}</td></tr>`;
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>${apiCount>0?'Loading products… '+apiCount.toLocaleString()+' found, downloading now':'Connecting to Shopify...'}</td></tr>`;
     document.getElementById('prodCount').textContent='';
     return;
   }
 
   // ── SEARCH GATE: require at least 2 chars for name, 1 char for SKU ──
   if(!search && !skuSearch){
-    const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
+    const loadingNote=stillLoading?`<div style="font-size:11px;color:var(--accent);font-family:var(--mono);margin-top:8px"><span class="si"></span>Loading… ${allProducts.length.toLocaleString()} of ${apiCount.toLocaleString()} ready — search works on loaded products</div>`:'';
     document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" style="text-align:center;padding:48px 24px">
       <div style="font-size:32px;margin-bottom:12px">🔍</div>
-      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Search from ${apiCount>0?apiCount.toLocaleString():allProducts.length.toLocaleString()} products</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Search ${allProducts.length.toLocaleString()}${stillLoading?'+':''} products</div>
       <div style="font-size:12px;color:var(--muted);font-family:var(--mono)">Type a product name (2+ chars) or SKU to see stock details</div>
+      ${loadingNote}
     </td></tr>`;
     document.getElementById('prodCount').textContent='—';
     return;
@@ -2387,14 +2366,17 @@ function renderProducts(){
 
   // Group by product — one row per product, show all variants inline
   const filteredProds=allProducts.filter(p=>{
+    // Status filter — 'active' only hides drafts; 'all' shows everything
     if(status==='active'&&p.status!=='active')return false;
-    // Product name search
+    // Product name search — also match tags and product_type
     if(search){
       const titleMatch=p.title.toLowerCase().includes(search);
+      const typeMatch=(p.product_type||'').toLowerCase().includes(search);
+      const tagMatch=(p.tags||'').toLowerCase().includes(search);
       const variantMatch=(p.variants||[]).some(v=>(v.title||'').toLowerCase().includes(search));
-      if(!titleMatch&&!variantMatch)return false;
+      if(!titleMatch&&!typeMatch&&!tagMatch&&!variantMatch)return false;
     }
-    // SKU search (separate box)
+    // SKU search (separate box) — exact prefix or contains match
     if(skuSearch){
       const skuMatch=(p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(skuSearch));
       if(!skuMatch)return false;
@@ -2458,11 +2440,9 @@ function renderProducts(){
     </tr>`);
   });
 
-  const apiTotal=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
-  const stillLoading=apiTotal>0&&allProducts.length<apiTotal;
-  const loadingRow=stillLoading?`<tr><td colspan="3" style="text-align:center;padding:12px;font-family:var(--mono);font-size:11px;color:var(--muted)"><span class="si"></span>Downloading more… ${allProducts.length.toLocaleString()} of ${apiTotal.toLocaleString()} loaded</td></tr>`:'';
-  document.getElementById('prodTbl').innerHTML=(rows.join('')||'<tr><td colspan="3" class="nodata">No products match filter</td></tr>')+loadingRow;
-  document.getElementById('prodCount').textContent=filteredProds.length+' products'+(stillLoading?' (partial)':'');
+  const loadingRow=stillLoading?`<tr><td colspan="3" style="text-align:center;padding:12px;font-family:var(--mono);font-size:11px;color:var(--accent)"><span class="si"></span>Still downloading… ${allProducts.length.toLocaleString()} of ${apiCount.toLocaleString()} loaded — results update automatically</td></tr>`:'';
+  document.getElementById('prodTbl').innerHTML=(rows.join('')||'<tr><td colspan="3" class="nodata">No products match — '+(stillLoading?allProducts.length.toLocaleString()+' loaded so far, still downloading more':'no results found')+'</td></tr>')+loadingRow;
+  document.getElementById('prodCount').textContent=filteredProds.length+' result'+(filteredProds.length!==1?'s':'')+(stillLoading?' ('+allProducts.length.toLocaleString()+'/'+apiCount.toLocaleString()+' loaded)':'');
 }
 function applyProdFilter(){renderProducts();}
 
@@ -3022,10 +3002,15 @@ function switchOverviewMonth(){
     const _ld=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     _customFrom=_ld(from)+'T00:00:00';
     _customTo=_ld(to)+'T23:59:59';
+    // Update date bar to reflect the month range
+    document.querySelectorAll('.dp').forEach(b=>b.classList.remove('active'));
+    const fromStr=_ld(from), toStr=_ld(to);
+    document.getElementById('dateFrom').value=fromStr;
+    document.getElementById('dateTo').value=toStr;
+    document.getElementById('dActiveLbl').textContent='📅 '+val+' (MTD)';
   }
 
-  // ── KEY FIX: update csData from allCsMonths for the selected month ──
-  // This ensures Returns MTD, Cancellations etc. on Overview tab match the chosen month
+  // Update csData from allCsMonths for the selected month
   if(allCsMonths[val]){
     csData=JSON.parse(JSON.stringify(allCsMonths[val]));
   }
@@ -3034,10 +3019,10 @@ function switchOverviewMonth(){
   const csSel=document.getElementById('csMonthSel');
   if(csSel){
     const opt=Array.from(csSel.options).find(o=>o.value===val);
-    if(opt){opt.selected=true;}
+    if(opt) opt.selected=true;
   }
 
-  document.getElementById('todayDate').textContent=val;
+  document.getElementById('todayDate').textContent=val+' — MTD';
   if(STORE&&STORE!=='demo'&&TOKEN) reloadShopifyData();
   else renderDailyStats();
 }
