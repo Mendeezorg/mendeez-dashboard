@@ -1449,6 +1449,7 @@ function renderCrrTable(){
 // Order Status section: "Landed MTD", "Total Dispatched", "Delivered", "Pending", "Cancellations MTD", "Returns MTD"
 function processCS(rows){
   console.log('[CS] processCS called, rows:', rows.length);
+  console.log('[CS] First 96 rows dump:', JSON.stringify(rows.slice(0,96)));
   _csRows=rows;
   const now=new Date();
   const todayDay=now.getDate();
