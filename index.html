@@ -749,8 +749,8 @@ let _searchTimer=null;
 let _returnsFetching=false;
 let _returnsRangeKey='';
 
-// PKT = UTC+5 — all day boundaries anchored to Pakistan time
-// so counts match Shopify Admin regardless of browser timezone
+// PKT = UTC+5. getRange() returns real UTC timestamps anchored to PKT midnight.
+// toLocalISO() just formats them as UTC (Shopify interprets +00:00 correctly).
 const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
 function pktNow(){ return new Date(Date.now() + PKT_OFFSET_MS); }
 function pktMidnight(pktDate, daysOffset){
@@ -777,13 +777,12 @@ function getRange(){
   return{from:pktMidnight(pkt,0), to:pktEndOfDay(pkt,0)};
 }
 
-
-// Format date for Shopify API — always sends PKT offset (+05:00)
+// Format UTC date for Shopify API — send as UTC, no offset conversion needed
+// getRange() already returns correct UTC boundaries for PKT midnight
 function toLocalISO(d){
   const pad=n=>String(n).padStart(2,'0');
-  const pk=new Date(d.getTime()+PKT_OFFSET_MS);
-  return pk.getUTCFullYear()+'-'+pad(pk.getUTCMonth()+1)+'-'+pad(pk.getUTCDate())+
-    'T'+pad(pk.getUTCHours())+':'+pad(pk.getUTCMinutes())+':'+pad(pk.getUTCSeconds())+'+05:00';
+  return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())+
+    'T'+pad(d.getUTCHours())+':'+pad(d.getUTCMinutes())+':'+pad(d.getUTCSeconds())+'+00:00';
 }
 function toUTCISO(d){
   // Format as UTC ISO for GraphQL queries
