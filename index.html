@@ -315,11 +315,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div class="sg" style="margin-bottom:20px">
-    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub">MTD Achieved Value PKR</div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub" id="s-delivered-sub">MTD Achieved Value PKR</div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub" id="s-cancel-mtd-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub" id="s-cancel-cf-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub" id="s-returns-mtd-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub" id="s-returns-cf-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Order Adjustment (Returns)</div><div class="sv red shimmer" id="s-order-adj"></div><div class="ssub" id="s-order-adj-sub">Value not count</div></div>
   </div>
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
   <div class="sh" style="margin-top:4px">
@@ -447,11 +448,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- ORDER STATUS -->
   <div class="sh"><div class="st">Order Status MTD</div></div>
   <div class="sg" id="csOrderStats">
-    <div class="sc"><div class="sl">Delivered MTD</div><div class="sv shimmer" id="cs-delivered" style="height:24px;width:65%"></div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="cs-cancel-cf" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="cs-returns-cf" style="height:24px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Delivered MTD</div><div class="sv shimmer" id="cs-delivered"></div><div class="ssub" id="cs-delivered-sub">—</div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel"></div><div class="ssub" id="cs-cancel-sub">—</div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="cs-cancel-cf"></div><div class="ssub" id="cs-cancel-cf-sub">—</div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns"></div><div class="ssub" id="cs-returns-sub">—</div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="cs-returns-cf"></div><div class="ssub" id="cs-returns-cf-sub">—</div></div>
+    <div class="sc"><div class="sl">Order Adjustment (Returns)</div><div class="sv shimmer" id="cs-order-adj"></div><div class="ssub" id="cs-order-adj-sub">—</div></div>
   </div>
   <!-- EWH WAREHOUSE -->
   <div class="sh"><div class="st">Warehouse (EWH) MTD</div></div>
@@ -701,6 +703,8 @@ async function refreshAll(){
 }
 
 // ═══════════ SHOPIFY ═══════════
+const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
 async function shopFetch(ep,method,body){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
   const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep);
@@ -709,86 +713,90 @@ async function shopFetch(ep,method,body){
     if(!r.ok){const t=await r.text();throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
     return r.json();
   }
-  const r=await fetch(workerUrl);
-  console.log('Worker status:',r.status,'ep:',ep.slice(0,50));
-  if(!r.ok){const t=await r.text();console.error('Worker error:',t);throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
+  let r;
+  for(let attempt=0;attempt<5;attempt++){
+    r=await fetch(workerUrl);
+    if(r.status===429){await _sleep(800*(attempt+1));continue;}
+    break;
+  }
+  if(!r.ok){const t=await r.text();throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
   const txt=await r.text();
   let parsed;
   try{parsed=JSON.parse(txt);}
-  catch(e){console.error('JSON parse error:',txt.slice(0,200));throw new Error('Invalid JSON from Shopify');}
-  // Try to extract page_info from Link header (if worker passes it through)
-  const link=r.headers.get('link')||r.headers.get('x-shopify-link')||'';
-  const nextMatch=link.match(/page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-  if(nextMatch) parsed._nextPageInfo=nextMatch[1];
+  catch(e){throw new Error('Invalid JSON from Shopify');}
+  const link=r.headers.get('x-shopify-link')||r.headers.get('link')||'';
+  if(link){
+    const m=link.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+    if(m) parsed._nextPageInfo=decodeURIComponent(m[1]);
+  }
   return parsed;
 }
 
-// Fetch ALL orders for a date range — handles 1000+ orders correctly
-// Uses page_info cursor if worker passes Link header, falls back to created_at chunking
+// Fetch one chunk of orders using page_info pagination
+async function fetchChunk(fromISO, toISO){
+  let orders=[];
+  let pageInfo=null;
+  let guard=0;
+  while(guard<30){
+    guard++;
+    const url=pageInfo
+      ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
+      : `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
+    let d;
+    try{d=await shopFetch(url);}
+    catch(e){console.error('fetchChunk error:',e.message);break;}
+    const batch=d.orders||[];
+    if(batch.length===0) break;
+    orders=orders.concat(batch);
+    pageInfo=d._nextPageInfo||null;
+    if(!pageInfo) break;
+  }
+  return orders;
+}
+
+// Fetch ALL orders fast — splits range into parallel 3-day chunks
 async function fetchAllOrders(from, to, onProgress){
-  let allOrders=[];
+  const start=new Date(from);
+  const end=new Date(to);
+  const totalDays=Math.ceil((end-start)/(86400*1000));
 
-  // Strategy 1: Try page_info cursor pagination (needs worker to pass Link header)
-  try{
-    let pageInfo=null;
-    let hasMore=true;
-    let guard=0;
-    while(hasMore&&guard<40){
-      guard++;
-      let url;
-      if(pageInfo){
-        // page_info replaces all other params
-        url=`/orders.json?limit=250&page_info=${pageInfo}`;
-      } else {
-        url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250`;
-      }
-      const d=await shopFetch(url);
-      const batch=d.orders||[];
-      allOrders=allOrders.concat(batch);
-      if(onProgress) onProgress(allOrders.length);
-      if(d._nextPageInfo){
-        pageInfo=d._nextPageInfo;
-      } else if(batch.length<250){
-        hasMore=false;
-      } else {
-        // Worker not passing Link header — fall back to date chunking
-        throw new Error('NO_PAGE_INFO');
-      }
-    }
-    return allOrders;
-  } catch(e){
-    if(e.message!=='NO_PAGE_INFO') throw e;
+  // For small ranges (<=3 days) just fetch directly — no need to split
+  if(totalDays<=3){
+    const orders=await fetchChunk(toLocalISO(start), toLocalISO(end));
+    if(onProgress) onProgress(orders.length);
+    console.log('fetchAllOrders complete:',orders.length,'orders (single chunk)');
+    return orders;
   }
 
-  // Strategy 2: Chunk by day — fetch each day separately, combine
-  // This works perfectly with date filters and has no pagination issues for 1-day chunks
-  console.log('Falling back to day-by-day chunking...');
-  allOrders=[];
-  const totalDays=Math.ceil((to-from)/(86400*1000))+1;
-
-  for(let d=0;d<totalDays;d++){
-    const dayFrom=new Date(from);dayFrom.setDate(dayFrom.getDate()+d);dayFrom.setHours(0,0,0,0);
-    const dayTo=new Date(dayFrom);dayTo.setHours(23,59,59,999);
-    // Don't go past the requested 'to' date
-    const effectiveTo=dayTo>to?to:dayTo;
-
-    let dayOrders=[];
-    let sinceId=null;
-    let hasMore=true;
-    let guard=0;
-    while(hasMore&&guard<10){
-      guard++;
-      let url=`/orders.json?status=any&created_at_min=${toLocalISO(dayFrom)}&created_at_max=${toLocalISO(effectiveTo)}&limit=250`;
-      if(sinceId) url+=`&since_id=${sinceId}`;
-      const data=await shopFetch(url);
-      const batch=data.orders||[];
-      dayOrders=dayOrders.concat(batch);
-      if(batch.length<250){hasMore=false;}
-      else{sinceId=batch[batch.length-1].id;}
-    }
-    allOrders=allOrders.concat(dayOrders);
-    if(onProgress) onProgress(allOrders.length);
+  // Split into ~3-day chunks and fetch ALL in parallel
+  const chunks=[];
+  let chunkStart=new Date(start);
+  while(chunkStart<end){
+    const chunkEnd=new Date(chunkStart);
+    chunkEnd.setDate(chunkEnd.getDate()+2);
+    chunkEnd.setHours(23,59,59,999);
+    if(chunkEnd>end) chunkEnd.setTime(end.getTime());
+    chunks.push({from:new Date(chunkStart),to:new Date(chunkEnd)});
+    chunkStart=new Date(chunkEnd);
+    chunkStart.setSeconds(chunkStart.getSeconds()+1);
   }
+
+  console.log('fetchAllOrders: fetching',chunks.length,'chunks in parallel');
+
+  // Fire all chunks simultaneously
+  let fetched=0;
+  const results=await Promise.all(
+    chunks.map(c=>fetchChunk(toLocalISO(c.from),toLocalISO(c.to)).then(orders=>{
+      fetched+=orders.length;
+      if(onProgress) onProgress(fetched);
+      console.log('Chunk',c.from.toLocaleDateString(),'→',c.to.toLocaleDateString(),':',orders.length,'orders');
+      return orders;
+    }))
+  );
+
+  // Flatten and sort by created_at descending (newest first)
+  const allOrders=results.flat().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  console.log('fetchAllOrders complete:',allOrders.length,'orders in',chunks.length,'parallel chunks');
   return allOrders;
 }
 // ═══════════ DATE RANGE STATE ═══════════
@@ -879,6 +887,9 @@ async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
   setBadge('s','amber','Fetching orders...');
+  // Show day count so user knows how long it will take
+  const days=Math.ceil((to-from)/(86400*1000))+1;
+  if(days>1) setBadge('s','amber','Fetching '+days+' days...');
   try{
     const allOrders=await fetchAllOrders(from,to,(n)=>{
       setBadge('s','amber',n+' orders...');
@@ -946,7 +957,7 @@ async function loadProducts(){
           renderProducts(); // shows the search-gate empty state with updated count
         }
         // Small delay to avoid hitting Shopify rate limit (2 req/sec for REST)
-        if(hasMore)await new Promise(r=>setTimeout(r,150));
+        if(hasMore)await new Promise(r=>setTimeout(r,50));
       }catch(pageErr){
         console.warn('loadProducts page',pageNum,'error:',pageErr.message);
         retries++;
@@ -1606,7 +1617,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
       if(cell.length>2&&cell.length<60&&agentNamePattern.test(cell)){
         if(!agentNames.find(a=>a.name===cell)){
           agentNames.push({name:cell,row:i,col:ci});
-          console.log('[CS extract] Found agent name:',cell,'at row',i,'col',ci);
         }
       }
     }
@@ -1637,7 +1647,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
     // A metric row has 2-6 numbers and mostly empty/quoted cells
     if(nums.length>=2&&nums.length<=7&&nonEmpty.length<=7){
       metricRows.push({row:i,nums,cells:r});
-      console.log('[CS extract] Metric row',i,':',nums,'| raw:',r.slice(0,10).map(c=>clean(c)));
     }
   }
   console.log('[CS extract]',monthName,year,'| agentNames:',agentNames.map(a=>a.name),'| metricRows:',metricRows.map(r=>r.row));
@@ -1653,8 +1662,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
   const fullAgentRows=agentMetricRows.filter(mr=>mr.nums.length>=3);
   const partialRows=agentMetricRows.filter(mr=>mr.nums.length<3);
 
-  console.log('[CS extract] fullAgentRows:',fullAgentRows.map(r=>r.row+':'+JSON.stringify(r.nums)));
-  console.log('[CS extract] partialRows:',partialRows.map(r=>r.row+':'+JSON.stringify(r.nums)));
 
   if(agentNames.length>0&&fullAgentRows.length>0){
     agentNames.forEach((ag,idx)=>{
@@ -1670,7 +1677,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
       // If returns not in full row, check adjacent partial row
       const prevPartial=partialRows.find(pr=>pr.row<fullRow.row&&fullRow.row-pr.row<=3);
       const returns=returnsInRow||(prevPartial?prevPartial.nums[0]||0:0);
-      console.log('[CS extract] Agent',ag.name,'→ chats:',chats,'inbound:',inbound,'outbound:',outbound,'returns:',returns,'complaints:',complaints);
       result.agents.push({name:ag.name,chats,inbound,outbound,returns,complaints,todayChats:0,todayOut:0});
     });
   }
@@ -1684,28 +1690,32 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
     result.ewh.dispVal=en[1]||0;
     result.ewh.dispUnits=en[2]||0;
     result.ewh.returnUnits=en[3]||0;
-    console.log('[CS extract] EWH:',result.ewh);
   }
 
-  // ORDER STATUS — col0=label, col4=MTD Ach Value, col3=No Of Orders
+  // ORDER STATUS — col0=label, col3=No Of Orders, col4=MTD Ach Value, col5=MTD Ach%, col6=Total Ach%
   for(let i=sectionStart;i<sectionEnd;i++){
     const r=rows[i];
     const label=clean(r[0]||'').toLowerCase();
     if(!label)continue;
-    const col3=nc2(r[3]);  // No Of Orders
-    const col4=nc2(r[4]);  // MTD Ach Value
+    const col3=nc2(r[3]);   // No Of Orders
+    const col4=nc2(r[4]);   // MTD Ach Value
+    const col5=clean(r[5]||'').replace('%','').trim(); // MTD Ach%
+    const col6=clean(r[6]||'').replace('%','').trim(); // Total Ach%
+    const pct=parseFloat(col5)||parseFloat(col6)||0;
     if(label.includes('landed mtd')){
-      if(col4>0){result.orderStatus.landed=col4;result.orderStatus.landedVal=col4;}
+      if(col4>0){result.orderStatus.landed=col4;result.orderStatus.landedVal=col4;result.orderStatus.landedOrders=col3;result.orderStatus.landedPct=pct;}
     } else if(label.includes('delivered to customer')){
-      if(col4>0)result.orderStatus.delivered=col4;
+      if(col4>0){result.orderStatus.delivered=col4;result.orderStatus.deliveredOrders=col3;result.orderStatus.deliveredPct=pct;}
     } else if(label.includes('cancelations mtd')||label.includes('cancellations mtd')){
-      if(col4>0){result.orderStatus.cancelMTD=col4;result.orderStatus.cancelMTDVal=col4;result.orderStatus.cancel=col4;}
+      if(col4>0){result.orderStatus.cancelMTD=col4;result.orderStatus.cancelMTDVal=col4;result.orderStatus.cancel=col4;result.orderStatus.cancelMTDOrders=col3;result.orderStatus.cancelMTDPct=pct;}
     } else if(label.includes('cancelations cf')||label.includes('cancellations cf')){
-      if(col4>0){result.orderStatus.cancelCF=col4;result.orderStatus.cancelCFVal=col4;}
+      if(col4>0){result.orderStatus.cancelCF=col4;result.orderStatus.cancelCFVal=col4;result.orderStatus.cancelCFOrders=col3;result.orderStatus.cancelCFPct=pct;}
     } else if((label.includes('mtd returns')||label.includes('returns mtd'))&&!label.includes('cf')){
-      if(col4>0){result.orderStatus.returnsMTD=col4;result.orderStatus.returnsMTDVal=col4;result.orderStatus.returns=col4;}
+      if(col4>0){result.orderStatus.returnsMTD=col4;result.orderStatus.returnsMTDVal=col4;result.orderStatus.returns=col4;result.orderStatus.returnsMTDOrders=col3;result.orderStatus.returnsMTDPct=pct;}
     } else if(label.includes('cf returns')||label.includes('returns cf')){
-      if(col4>0){result.orderStatus.returnsCF=col4;result.orderStatus.returnsCFVal=col4;}
+      if(col4>0){result.orderStatus.returnsCF=col4;result.orderStatus.returnsCFVal=col4;result.orderStatus.returnsCFOrders=col3;result.orderStatus.returnsCFPct=pct;}
+    } else if(label.includes('order adjustment')){
+      if(col4>0){result.orderStatus.orderAdjVal=col4;result.orderStatus.orderAdjPct=pct;}
     } else if(label.includes('pending')){
       if(col3>0)result.orderStatus.pending=col3;
     } else if(label.includes('total dispach')||label.includes('total dispatch')){
@@ -1751,11 +1761,25 @@ function renderCS(){
 
   // Order stats
   const os=csData.orderStatus;
-  setV('cs-delivered', os.delivered   ? fPKR(os.delivered)   : '—', 'green');
-  setV('cs-cancel',   os.cancelMTDVal? fPKR(os.cancelMTDVal): '—', 'red');
-  setV('cs-cancel-cf',os.cancelCFVal ? fPKR(os.cancelCFVal) : '—', 'red');
-  setV('cs-returns',  os.returnsMTDVal? fPKR(os.returnsMTDVal): '—', 'red');
-  setV('cs-returns-cf',os.returnsCFVal? fPKR(os.returnsCFVal): '—', 'red');
+  const setCSCard=(valId,val,cls,orders,pct)=>{
+    setV(valId,val?fPKR(val):'—',cls);
+    const sub=document.getElementById(valId+'-sub');
+    if(sub){
+      const parts=[];
+      if(orders>0)parts.push(fmt(orders)+' orders');
+      if(pct>0)parts.push(pct+'%');
+      sub.textContent=parts.length>0?parts.join(' · '):'Value not count';
+    }
+  };
+  setCSCard('cs-delivered', os.delivered,  'green', os.deliveredOrders||0,  os.deliveredPct||0);
+  setCSCard('cs-cancel',    os.cancelMTDVal||os.cancelMTD, 'red', os.cancelMTDOrders||0, os.cancelMTDPct||0);
+  setCSCard('cs-cancel-cf', os.cancelCFVal, 'red', os.cancelCFOrders||0, os.cancelCFPct||0);
+  setCSCard('cs-returns',   os.returnsMTDVal||os.returnsMTD, 'red', os.returnsMTDOrders||0, os.returnsMTDPct||0);
+  setCSCard('cs-returns-cf',os.returnsCFVal, 'red', os.returnsCFOrders||0, os.returnsCFPct||0);
+  // Order Adjustment — value + percentage only
+  setV('cs-order-adj',os.orderAdjVal>0?fPKR(os.orderAdjVal):'—','red');
+  const csAdjSub=document.getElementById('cs-order-adj-sub');
+  if(csAdjSub)csAdjSub.textContent=os.orderAdjPct>0?os.orderAdjPct+'%':'Value only';
 
   // Warehouse
   const ewh=csData.ewh;
@@ -1877,15 +1901,47 @@ function renderDailyStats(){
   setV('s-ord',ords>0?ords:'—','');
   setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
   setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
-  setV('s-delivered',cntCrr.delivered>0?cntCrr.delivered:'—','green');
+
+  // Helper to set sub-line text for sheet cards
+  const setSub=(id,orders,pct)=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    const parts=[];
+    if(orders>0)parts.push(fmt(orders)+' orders');
+    if(pct>0)parts.push(pct+'%');
+    el.textContent=parts.length>0?parts.join(' · '):'Value not count';
+  };
+
+  // Delivered
+  const deliveredVal=os.delivered||0;
+  setV('s-delivered',deliveredVal>0?fPKR(deliveredVal):'—','green');
+  setSub('s-delivered-sub',os.deliveredOrders||0,os.deliveredPct||0);
+
+  // Cancellations MTD
   const cancelMTD=os.cancelMTDVal||os.cancelMTD||0;
-  const cancelCF=os.cancelCFVal||os.cancelCF||0;
-  const returnsMTD=os.returnsMTDVal||os.returnsMTD||0;
-  const returnsCF=os.returnsCFVal||os.returnsCF||0;
   setV('s-cancel-mtd',cancelMTD>0?fPKR(cancelMTD):'—','red');
+  setSub('s-cancel-mtd-sub',os.cancelMTDOrders||0,os.cancelMTDPct||0);
+
+  // Cancellations CF
+  const cancelCF=os.cancelCFVal||os.cancelCF||0;
   setV('s-cancel-cf',cancelCF>0?fPKR(cancelCF):'—','red');
+  setSub('s-cancel-cf-sub',os.cancelCFOrders||0,os.cancelCFPct||0);
+
+  // Returns MTD
+  const returnsMTD=os.returnsMTDVal||os.returnsMTD||0;
   setV('s-returns-mtd',returnsMTD>0?fPKR(returnsMTD):'—','red');
+  setSub('s-returns-mtd-sub',os.returnsMTDOrders||0,os.returnsMTDPct||0);
+
+  // Returns CF
+  const returnsCF=os.returnsCFVal||os.returnsCF||0;
   setV('s-returns-cf',returnsCF>0?fPKR(returnsCF):'—','red');
+  setSub('s-returns-cf-sub',os.returnsCFOrders||0,os.returnsCFPct||0);
+
+  // Order Adjustment (Returns) — value + percentage only, no order count
+  const orderAdj=os.orderAdjVal||0;
+  setV('s-order-adj',orderAdj>0?fPKR(orderAdj):'—','red');
+  const adjSubEl=document.getElementById('s-order-adj-sub');
+  if(adjSubEl)adjSubEl.textContent=os.orderAdjPct>0?os.orderAdjPct+'%':'Value only';
 
   // Shopify cards (gross, net, discounts)
   if(STORE&&STORE!=='demo'&&TOKEN){
