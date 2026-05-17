@@ -734,8 +734,13 @@ async function fetchAllOrders(from, to, onProgress){
 
   while(hasMore && guard<100){
     guard++;
-    let url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250&order=created_at+asc`;
-    if(sinceId) url+=`&since_id=${sinceId}`;
+    let url;
+    if(sinceId){
+      // Shopify does NOT allow order= when since_id is present
+      url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250&since_id=${sinceId}`;
+    } else {
+      url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250&order=created_at+asc`;
+    }
 
     try{
       const d=await shopFetch(url);
@@ -1585,7 +1590,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
       if(cell.length>2&&cell.length<60&&agentNamePattern.test(cell)){
         if(!agentNames.find(a=>a.name===cell)){
           agentNames.push({name:cell,row:i,col:ci});
-          console.log('[CS extract] Found agent name:',cell,'at row',i,'col',ci);
         }
       }
     }
@@ -1616,7 +1620,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
     // A metric row has 2-6 numbers and mostly empty/quoted cells
     if(nums.length>=2&&nums.length<=7&&nonEmpty.length<=7){
       metricRows.push({row:i,nums,cells:r});
-      console.log('[CS extract] Metric row',i,':',nums,'| raw:',r.slice(0,10).map(c=>clean(c)));
     }
   }
   console.log('[CS extract]',monthName,year,'| agentNames:',agentNames.map(a=>a.name),'| metricRows:',metricRows.map(r=>r.row));
@@ -1632,8 +1635,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
   const fullAgentRows=agentMetricRows.filter(mr=>mr.nums.length>=3);
   const partialRows=agentMetricRows.filter(mr=>mr.nums.length<3);
 
-  console.log('[CS extract] fullAgentRows:',fullAgentRows.map(r=>r.row+':'+JSON.stringify(r.nums)));
-  console.log('[CS extract] partialRows:',partialRows.map(r=>r.row+':'+JSON.stringify(r.nums)));
 
   if(agentNames.length>0&&fullAgentRows.length>0){
     agentNames.forEach((ag,idx)=>{
@@ -1649,7 +1650,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
       // If returns not in full row, check adjacent partial row
       const prevPartial=partialRows.find(pr=>pr.row<fullRow.row&&fullRow.row-pr.row<=3);
       const returns=returnsInRow||(prevPartial?prevPartial.nums[0]||0:0);
-      console.log('[CS extract] Agent',ag.name,'→ chats:',chats,'inbound:',inbound,'outbound:',outbound,'returns:',returns,'complaints:',complaints);
       result.agents.push({name:ag.name,chats,inbound,outbound,returns,complaints,todayChats:0,todayOut:0});
     });
   }
@@ -1663,7 +1663,6 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
     result.ewh.dispVal=en[1]||0;
     result.ewh.dispUnits=en[2]||0;
     result.ewh.returnUnits=en[3]||0;
-    console.log('[CS extract] EWH:',result.ewh);
   }
 
   // ORDER STATUS — col0=label, col3=No Of Orders, col4=MTD Ach Value, col5=MTD Ach%, col6=Total Ach%
