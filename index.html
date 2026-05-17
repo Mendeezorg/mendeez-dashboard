@@ -725,87 +725,23 @@ async function shopFetch(ep,method,body){
   let parsed;
   try{parsed=JSON.parse(txt);}
   catch(e){throw new Error('Invalid JSON from Shopify');}
-  const link=r.headers.get('x-shopify-link')||r.headers.get('link')||'';
-  if(link){
-    const m=link.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-    if(m) parsed._nextPageInfo=decodeURIComponent(m[1]);
-  }
+
   return parsed;
 }
 
-// FIX 1: fetchChunk now follows Shopify pagination cursor until ALL pages are fetched.
-// Previously stopped at 250 orders (1 page) — now continues through page 2, 3, etc.
-async function fetchChunk(fromISO, toISO, onPage){
-  let allOrders=[];
-  let pageInfo=null;
-  let pageNum=0;
-  while(true){
-    let url;
-    if(pageInfo){
-      // Cursor-based pagination — must NOT include date filters on subsequent pages
-      url=`/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`;
-    } else {
-      url=`/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
-    }
-    let d;
-    try{d=await shopFetch(url);}
-    catch(e){console.error('fetchChunk page',pageNum,'error:',e.message);break;}
-    const page=d.orders||[];
-    pageNum++;
-    if(page.length===0) break;
-    allOrders=allOrders.concat(page);
-    if(onPage&&page.length) onPage(page);
-    pageInfo=d._nextPageInfo||null; // shopFetch already parses Link header into _nextPageInfo
-    if(!pageInfo||page.length<250) break;
-    await _sleep(400); // respect Shopify REST ~2 req/sec limit between pages
-  }
-  return allOrders;
-}
-
-// FIX 2: fetchAllOrders now runs chunks SEQUENTIALLY (not Promise.all in parallel).
-// Promise.all fired 30 requests simultaneously → Shopify 429 rate-limits → 2-min stall.
-// Sequential with small gap between chunks keeps us well under the rate limit.
+// ONE request — the Cloudflare Worker handles all Shopify pagination server-side
+// and returns a single flat {orders:[...]} response. Nothing to loop over here.
 async function fetchAllOrders(from, to, onProgress){
-  const start=new Date(from);
-  const end=new Date(to);
-
-  // Build 1-day chunks
-  const chunks=[];
-  let chunkStart=new Date(start);
-  while(chunkStart<end){
-    const chunkEnd=new Date(chunkStart);
-    chunkEnd.setHours(23,59,59,999);
-    if(chunkEnd>end) chunkEnd.setTime(end.getTime());
-    chunks.push({from:new Date(chunkStart),to:new Date(chunkEnd)});
-    chunkStart=new Date(chunkEnd);
-    chunkStart.setSeconds(chunkStart.getSeconds()+1);
-  }
-
-  console.log('fetchAllOrders: fetching',chunks.length,'chunks sequentially (rate-limit safe)');
-
-  let fetched=0;
-  const allOrders=[];
-
-  // Sequential loop — one chunk at a time, no rate-limit hammering
-  for(const c of chunks){
-    const page=await fetchChunk(toLocalISO(c.from),toLocalISO(c.to),(orders)=>{
-      fetched+=orders.length;
-      if(onProgress) onProgress(fetched,orders);
-    });
-    allOrders.push(...page);
-    console.log('Chunk',c.from.toLocaleDateString(),':',page.length,'orders (total so far:',allOrders.length+')');
-    if(chunks.length>1) await _sleep(300); // breathing room between day-chunks
-  }
-
-  // Sort newest first — pre-cache timestamps so sort doesn't call new Date() on every comparison
-  // (1500 orders × O(n log n) comparisons = ~16,000 Date constructions without this)
-  const withTs=allOrders.map(o=>({o,t:Date.parse(o.created_at)}));
-  withTs.sort((a,b)=>b.t-a.t);
-  const sorted=withTs.map(x=>x.o);
-  // Yield to browser paint before returning so the UI can update
-  await _sleep(0);
-  console.log('fetchAllOrders complete:',sorted.length,'total orders across',chunks.length,'chunks');
-  return sorted;
+  const fromISO = toLocalISO(from);
+  const toISO   = toLocalISO(to);
+  const url = `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
+  let d;
+  try{ d = await shopFetch(url); }
+  catch(e){ console.error('fetchAllOrders error:',e.message); return []; }
+  const orders = d.orders || [];
+  if(onProgress) onProgress(orders.length, orders);
+  console.log('fetchAllOrders done:',orders.length,'orders (all fetched by Worker)');
+  return orders;
 }
 // ═══════════ DATE RANGE STATE ═══════════
 let _preset='today', _customFrom=null, _customTo=null;
@@ -895,37 +831,15 @@ async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
   setBadge('s','amber','Fetching orders...');
-  const days=Math.ceil((to-from)/(86400*1000))+1;
-  if(days>1) setBadge('s','amber','Fetching '+days+' days...');
   try{
-    // FIX 3: Debounced progress rendering — accumulate orders but only re-render
-    // at most once per 600ms. Previously re-sorted + re-rendered on every single chunk
-    // arrival, causing 30+ simultaneous DOM updates that froze the browser.
-    let _liveOrders=[];
-    let _renderPending=false;
-    const allOrders=await fetchAllOrders(from,to,(n,chunkOrders)=>{
+    ordersData=await fetchAllOrders(from,to,(n)=>{
       setBadge('s','amber',n+' orders...');
-      if(chunkOrders&&chunkOrders.length){
-        _liveOrders=_liveOrders.concat(chunkOrders);
-        ordersData=_liveOrders;
-        if(!_renderPending){
-          _renderPending=true;
-          setTimeout(()=>{
-            _renderPending=false;
-            const _wt=[..._liveOrders].map(o=>({o,t:Date.parse(o.created_at)}));_wt.sort((a,b)=>b.t-a.t);ordersData=_wt.map(x=>x.o);
-            renderDailyStats();
-            renderSpark();
-          },600);
-        }
-      }
     });
-    ordersData=allOrders;
     setBadge('s','live',ordersData.length+' orders · '+rangeLabel());
     weeklyOrdersData=ordersData;
     document.getElementById('todayDate').textContent=rangeLabel();
     document.getElementById('weeklyRange').textContent=rangeLabel();
     document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
-    // Re-parse CS sheet for the new month if raw rows are available
     if(_csRows.length){try{processCS(_csRows);}catch(e){console.warn('processCS error:',e.message);}}
     renderDailyStats();
     renderWeeklyTop20();
@@ -939,29 +853,12 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    // FIX 3b: Same debounced progress rendering as reloadShopifyData
-    let _liveOrders=[];
-    let _renderPending=false;
-    const allOrders=await fetchAllOrders(from,to,(n,page)=>{
+    ordersData=await fetchAllOrders(from,to,(n)=>{
       setBadge('s','amber',n+' orders...');
-      if(page&&page.length){
-        _liveOrders=_liveOrders.concat(page);
-        ordersData=_liveOrders;
-        if(!_renderPending){
-          _renderPending=true;
-          setTimeout(()=>{
-            _renderPending=false;
-            const _wt=[..._liveOrders].map(o=>({o,t:Date.parse(o.created_at)}));_wt.sort((a,b)=>b.t-a.t);ordersData=_wt.map(x=>x.o);
-            renderDailyStats();
-            renderSpark();
-          },600);
-        }
-      }
     });
-    ordersData=allOrders;
     setBadge('s','live',ordersData.length+' orders');
     renderDailyStats();
-    loadWeeklyOrders(); // weekly orders use same worker but low volume
+    loadWeeklyOrders();
   }catch(e){
     console.error('loadShopify error:',e);
     setBadge('s','error',e.message.slice(0,30));
