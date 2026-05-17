@@ -713,20 +713,17 @@ async function shopFetch(ep,method,body){
     if(!r.ok){const t=await r.text();throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
     return r.json();
   }
-  // Retry on 429 rate limit
   let r;
   for(let attempt=0;attempt<5;attempt++){
     r=await fetch(workerUrl);
     if(r.status===429){await _sleep(2000*(attempt+1));continue;}
     break;
   }
-  console.log('Worker status:',r.status,'ep:',ep.slice(0,60));
-  if(!r.ok){const t=await r.text();console.error('Worker error:',t);throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
+  if(!r.ok){const t=await r.text();throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
   const txt=await r.text();
   let parsed;
   try{parsed=JSON.parse(txt);}
-  catch(e){console.error('JSON parse error:',txt.slice(0,200));throw new Error('Invalid JSON from Shopify');}
-  // Extract page_info cursor from x-shopify-link header forwarded by Worker
+  catch(e){throw new Error('Invalid JSON from Shopify');}
   const link=r.headers.get('x-shopify-link')||r.headers.get('link')||'';
   if(link){
     const m=link.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
@@ -735,30 +732,71 @@ async function shopFetch(ep,method,body){
   return parsed;
 }
 
-// Fetch ALL orders — page_info cursor pagination (Shopify official method)
-async function fetchAllOrders(from, to, onProgress){
-  let allOrders=[];
+// Fetch one chunk of orders using page_info pagination
+async function fetchChunk(fromISO, toISO){
+  let orders=[];
   let pageInfo=null;
   let guard=0;
-  const fromISO=toLocalISO(new Date(from));
-  const toISO=toLocalISO(new Date(to));
-  while(guard<200){
+  while(guard<100){
     guard++;
-    await _sleep(600);
     const url=pageInfo
       ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
       : `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
     let d;
     try{d=await shopFetch(url);}
-    catch(e){console.error('fetchAllOrders page',guard,'error:',e.message);break;}
+    catch(e){console.error('fetchChunk error:',e.message);break;}
     const batch=d.orders||[];
-    console.log('Orders page',guard,': got',batch.length,'| total:',(allOrders.length+batch.length));
     if(batch.length===0) break;
-    allOrders=allOrders.concat(batch);
-    if(onProgress) onProgress(allOrders.length);
+    orders=orders.concat(batch);
     pageInfo=d._nextPageInfo||null;
-    if(!pageInfo){console.log('fetchAllOrders complete:',allOrders.length,'total');break;}
+    if(!pageInfo) break;
   }
+  return orders;
+}
+
+// Fetch ALL orders fast — splits range into parallel weekly chunks
+async function fetchAllOrders(from, to, onProgress){
+  const start=new Date(from);
+  const end=new Date(to);
+  const totalDays=Math.ceil((end-start)/(86400*1000));
+
+  // For small ranges (<=7 days) just fetch directly — no need to split
+  if(totalDays<=7){
+    const orders=await fetchChunk(toLocalISO(start), toLocalISO(end));
+    if(onProgress) onProgress(orders.length);
+    console.log('fetchAllOrders complete:',orders.length,'orders (single chunk)');
+    return orders;
+  }
+
+  // Split into ~7-day chunks and fetch ALL in parallel
+  const chunks=[];
+  let chunkStart=new Date(start);
+  while(chunkStart<end){
+    const chunkEnd=new Date(chunkStart);
+    chunkEnd.setDate(chunkEnd.getDate()+6);
+    chunkEnd.setHours(23,59,59,999);
+    if(chunkEnd>end) chunkEnd.setTime(end.getTime());
+    chunks.push({from:new Date(chunkStart),to:new Date(chunkEnd)});
+    chunkStart=new Date(chunkEnd);
+    chunkStart.setSeconds(chunkStart.getSeconds()+1);
+  }
+
+  console.log('fetchAllOrders: fetching',chunks.length,'chunks in parallel');
+
+  // Fire all chunks simultaneously
+  let fetched=0;
+  const results=await Promise.all(
+    chunks.map(c=>fetchChunk(toLocalISO(c.from),toLocalISO(c.to)).then(orders=>{
+      fetched+=orders.length;
+      if(onProgress) onProgress(fetched);
+      console.log('Chunk',c.from.toLocaleDateString(),'→',c.to.toLocaleDateString(),':',orders.length,'orders');
+      return orders;
+    }))
+  );
+
+  // Flatten and sort by created_at descending (newest first)
+  const allOrders=results.flat().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  console.log('fetchAllOrders complete:',allOrders.length,'orders in',chunks.length,'parallel chunks');
   return allOrders;
 }
 // ═══════════ DATE RANGE STATE ═══════════
