@@ -1652,8 +1652,16 @@ function renderCS(){
 function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
   // Returns a csData-shaped object for the given month section
   const result={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-  const scanStart=Math.max(0,sectionStart-10);
-  const scanEnd=sectionEnd?Math.min(sectionEnd,rows.length):Math.min(rows.length,sectionStart+600);
+  // The month header is at the BOTTOM of its data block — scan upward from it
+  // sectionEnd from caller = start of NEXT month's block (or rows.length)
+  // sectionStart = row where this month's header was found
+  // Real data (ORDER STATUS, AGENTS) is in rows BEFORE sectionStart
+  const prevSectionStart = sectionEnd !== rows.length
+    ? Math.max(0, sectionStart - 200)   // bounded by previous month
+    : Math.max(0, sectionStart - 200);
+  const scanStart = prevSectionStart;
+  const scanEnd = Math.min(rows.length, sectionStart + 5); // include header row + a few below
+  console.log('[CS extract]', monthName, '| scanStart:', scanStart, 'scanEnd:', scanEnd, 'rows in window:', scanEnd-scanStart);
 
   // Find date column for that month's "Dates" row
   let dateColIdx=-1;
@@ -1676,7 +1684,7 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     return row.length-1;
   };
 
-  let inSection=false;
+  let inSection=true; // scan entire window — data is above the month header
   for(let i=scanStart;i<scanEnd;i++){
     const r=rows[i];
     const a0=(r[0]||'').trim();
@@ -1685,13 +1693,6 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     // Find the first non-empty cell value (agent names can be in any column)
     const firstCell=r.find(c=>c&&c.trim())||'';
     const firstCellL=firstCell.toLowerCase().trim();
-
-    if(i===sectionStart||(rowText.includes(monthName)&&(
-      rowText.includes('cs data')||rowText.includes('cs')||
-      rowText.includes('26')||rowText.includes('agent')||rowText.includes('dates')
-    )&&i>=sectionStart))inSection=true;
-
-    if(!inSection)continue;
 
     // Order status — Sheet columns: [0:Label] [1:Total Target] [2:Target Till Date] [3:No Of Orders] [4:Achieved Value] [5:ACH%] [6:Units]
     // Find label cell index first, then offset to get Achieved Value
