@@ -887,20 +887,21 @@ async function loadShopify(){
 }
 async function loadProducts(){
   try{
-    // Fetch ALL products using page-based pagination (more reliable than since_id)
-    // since_id can miss products if Shopify returns them out of order
-    let allProds=[],page=1,hasMore=true,retries=0;
-    while(hasMore&&page<=20){
-      const url=`/products.json?limit=250&page=${page}&fields=id,title,product_type,status,variants,images`;
+    let allProds=[],pageInfo=null,hasMore=true,retries=0,pageNum=0;
+    while(hasMore&&pageNum<=20){
+      // Shopify REST requires cursor-based pagination (page_info), not ?page=
+      const base=`/products.json?limit=250&fields=id,title,product_type,status,variants,images`;
+      const url=pageInfo?`${base}&page_info=${pageInfo}`:base;
       try{
-        const d=await shopFetch(url);
-        const batch=d.products||[];
+        const resp=await shopFetch(url);
+        const batch=resp.products||[];
+        pageInfo=resp._nextPageInfo||null;
         if(batch.length===0){hasMore=false;break;}
         allProds=allProds.concat(batch);
         retries=0;
-        if(batch.length<250){hasMore=false;}
-        else{page++;}
-        // Update count progressively and re-render if tab is active or search is typed
+        hasMore=!!(pageInfo&&batch.length===250);
+        pageNum++;
+        // Update progressively and re-render if tab active or search typed
         allProducts=[...allProds];
         updateProductCounts();
         const _s=(document.getElementById('prodSearch')?.value||'').trim();
@@ -908,18 +909,16 @@ async function loadProducts(){
         if(_s||_sk||document.getElementById('panel-products')?.classList.contains('active')){
           renderProducts();
         }
-        // Pause every 4 pages to avoid worker rate limit
-        if(page%4===1&&hasMore)await new Promise(r=>setTimeout(r,300));
+        if(hasMore)await new Promise(r=>setTimeout(r,300));
       }catch(pageErr){
-        console.warn('loadProducts page',page,'error:',pageErr.message);
+        console.warn('loadProducts page',pageNum,'error:',pageErr.message);
         retries++;
         if(retries>=3){console.error('loadProducts gave up at',allProds.length,'products');hasMore=false;}
-        else{await new Promise(r=>setTimeout(r,2500));} // wait then retry same page
+        else await new Promise(r=>setTimeout(r,2500));
       }
     }
     allProducts=allProds;
     updateProductCounts();
-    // Always re-render products tab — if user typed a search while loading, show results now
     const search=(document.getElementById('prodSearch')?.value||'').trim();
     const skuSearch=(document.getElementById('skuSearch')?.value||'').trim();
     if(search||skuSearch||document.getElementById('panel-products')?.classList.contains('active')){
@@ -1521,7 +1520,6 @@ function processCS(rows){
   availableMonths.sort((a,b)=>b.year!==a.year?b.year-a.year:b.monthNum-a.monthNum);
 
   console.log('[CS] availableMonths found:', availableMonths.map(m=>m.label));
-  console.log('[CS] currentLabel:', currentLabel, '| sectionStart:', sectionStart);
 
   // Process each month using dynamic boundaries — next month header = end of current section
   // This means each month's scan window automatically grows as data is added
@@ -1536,6 +1534,7 @@ function processCS(rows){
 
   // Set csData from the correctly-parsed month section (agents, EWH, orderStatus all from right month)
   const currentLabel=currentMonth.charAt(0).toUpperCase()+currentMonth.slice(1)+' 20'+currentYear;
+  console.log('[CS] currentLabel:', currentLabel, '| sectionStart:', sectionStart);
   if(allCsMonths[currentLabel]){
     csData=JSON.parse(JSON.stringify(allCsMonths[currentLabel]));
   } else {
