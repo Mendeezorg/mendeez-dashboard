@@ -732,32 +732,43 @@ async function shopFetch(ep,method,body){
   return parsed;
 }
 
-// Fetch one chunk of orders — single request, Worker handles all pagination server-side
+// FIX 1: fetchChunk now follows Shopify pagination cursor until ALL pages are fetched.
+// Previously stopped at 250 orders (1 page) — now continues through page 2, 3, etc.
 async function fetchChunk(fromISO, toISO, onPage){
-  const url=`/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
-  let d;
-  try{d=await shopFetch(url);}
-  catch(e){console.error('fetchChunk error:',e.message);return[];}
-  const orders=d.orders||[];
-  if(onPage&&orders.length) onPage(orders);
-  return orders;
+  let allOrders=[];
+  let pageInfo=null;
+  let pageNum=0;
+  while(true){
+    let url;
+    if(pageInfo){
+      // Cursor-based pagination — must NOT include date filters on subsequent pages
+      url=`/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`;
+    } else {
+      url=`/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
+    }
+    let d;
+    try{d=await shopFetch(url);}
+    catch(e){console.error('fetchChunk page',pageNum,'error:',e.message);break;}
+    const page=d.orders||[];
+    pageNum++;
+    if(page.length===0) break;
+    allOrders=allOrders.concat(page);
+    if(onPage&&page.length) onPage(page);
+    pageInfo=d._nextPageInfo||null; // shopFetch already parses Link header into _nextPageInfo
+    if(!pageInfo||page.length<250) break;
+    await _sleep(400); // respect Shopify REST ~2 req/sec limit between pages
+  }
+  return allOrders;
 }
 
-// Fetch ALL orders fast — 1-day chunks so each stays under 250 orders (no second page)
+// FIX 2: fetchAllOrders now runs chunks SEQUENTIALLY (not Promise.all in parallel).
+// Promise.all fired 30 requests simultaneously → Shopify 429 rate-limits → 2-min stall.
+// Sequential with small gap between chunks keeps us well under the rate limit.
 async function fetchAllOrders(from, to, onProgress){
   const start=new Date(from);
   const end=new Date(to);
-  const totalDays=Math.ceil((end-start)/(86400*1000));
 
-  // Single day — fetch directly
-  if(totalDays<=1){
-    const orders=await fetchChunk(toLocalISO(start), toLocalISO(end));
-    if(onProgress) onProgress(orders.length, orders);
-    console.log('fetchAllOrders complete:',orders.length,'orders (single chunk)');
-    return orders;
-  }
-
-  // Split into 1-day chunks and fire ALL in parallel
+  // Build 1-day chunks
   const chunks=[];
   let chunkStart=new Date(start);
   while(chunkStart<end){
@@ -769,24 +780,25 @@ async function fetchAllOrders(from, to, onProgress){
     chunkStart.setSeconds(chunkStart.getSeconds()+1);
   }
 
-  console.log('fetchAllOrders: fetching',chunks.length,'chunks in parallel');
+  console.log('fetchAllOrders: fetching',chunks.length,'chunks sequentially (rate-limit safe)');
 
-  // Fire all chunks simultaneously
-  // onPage fires per page (not per chunk) so even chunks needing page 2 render immediately
   let fetched=0;
-  const results=await Promise.all(
-    chunks.map(c=>fetchChunk(toLocalISO(c.from),toLocalISO(c.to),(page)=>{
-      fetched+=page.length;
-      if(onProgress) onProgress(fetched,page); // fires per page, not per chunk
-    }).then(orders=>{
-      console.log('Chunk',c.from.toLocaleDateString(),'→',c.to.toLocaleDateString(),':',orders.length,'orders');
-      return orders;
-    }))
-  );
+  const allOrders=[];
 
-  // Flatten and sort by created_at descending (newest first)
-  const allOrders=results.flat().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  console.log('fetchAllOrders complete:',allOrders.length,'orders in',chunks.length,'parallel chunks');
+  // Sequential loop — one chunk at a time, no rate-limit hammering
+  for(const c of chunks){
+    const page=await fetchChunk(toLocalISO(c.from),toLocalISO(c.to),(orders)=>{
+      fetched+=orders.length;
+      if(onProgress) onProgress(fetched,orders);
+    });
+    allOrders.push(...page);
+    console.log('Chunk',c.from.toLocaleDateString(),':',page.length,'orders (total so far:',allOrders.length+')');
+    if(chunks.length>1) await _sleep(300); // breathing room between day-chunks
+  }
+
+  // Sort newest first
+  allOrders.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  console.log('fetchAllOrders complete:',allOrders.length,'total orders across',chunks.length,'chunks');
   return allOrders;
 }
 // ═══════════ DATE RANGE STATE ═══════════
@@ -877,20 +889,28 @@ async function reloadShopifyData(){
   const {from,to}=getRange();
   document.getElementById('lastUpd').textContent='Loading...';
   setBadge('s','amber','Fetching orders...');
-  // Show day count so user knows how long it will take
   const days=Math.ceil((to-from)/(86400*1000))+1;
   if(days>1) setBadge('s','amber','Fetching '+days+' days...');
   try{
-    // _liveOrders accumulates chunks as they arrive for progressive rendering
+    // FIX 3: Debounced progress rendering — accumulate orders but only re-render
+    // at most once per 600ms. Previously re-sorted + re-rendered on every single chunk
+    // arrival, causing 30+ simultaneous DOM updates that froze the browser.
     let _liveOrders=[];
+    let _renderPending=false;
     const allOrders=await fetchAllOrders(from,to,(n,chunkOrders)=>{
       setBadge('s','amber',n+' orders...');
-      // Render dashboard immediately with each chunk — don't wait for all chunks
       if(chunkOrders&&chunkOrders.length){
-        _liveOrders=_liveOrders.concat(chunkOrders).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+        _liveOrders=_liveOrders.concat(chunkOrders);
         ordersData=_liveOrders;
-        renderDailyStats();
-        renderSpark();
+        if(!_renderPending){
+          _renderPending=true;
+          setTimeout(()=>{
+            _renderPending=false;
+            ordersData=[..._liveOrders].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+            renderDailyStats();
+            renderSpark();
+          },600);
+        }
       }
     });
     ordersData=allOrders;
@@ -913,15 +933,23 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    // 1. Fetch orders with progressive rendering (same as reloadShopifyData)
+    // FIX 3b: Same debounced progress rendering as reloadShopifyData
     let _liveOrders=[];
+    let _renderPending=false;
     const allOrders=await fetchAllOrders(from,to,(n,page)=>{
       setBadge('s','amber',n+' orders...');
       if(page&&page.length){
-        _liveOrders=_liveOrders.concat(page).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+        _liveOrders=_liveOrders.concat(page);
         ordersData=_liveOrders;
-        renderDailyStats();
-        renderSpark();
+        if(!_renderPending){
+          _renderPending=true;
+          setTimeout(()=>{
+            _renderPending=false;
+            ordersData=[..._liveOrders].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+            renderDailyStats();
+            renderSpark();
+          },600);
+        }
       }
     });
     ordersData=allOrders;
