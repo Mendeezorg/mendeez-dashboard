@@ -749,28 +749,43 @@ let _searchTimer=null;
 let _returnsFetching=false;
 let _returnsRangeKey='';
 
-function getRange(){
-  const n=new Date();
-  if(_preset==='custom'&&_customFrom&&_customTo) return{from:new Date(_customFrom),to:new Date(_customTo)};
-  const f=new Date(n), t=new Date(n);
-  if(_preset==='today')    {f.setHours(0,0,0,0);t.setHours(23,59,59,999);}
-  else if(_preset==='yesterday'){f.setDate(f.getDate()-1);f.setHours(0,0,0,0);t.setDate(t.getDate()-1);t.setHours(23,59,59,999);}
-  else if(_preset==='2days'){f.setDate(f.getDate()-2);f.setHours(0,0,0,0);t.setDate(t.getDate()-2);t.setHours(23,59,59,999);}
-  else if(_preset==='7days'){f.setDate(f.getDate()-6);f.setHours(0,0,0,0);t.setHours(23,59,59,999);}
-  else if(_preset==='30days'){f.setDate(f.getDate()-29);f.setHours(0,0,0,0);t.setHours(23,59,59,999);}
-  else if(_preset==='mtd') {f.setDate(1);f.setHours(0,0,0,0);t.setHours(23,59,59,999);}
-  else                     {f.setHours(0,0,0,0);t.setHours(23,59,59,999);}
-  return{from:f,to:t};
+// PKT = UTC+5. All day boundaries anchored to Pakistan time
+// so order counts match Shopify Admin regardless of browser timezone.
+const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+function pktNow(){
+  // Returns a Date whose UTC fields represent the current PKT wall-clock time
+  return new Date(Date.now() + PKT_OFFSET_MS);
+}
+function pktMidnight(pktDate, daysOffset){
+  const d = new Date(pktDate);
+  d.setUTCDate(d.getUTCDate() + (daysOffset||0));
+  d.setUTCHours(0,0,0,0);
+  return new Date(d.getTime() - PKT_OFFSET_MS); // back to real UTC
+}
+function pktEndOfDay(pktDate, daysOffset){
+  const d = new Date(pktDate);
+  d.setUTCDate(d.getUTCDate() + (daysOffset||0));
+  d.setUTCHours(23,59,59,999);
+  return new Date(d.getTime() - PKT_OFFSET_MS);
 }
 
+function getRange(){
+  if(_preset==='custom'&&_customFrom&&_customTo) return{from:new Date(_customFrom),to:new Date(_customTo)};
+  const pkt = pktNow();
+  if(_preset==='today')    return{from:pktMidnight(pkt,0),   to:pktEndOfDay(pkt,0)};
+  if(_preset==='yesterday')return{from:pktMidnight(pkt,-1),  to:pktEndOfDay(pkt,-1)};
+  if(_preset==='2days')    return{from:pktMidnight(pkt,-2),  to:pktEndOfDay(pkt,-2)};
+  if(_preset==='7days')    return{from:pktMidnight(pkt,-6),  to:pktEndOfDay(pkt,0)};
+  if(_preset==='30days')   return{from:pktMidnight(pkt,-29), to:pktEndOfDay(pkt,0)};
+  if(_preset==='mtd'){const mtd=new Date(pkt);mtd.setUTCDate(1);return{from:pktMidnight(mtd,0),to:pktEndOfDay(pkt,0)};}
+  return{from:pktMidnight(pkt,0), to:pktEndOfDay(pkt,0)};
+}
 
-// Format date for Shopify API using PKT (UTC+5) — hardcoded to match Shopify store timezone
-// This ensures "Today" starts at midnight PKT regardless of where the browser is located
+// Format date for Shopify API — always sends PKT offset (+05:00)
 function toLocalISO(d){
   const pad=n=>String(n).padStart(2,'0');
-  // Shift the date to PKT (UTC+5)
-  const pktOffset=5*60*60*1000;
-  const pk=new Date(d.getTime()+pktOffset);
+  const pk=new Date(d.getTime()+PKT_OFFSET_MS);
   return pk.getUTCFullYear()+'-'+pad(pk.getUTCMonth()+1)+'-'+pad(pk.getUTCDate())+
     'T'+pad(pk.getUTCHours())+':'+pad(pk.getUTCMinutes())+':'+pad(pk.getUTCSeconds())+'+05:00';
 }
