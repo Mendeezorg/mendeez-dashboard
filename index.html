@@ -279,19 +279,47 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div id="alertsZone"></div>
-  <div class="sg" id="statGrid">
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue · Shopify</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div><div class="ssub">Net after discounts</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders · Shopify</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div><div class="ssub">Orders in selected range</div></div>
-    <div class="sc"><div class="sl">Total Ad Spend · Ads Sheet</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div><div class="ssub">Think Spendin PW 26</div></div>
-    <div class="sc"><div class="sl">Total Delivered · Perf Report</div><div class="sv shimmer" id="s-delivered" style="height:26px;width:50%"></div><div class="ssub">Achieved Value PKR</div></div>
-    <div class="sc"><div class="sl">Cancellations MTD · Perf Report</div><div class="sv shimmer" id="s-cancel-mtd" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Cancellations CF · Perf Report</div><div class="sv shimmer" id="s-cancel-cf" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns MTD · Perf Report</div><div class="sv shimmer" id="s-returns-mtd" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns CF · Perf Report</div><div class="sv shimmer" id="s-returns-cf" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns · <span id="returns-range-lbl">Selected Range</span></div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-gross">—</div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales MTD · Shopify</div><div class="sv muted" id="s-shopify-net">—</div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
-    <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts MTD · Shopify</div><div class="sv muted" id="s-shopify-discounts">—</div><div class="ssub" id="s-shopify-discounts-sub">Total discounts given</div></div>
+
+  <!-- ── ADS CARD ── -->
+  <div class="sh" style="margin-bottom:8px;margin-top:0">
+    <div class="st" style="display:flex;align-items:center;gap:7px">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block"></span>
+      Think Spendin PW 26 — Ads
+    </div>
+  </div>
+  <div class="sg" style="margin-bottom:20px">
+    <div class="sc"><div class="sl">Total Ad Spend</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div><div class="ssub">All platforms combined</div></div>
+  </div>
+
+  <!-- ── SHOPIFY CARDS ── -->
+  <div class="sh" style="margin-bottom:8px">
+    <div class="st" style="display:flex;align-items:center;gap:7px">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
+      Shopify — Live Orders
+    </div>
+  </div>
+  <div class="sg" id="statGrid" style="margin-bottom:20px">
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales</div><div class="sv amber shimmer" id="s-shopify-gross" style="height:26px;width:75%"></div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
+    <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts</div><div class="sv muted shimmer" id="s-shopify-discounts" style="height:26px;width:55%"></div><div class="ssub" id="s-shopify-discounts-sub">Total discounts given</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales</div><div class="sv amber shimmer" id="s-shopify-net" style="height:26px;width:70%"></div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div><div class="ssub">Net after discounts</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div><div class="ssub">Orders in selected range</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns · <span id="returns-range-lbl">Range</span></div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
+  </div>
+
+  <!-- ── PERF REPORT (SHEET) CARDS ── -->
+  <div class="sh" style="margin-bottom:8px">
+    <div class="st" style="display:flex;align-items:center;gap:7px">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
+      Perf Report 26 — MTD
+    </div>
+  </div>
+  <div class="sg" style="margin-bottom:20px">
+    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered" style="height:26px;width:50%"></div><div class="ssub">MTD Achieved Value PKR</div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
   </div>
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
   <div class="sh" style="margin-top:4px">
