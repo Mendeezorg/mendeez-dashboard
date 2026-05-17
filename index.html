@@ -718,19 +718,22 @@ async function shopFetch(ep,method,body){
   let parsed;
   try{parsed=JSON.parse(txt);}
   catch(e){console.error('JSON parse error:',txt.slice(0,200));throw new Error('Invalid JSON from Shopify');}
-  // Try to extract page_info from Link header (if worker passes it through)
-  const link=r.headers.get('link')||r.headers.get('x-shopify-link')||'';
-  const nextMatch=link.match(/page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-  if(nextMatch) parsed._nextPageInfo=nextMatch[1];
+  // Extract page_info cursor from x-shopify-link header forwarded by Worker
+  const link=r.headers.get('x-shopify-link')||r.headers.get('link')||'';
+  if(link){
+    const nextMatch=link.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+    if(nextMatch) parsed._nextPageInfo=decodeURIComponent(nextMatch[1]);
+  }
   return parsed;
 }
 
-// Fetch ALL orders for a date range using since_id pagination
-// since_id keeps date filters fixed across all pages — simplest reliable approach
+// Fetch ALL orders for a date range
+// Strategy: page_info cursor (Shopify official approach for paginating past 250)
+// Page 1 uses date filters; Worker returns Link header with page_info cursor for next pages
 const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fetchAllOrders(from, to, onProgress){
   let allOrders=[];
-  let sinceId=0;
+  let pageInfo=null;
   let guard=0;
   const fromISO=toLocalISO(new Date(from));
   const toISO=toLocalISO(new Date(to));
@@ -738,21 +741,24 @@ async function fetchAllOrders(from, to, onProgress){
   while(guard<200){
     guard++;
     await _sleep(150);
-    const url=`/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250${sinceId?'&since_id='+sinceId:''}`;
-    let batch=[];
+    // First page: date filters. Next pages: page_info cursor only (Shopify requirement)
+    const url=pageInfo
+      ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
+      : `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
+    let d;
     try{
-      const d=await shopFetch(url);
-      batch=d.orders||[];
+      d=await shopFetch(url);
     }catch(e){
       console.error('fetchAllOrders error:',e.message);
       break;
     }
+    const batch=d.orders||[];
     if(batch.length===0) break;
     allOrders=allOrders.concat(batch);
     if(onProgress) onProgress(allOrders.length);
-    if(batch.length<250) break;
-    // Advance cursor to last order id in this batch
-    sinceId=batch[batch.length-1].id;
+    // If Worker passed back a next page cursor, continue; otherwise we are done
+    pageInfo=d._nextPageInfo||null;
+    if(!pageInfo) break;
   }
 
   return allOrders;
