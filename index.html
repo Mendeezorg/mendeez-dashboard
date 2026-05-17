@@ -2853,40 +2853,70 @@ async function loadSorterCollection(){
   try{
     const collId=String(cat).replace('gid://shopify/Collection/','');
 
-    // Fetch products using cursor pagination (page_info) — preserves collection sort order
-    // Worker forwards Shopify's Link header as x-shopify-link so we can get next cursor
+    // Fetch ALL products in collection using GraphQL — no pagination issues, correct order
+    // GraphQL collectionByHandle supports cursor pagination and always returns correct sort order
     sts.textContent='Loading products in current Shopify order...';
     let prods=[];
-    let nextCursor=null;
+    let afterCursor=null;
     let hasMore=true;
     let guard=0;
+    const collGidFull='gid://shopify/Collection/'+collId;
+
     while(hasMore&&guard<50){
       guard++;
       sts.textContent='Loading... '+prods.length+' products';
-      let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
-      if(nextCursor) url+='&page_info='+encodeURIComponent(nextCursor);
-      // Use raw fetch to access response headers for Link cursor
-      const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
-      const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(url);
-      let resp;
-      for(let attempt=0;attempt<3;attempt++){
-        resp=await fetch(workerUrl);
-        if(resp.status===429){await new Promise(r=>setTimeout(r,1000*(attempt+1)));continue;}
-        break;
-      }
-      if(!resp.ok){const t=await resp.text();throw new Error('Shopify '+resp.status+': '+t.slice(0,80));}
-      const d=await resp.json();
-      const batch=d.products||[];
-      prods=prods.concat(batch);
-      // Extract next cursor from Link header
-      const linkHeader=resp.headers.get('x-shopify-link')||'';
-      const nextMatch=linkHeader.match(/<[^>]*page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-      if(nextMatch&&batch.length===250){
-        nextCursor=decodeURIComponent(nextMatch[1]);
-        hasMore=true;
-      } else {
-        hasMore=false;
-      }
+      const afterClause=afterCursor?`, after: "${afterCursor}"`:'';
+      const gql=`{
+        collection(id: "${collGidFull}") {
+          products(first: 250${afterClause}) {
+            edges {
+              node {
+                id
+                title
+                status
+                productType
+                images(first: 1) { edges { node { url } } }
+                variants(first: 50) {
+                  edges {
+                    node {
+                      id
+                      title
+                      price
+                      sku
+                      inventoryQuantity
+                    }
+                  }
+                }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`;
+      const d=await shopFetch('/graphql.json','POST',{query:gql});
+      const collection=d?.data?.collection;
+      if(!collection){hasMore=false;break;}
+      const edges=collection.products.edges||[];
+      // Normalize GraphQL response to match REST format expected by renderSorterGrid
+      // GraphQL uses camelCase (inventoryQuantity, url) vs REST snake_case
+      edges.forEach(({node:p})=>{
+        prods.push({
+          id: parseInt(p.id.replace('gid://shopify/Product/','')),
+          title: p.title,
+          status: (p.status||'active').toLowerCase(),
+          product_type: p.productType||'',
+          images: (p.images?.edges||[]).map(e=>({src:e.node.url})),
+          variants: (p.variants?.edges||[]).map(e=>({
+            id: parseInt(e.node.id.replace('gid://shopify/ProductVariant/','')),
+            title: e.node.title,
+            price: e.node.price,
+            sku: e.node.sku||'',
+            inventory_quantity: e.node.inventoryQuantity||0
+          }))
+        });
+      });
+      hasMore=collection.products.pageInfo.hasNextPage;
+      afterCursor=collection.products.pageInfo.endCursor;
       await new Promise(r=>setTimeout(r,0));
     }
 
