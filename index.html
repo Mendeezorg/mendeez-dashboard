@@ -1598,12 +1598,12 @@ function renderCS(){
 
   // Order stats
   const os=csData.orderStatus;
-  setV('cs-landed',os.landed?fmt(os.landed):'—','amber');
+  setV('cs-landed',os.landedVal?fPKR(os.landedVal):'—','amber');
   setV('cs-dispatched',os.dispatched?fmt(os.dispatched):'—','blue');
-  setV('cs-delivered',os.delivered?fmt(os.delivered):'—','green');
+  setV('cs-delivered',os.delivered?fPKR(os.delivered):'—','green');
   setV('cs-pending',os.pending?fmt(os.pending):'—','');
-  setV('cs-cancel',os.cancel?fmt(os.cancel):'—',os.cancel>50?'red':'');
-  setV('cs-returns',os.returns?fmt(os.returns):'—',os.returns>30?'red':'');
+  setV('cs-cancel',os.cancelMTDVal?fPKR(os.cancelMTDVal):'—','red');
+  setV('cs-returns',os.returnsMTDVal?fPKR(os.returnsMTDVal):'—','red');
 
   // Warehouse
   const ewh=csData.ewh;
@@ -1686,49 +1686,47 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
 
     if(!inSection)continue;
 
-    // Order status — label can be in ANY column, scan all cells
-    const anyCol=r.map(c=>(c||'').toLowerCase().trim()).find(c=>c.length>3)||firstCellL;
-    // Also check rowText for broader matching
+    // Order status — Sheet columns: [0:Label] [1:Total Target] [2:Target Till Date] [3:No Of Orders] [4:Achieved Value] [5:ACH%] [6:Units]
+    // Find label cell index first, then offset to get Achieved Value
     const rl=rowText;
-    if(rl.includes('landed mtd')){const v=r.map(nc).find(v=>v>0)||0;result.orderStatus.landed=v;result.orderStatus.landedVal=v;}
-    if(rl.includes('total dispach')||rl.includes('total dispatch')){const v=r.map(nc).find(v=>v>0)||0;result.orderStatus.dispatched=v;}
-    if(rl.includes('delivered to customer')){const v=r.map(nc).find(v=>v>0)||0;result.orderStatus.delivered=v;}
-    if(rl.includes('pending orders')){const v=r.map(nc).find(v=>v>0)||0;result.orderStatus.pending=v;}
-    if(rl.includes('cancelations mtd')&&!rl.includes('cancelations cf')&&!rl.includes('cf')){const nums=r.map(nc).filter(v=>v>0);const v=nums[0]||0;result.orderStatus.cancelMTD=v;result.orderStatus.cancelMTDVal=v;result.orderStatus.cancel=v;}
-    if(rl.includes('cancelations cf')||rl.includes('cancellations cf')){const nums=r.map(nc).filter(v=>v>0);const v=nums[0]||0;result.orderStatus.cancelCF=v;result.orderStatus.cancelCFVal=v;}
-    if((rl.includes('mtd returns')||rl.includes('returns mtd'))&&!rl.includes('cf')){const nums=r.map(nc).filter(v=>v>0);const v=nums[0]||0;result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}
-    if(rl.includes('cf returns')||rl.includes('returns cf')){const nums=r.map(nc).filter(v=>v>0);const v=nums[0]||0;result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}
+    const labelIdx=r.findIndex(c=>{const cl=(c||'').toLowerCase().trim();return cl.includes('landed mtd')||cl.includes('delivered to customer')||cl.includes('cancelations')||cl.includes('mtd returns')||cl.includes('pending orders')||cl.includes('total dispatch')||cl.includes('total dispach');});
+    const achVal=()=>{
+      // Achieved Value is 4 cols after the label cell
+      if(labelIdx>=0&&nc(r[labelIdx+4])>0)return nc(r[labelIdx+4]);
+      // Fallback: find a value smaller than Total Target (second-largest number)
+      const nums=r.slice(1).map(nc).filter(v=>v>0).sort((a,b)=>b-a);
+      return nums[1]||nums[0]||0;
+    };
+    const cntVal=()=>{
+      if(labelIdx>=0&&nc(r[labelIdx+3])>0)return nc(r[labelIdx+3]);
+      return r.slice(1).map(nc).find(v=>v>0&&v<100000)||0;
+    };
+    if(rl.includes('landed mtd')){const v=achVal();result.orderStatus.landed=v;result.orderStatus.landedVal=v;}
+    if(rl.includes('total dispatch')||rl.includes('total dispach')||rl.includes('dispatched orders')){const v=cntVal();result.orderStatus.dispatched=v;}
+    if(rl.includes('delivered to customer')){const v=achVal();result.orderStatus.delivered=v;}
+    if(rl.includes('pending orders')){const v=cntVal();result.orderStatus.pending=v;}
+    if(rl.includes('cancelations mtd')&&!rl.includes('cf')){const v=achVal();result.orderStatus.cancelMTD=v;result.orderStatus.cancelMTDVal=v;result.orderStatus.cancel=v;}
+    if(rl.includes('cancelations cf')||rl.includes('cancellations cf')){const v=achVal();result.orderStatus.cancelCF=v;result.orderStatus.cancelCFVal=v;}
+    if(rl.includes('mtd returns')&&!rl.includes('cf')&&!rl.includes('cf returns')){const v=achVal();result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}
+    if(rl.includes('cf returns')||rl.includes('returns cf')){const v=achVal();result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}
 
     // ── AGENTS: horizontal layout ──
-    // Row contains an agent name cell (Abdullah or Namra) with numbers alongside it
-    // Structure: [empty...] [Agent Name] [Chats] [Inbound] [Outbound] [R/Returns] [Complaints]
-    // We find the agent name cell index, then read the next numeric cells after it
+    // Each agent row: [empty...] [Agent Name] [Chats] [Inbound Calls] [Outbound Calls] [R/Returns] [Solve Compl]
     const isAgentName=(c)=>{
       const cl=(c||'').toLowerCase().trim();
       return cl.includes('abdullah')||cl.includes('namra')||cl.includes('nimra')||
-             (cl.includes('agent')&&cl.length>7);
+             (cl.startsWith('agent')&&cl.length>7);
     };
     const agentCellIdx=r.findIndex(c=>isAgentName(c));
     if(agentCellIdx>=0){
       const agentName=r[agentCellIdx].trim();
-      // Collect numeric values in cells after the agent name
-      const vals=[];
-      for(let k=agentCellIdx+1;k<r.length;k++){
-        const v=nc(r[k]);
-        if(v>0||(r[k]&&r[k].trim()&&r[k].trim()!=='-'&&r[k].trim()!=='—'))vals.push(v);
-        if(vals.length>=5)break;
-      }
-      // Order matches sheet columns: Chats, Inbound Calls, Outbound Calls, R/Returns, Solve/Complaints
-      result.agents.push({
-        name:       agentName,
-        chats:      vals[0]||0,
-        inbound:    vals[1]||0,
-        outbound:   vals[2]||0,
-        returns:    vals[3]||0,
-        complaints: vals[4]||0,
-        todayChats: 0,
-        todayOut:   0,
-      });
+      // Values are in the next 5 cells after the agent name cell
+      const chats=    nc(r[agentCellIdx+1])||0;
+      const inbound=  nc(r[agentCellIdx+2])||0;
+      const outbound= nc(r[agentCellIdx+3])||0;
+      const returns=  nc(r[agentCellIdx+4])||0;
+      const complaints=nc(r[agentCellIdx+5])||0;
+      result.agents.push({name:agentName,chats,inbound,outbound,returns,complaints,todayChats:0,todayOut:0});
       continue;
     }
 
@@ -1743,11 +1741,12 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
       i++;continue;
     }
 
-    // Cancel reasons
-    const isCancelSection=(a0l.includes('cancel')||a0l.includes('reason')||a0l.includes('wrong')||a0l.includes('price')||a0l.includes('size')||a0l.includes('cod')||a0l.includes('fake')||a0l.includes('duplicate')||a0l.includes('no answer')||a0l.includes('not interested'));
-    if(isCancelSection&&a0.length>2&&a0.length<60){
+    // Cancel reasons — label can be in any column
+    const cancelKeywords=['call not answered','customer cancelled','duplicate order','fake order','invalid customer','non service area','payment issue','inventory constraint','wrong product','wrong size','price issue','cod issue'];
+    const cancelCell=r.find(c=>cancelKeywords.some(k=>(c||'').toLowerCase().includes(k)))||'';
+    if(cancelCell){
       const nums=r.slice(1).map(v=>nc(v)).filter(v=>v>0);
-      if(nums.length>0)result.cancelReasons.push({reason:a0,count:nums[nums.length-1]});
+      if(nums.length>0)result.cancelReasons.push({reason:cancelCell.trim(),count:nums[nums.length-1]});
     }
   }
   return result;
