@@ -680,19 +680,20 @@ async function connectAll(){
 }
 
 async function loadAll(){
-  // Start ALL three in parallel — products, orders, and sheets use different servers
-  // Products: Cloudflare worker → Shopify /products.json
-  // Orders:   Cloudflare worker → Shopify /orders.json
-  // Sheets:   Google Sheets API (completely separate)
-  // Running them in parallel cuts total load time by ~60% for large stores
-  const [,, ] = await Promise.allSettled([
-    loadShopify(),
-    fetchSheets(),
-    loadProducts()   // ← now starts immediately, no longer waits for orders
+  // Orders + Products both route through the same Cloudflare Worker → Shopify.
+  // Running them in parallel doubles request rate and causes 429s that stall orders.
+  // Strategy: fetch orders first (user-visible), then products in background after.
+  // Sheets are Google's server — always safe to run alongside Worker calls.
+  await Promise.allSettled([
+    loadShopify(),  // orders via Cloudflare Worker
+    fetchSheets()   // sheets via Google — separate server, safe to parallel
   ]);
+  // Orders done — render final state, then start products in background
   renderDailyStats();
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+  // Products start AFTER orders — same Worker, avoids rate-limit competition
+  loadProducts();   // background, non-blocking
   fetchProductCounts();
   loadCollections();
 }
@@ -796,10 +797,15 @@ async function fetchAllOrders(from, to, onProgress){
     if(chunks.length>1) await _sleep(300); // breathing room between day-chunks
   }
 
-  // Sort newest first
-  allOrders.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  console.log('fetchAllOrders complete:',allOrders.length,'total orders across',chunks.length,'chunks');
-  return allOrders;
+  // Sort newest first — pre-cache timestamps so sort doesn't call new Date() on every comparison
+  // (1500 orders × O(n log n) comparisons = ~16,000 Date constructions without this)
+  const withTs=allOrders.map(o=>({o,t:Date.parse(o.created_at)}));
+  withTs.sort((a,b)=>b.t-a.t);
+  const sorted=withTs.map(x=>x.o);
+  // Yield to browser paint before returning so the UI can update
+  await _sleep(0);
+  console.log('fetchAllOrders complete:',sorted.length,'total orders across',chunks.length,'chunks');
+  return sorted;
 }
 // ═══════════ DATE RANGE STATE ═══════════
 let _preset='today', _customFrom=null, _customTo=null;
@@ -906,7 +912,7 @@ async function reloadShopifyData(){
           _renderPending=true;
           setTimeout(()=>{
             _renderPending=false;
-            ordersData=[..._liveOrders].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+            const _wt=[..._liveOrders].map(o=>({o,t:Date.parse(o.created_at)}));_wt.sort((a,b)=>b.t-a.t);ordersData=_wt.map(x=>x.o);
             renderDailyStats();
             renderSpark();
           },600);
@@ -945,7 +951,7 @@ async function loadShopify(){
           _renderPending=true;
           setTimeout(()=>{
             _renderPending=false;
-            ordersData=[..._liveOrders].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+            const _wt=[..._liveOrders].map(o=>({o,t:Date.parse(o.created_at)}));_wt.sort((a,b)=>b.t-a.t);ordersData=_wt.map(x=>x.o);
             renderDailyStats();
             renderSpark();
           },600);
