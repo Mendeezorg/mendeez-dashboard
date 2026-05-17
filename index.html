@@ -315,11 +315,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div class="sg" style="margin-bottom:20px">
-    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub">MTD Achieved Value PKR</div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub" id="s-delivered-sub">MTD Achieved Value PKR</div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub" id="s-cancel-mtd-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub" id="s-cancel-cf-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub" id="s-returns-mtd-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub" id="s-returns-cf-sub">Value not count</div></div>
+    <div class="sc"><div class="sl">Order Adjustment (Returns)</div><div class="sv red shimmer" id="s-order-adj"></div><div class="ssub" id="s-order-adj-sub">Value not count</div></div>
   </div>
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
   <div class="sh" style="margin-top:4px">
@@ -447,11 +448,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- ORDER STATUS -->
   <div class="sh"><div class="st">Order Status MTD</div></div>
   <div class="sg" id="csOrderStats">
-    <div class="sc"><div class="sl">Delivered MTD</div><div class="sv shimmer" id="cs-delivered" style="height:24px;width:65%"></div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="cs-cancel-cf" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns" style="height:24px;width:55%"></div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="cs-returns-cf" style="height:24px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Delivered MTD</div><div class="sv shimmer" id="cs-delivered"></div><div class="ssub" id="cs-delivered-sub">—</div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel"></div><div class="ssub" id="cs-cancel-sub">—</div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="cs-cancel-cf"></div><div class="ssub" id="cs-cancel-cf-sub">—</div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns"></div><div class="ssub" id="cs-returns-sub">—</div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="cs-returns-cf"></div><div class="ssub" id="cs-returns-cf-sub">—</div></div>
+    <div class="sc"><div class="sl">Order Adjustment (Returns)</div><div class="sv shimmer" id="cs-order-adj"></div><div class="ssub" id="cs-order-adj-sub">—</div></div>
   </div>
   <!-- EWH WAREHOUSE -->
   <div class="sh"><div class="st">Warehouse (EWH) MTD</div></div>
@@ -1687,25 +1689,30 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
     console.log('[CS extract] EWH:',result.ewh);
   }
 
-  // ORDER STATUS — col0=label, col4=MTD Ach Value, col3=No Of Orders
+  // ORDER STATUS — col0=label, col3=No Of Orders, col4=MTD Ach Value, col5=MTD Ach%, col6=Total Ach%
   for(let i=sectionStart;i<sectionEnd;i++){
     const r=rows[i];
     const label=clean(r[0]||'').toLowerCase();
     if(!label)continue;
-    const col3=nc2(r[3]);  // No Of Orders
-    const col4=nc2(r[4]);  // MTD Ach Value
+    const col3=nc2(r[3]);   // No Of Orders
+    const col4=nc2(r[4]);   // MTD Ach Value
+    const col5=clean(r[5]||'').replace('%','').trim(); // MTD Ach%
+    const col6=clean(r[6]||'').replace('%','').trim(); // Total Ach%
+    const pct=parseFloat(col5)||parseFloat(col6)||0;
     if(label.includes('landed mtd')){
-      if(col4>0){result.orderStatus.landed=col4;result.orderStatus.landedVal=col4;}
+      if(col4>0){result.orderStatus.landed=col4;result.orderStatus.landedVal=col4;result.orderStatus.landedOrders=col3;result.orderStatus.landedPct=pct;}
     } else if(label.includes('delivered to customer')){
-      if(col4>0)result.orderStatus.delivered=col4;
+      if(col4>0){result.orderStatus.delivered=col4;result.orderStatus.deliveredOrders=col3;result.orderStatus.deliveredPct=pct;}
     } else if(label.includes('cancelations mtd')||label.includes('cancellations mtd')){
-      if(col4>0){result.orderStatus.cancelMTD=col4;result.orderStatus.cancelMTDVal=col4;result.orderStatus.cancel=col4;}
+      if(col4>0){result.orderStatus.cancelMTD=col4;result.orderStatus.cancelMTDVal=col4;result.orderStatus.cancel=col4;result.orderStatus.cancelMTDOrders=col3;result.orderStatus.cancelMTDPct=pct;}
     } else if(label.includes('cancelations cf')||label.includes('cancellations cf')){
-      if(col4>0){result.orderStatus.cancelCF=col4;result.orderStatus.cancelCFVal=col4;}
+      if(col4>0){result.orderStatus.cancelCF=col4;result.orderStatus.cancelCFVal=col4;result.orderStatus.cancelCFOrders=col3;result.orderStatus.cancelCFPct=pct;}
     } else if((label.includes('mtd returns')||label.includes('returns mtd'))&&!label.includes('cf')){
-      if(col4>0){result.orderStatus.returnsMTD=col4;result.orderStatus.returnsMTDVal=col4;result.orderStatus.returns=col4;}
+      if(col4>0){result.orderStatus.returnsMTD=col4;result.orderStatus.returnsMTDVal=col4;result.orderStatus.returns=col4;result.orderStatus.returnsMTDOrders=col3;result.orderStatus.returnsMTDPct=pct;}
     } else if(label.includes('cf returns')||label.includes('returns cf')){
-      if(col4>0){result.orderStatus.returnsCF=col4;result.orderStatus.returnsCFVal=col4;}
+      if(col4>0){result.orderStatus.returnsCF=col4;result.orderStatus.returnsCFVal=col4;result.orderStatus.returnsCFOrders=col3;result.orderStatus.returnsCFPct=pct;}
+    } else if(label.includes('order adjustment')){
+      if(col4>0){result.orderStatus.orderAdjVal=col4;result.orderStatus.orderAdjPct=pct;}
     } else if(label.includes('pending')){
       if(col3>0)result.orderStatus.pending=col3;
     } else if(label.includes('total dispach')||label.includes('total dispatch')){
@@ -1751,11 +1758,25 @@ function renderCS(){
 
   // Order stats
   const os=csData.orderStatus;
-  setV('cs-delivered', os.delivered   ? fPKR(os.delivered)   : '—', 'green');
-  setV('cs-cancel',   os.cancelMTDVal? fPKR(os.cancelMTDVal): '—', 'red');
-  setV('cs-cancel-cf',os.cancelCFVal ? fPKR(os.cancelCFVal) : '—', 'red');
-  setV('cs-returns',  os.returnsMTDVal? fPKR(os.returnsMTDVal): '—', 'red');
-  setV('cs-returns-cf',os.returnsCFVal? fPKR(os.returnsCFVal): '—', 'red');
+  const setCSCard=(valId,val,cls,orders,pct)=>{
+    setV(valId,val?fPKR(val):'—',cls);
+    const sub=document.getElementById(valId+'-sub');
+    if(sub){
+      const parts=[];
+      if(orders>0)parts.push(fmt(orders)+' orders');
+      if(pct>0)parts.push(pct+'%');
+      sub.textContent=parts.length>0?parts.join(' · '):'Value not count';
+    }
+  };
+  setCSCard('cs-delivered', os.delivered,  'green', os.deliveredOrders||0,  os.deliveredPct||0);
+  setCSCard('cs-cancel',    os.cancelMTDVal||os.cancelMTD, 'red', os.cancelMTDOrders||0, os.cancelMTDPct||0);
+  setCSCard('cs-cancel-cf', os.cancelCFVal, 'red', os.cancelCFOrders||0, os.cancelCFPct||0);
+  setCSCard('cs-returns',   os.returnsMTDVal||os.returnsMTD, 'red', os.returnsMTDOrders||0, os.returnsMTDPct||0);
+  setCSCard('cs-returns-cf',os.returnsCFVal, 'red', os.returnsCFOrders||0, os.returnsCFPct||0);
+  // Order Adjustment — value + percentage only
+  setV('cs-order-adj',os.orderAdjVal>0?fPKR(os.orderAdjVal):'—','red');
+  const csAdjSub=document.getElementById('cs-order-adj-sub');
+  if(csAdjSub)csAdjSub.textContent=os.orderAdjPct>0?os.orderAdjPct+'%':'Value only';
 
   // Warehouse
   const ewh=csData.ewh;
@@ -1877,15 +1898,47 @@ function renderDailyStats(){
   setV('s-ord',ords>0?ords:'—','');
   setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
   setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
-  setV('s-delivered',cntCrr.delivered>0?cntCrr.delivered:'—','green');
+
+  // Helper to set sub-line text for sheet cards
+  const setSub=(id,orders,pct)=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    const parts=[];
+    if(orders>0)parts.push(fmt(orders)+' orders');
+    if(pct>0)parts.push(pct+'%');
+    el.textContent=parts.length>0?parts.join(' · '):'Value not count';
+  };
+
+  // Delivered
+  const deliveredVal=os.delivered||0;
+  setV('s-delivered',deliveredVal>0?fPKR(deliveredVal):'—','green');
+  setSub('s-delivered-sub',os.deliveredOrders||0,os.deliveredPct||0);
+
+  // Cancellations MTD
   const cancelMTD=os.cancelMTDVal||os.cancelMTD||0;
-  const cancelCF=os.cancelCFVal||os.cancelCF||0;
-  const returnsMTD=os.returnsMTDVal||os.returnsMTD||0;
-  const returnsCF=os.returnsCFVal||os.returnsCF||0;
   setV('s-cancel-mtd',cancelMTD>0?fPKR(cancelMTD):'—','red');
+  setSub('s-cancel-mtd-sub',os.cancelMTDOrders||0,os.cancelMTDPct||0);
+
+  // Cancellations CF
+  const cancelCF=os.cancelCFVal||os.cancelCF||0;
   setV('s-cancel-cf',cancelCF>0?fPKR(cancelCF):'—','red');
+  setSub('s-cancel-cf-sub',os.cancelCFOrders||0,os.cancelCFPct||0);
+
+  // Returns MTD
+  const returnsMTD=os.returnsMTDVal||os.returnsMTD||0;
   setV('s-returns-mtd',returnsMTD>0?fPKR(returnsMTD):'—','red');
+  setSub('s-returns-mtd-sub',os.returnsMTDOrders||0,os.returnsMTDPct||0);
+
+  // Returns CF
+  const returnsCF=os.returnsCFVal||os.returnsCF||0;
   setV('s-returns-cf',returnsCF>0?fPKR(returnsCF):'—','red');
+  setSub('s-returns-cf-sub',os.returnsCFOrders||0,os.returnsCFPct||0);
+
+  // Order Adjustment (Returns) — value + percentage only, no order count
+  const orderAdj=os.orderAdjVal||0;
+  setV('s-order-adj',orderAdj>0?fPKR(orderAdj):'—','red');
+  const adjSubEl=document.getElementById('s-order-adj-sub');
+  if(adjSubEl)adjSubEl.textContent=os.orderAdjPct>0?os.orderAdjPct+'%':'Value only';
 
   // Shopify cards (gross, net, discounts)
   if(STORE&&STORE!=='demo'&&TOKEN){
