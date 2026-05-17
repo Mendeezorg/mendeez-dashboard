@@ -2853,20 +2853,40 @@ async function loadSorterCollection(){
   try{
     const collId=String(cat).replace('gid://shopify/Collection/','');
 
-    // Fetch products using page= parameter — preserves collection sort order for ALL types
-    // since_id breaks sort order; page= is the only way to paginate while keeping position
+    // Fetch products using cursor pagination (page_info) — preserves collection sort order
+    // Worker forwards Shopify's Link header as x-shopify-link so we can get next cursor
     sts.textContent='Loading products in current Shopify order...';
     let prods=[];
-    let page=1;
+    let nextCursor=null;
     let hasMore=true;
-    while(hasMore){
+    let guard=0;
+    while(hasMore&&guard<50){
+      guard++;
       sts.textContent='Loading... '+prods.length+' products';
-      const url='/products.json?collection_id='+collId+'&limit=250&page='+page+'&fields=id,title,product_type,status,variants,images';
-      const d=await shopFetch(url);
+      let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
+      if(nextCursor) url+='&page_info='+encodeURIComponent(nextCursor);
+      // Use raw fetch to access response headers for Link cursor
+      const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
+      const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(url);
+      let resp;
+      for(let attempt=0;attempt<3;attempt++){
+        resp=await fetch(workerUrl);
+        if(resp.status===429){await new Promise(r=>setTimeout(r,1000*(attempt+1)));continue;}
+        break;
+      }
+      if(!resp.ok){const t=await resp.text();throw new Error('Shopify '+resp.status+': '+t.slice(0,80));}
+      const d=await resp.json();
       const batch=d.products||[];
       prods=prods.concat(batch);
-      if(batch.length<250){hasMore=false;}
-      else{page++;}
+      // Extract next cursor from Link header
+      const linkHeader=resp.headers.get('x-shopify-link')||'';
+      const nextMatch=linkHeader.match(/<[^>]*page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+      if(nextMatch&&batch.length===250){
+        nextCursor=decodeURIComponent(nextMatch[1]);
+        hasMore=true;
+      } else {
+        hasMore=false;
+      }
       await new Promise(r=>setTimeout(r,0));
     }
 
