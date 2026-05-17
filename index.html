@@ -166,7 +166,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .dactive{font-size:11px;font-family:var(--mono);color:var(--accent);margin-left:4px;white-space:nowrap}
 
 /* SHIMMER */
-.shimmer{background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px;height:24px}
+.shimmer{background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px;min-height:28px;min-width:80px;display:inline-block}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 /* PAGINATION */
 .pager{display:flex;align-items:center;gap:8px;padding:9px 13px;border-top:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -288,7 +288,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div class="sg" style="margin-bottom:20px">
-    <div class="sc"><div class="sl">Total Ad Spend</div><div class="sv shimmer" id="s-spend" style="height:26px;width:65%"></div><div class="ssub">All platforms combined</div></div>
+    <div class="sc"><div class="sl">Total Ad Spend</div><div class="sv shimmer" id="s-spend"></div><div class="ssub">All platforms combined</div></div>
   </div>
 
   <!-- ── SHOPIFY CARDS ── -->
@@ -299,11 +299,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div class="sg" id="statGrid" style="margin-bottom:20px">
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales</div><div class="sv amber shimmer" id="s-shopify-gross" style="height:26px;width:75%"></div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
-    <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts</div><div class="sv muted shimmer" id="s-shopify-discounts" style="height:26px;width:55%"></div><div class="ssub" id="s-shopify-discounts-sub">Total discounts given</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales</div><div class="sv amber shimmer" id="s-shopify-net" style="height:26px;width:70%"></div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev" style="height:26px;width:75%"></div><div class="ssub">Net after discounts</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders</div><div class="sv shimmer" id="s-ord" style="height:26px;width:55%"></div><div class="ssub">Orders in selected range</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales</div><div class="sv amber shimmer" id="s-shopify-gross"></div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
+    <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts</div><div class="sv muted shimmer" id="s-shopify-discounts"></div><div class="ssub" id="s-shopify-discounts-sub">Total discounts given</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales</div><div class="sv amber shimmer" id="s-shopify-net"></div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev"></div><div class="ssub">Net after discounts</div></div>
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders</div><div class="sv shimmer" id="s-ord"></div><div class="ssub">Orders in selected range</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns · <span id="returns-range-lbl">Range</span></div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
   </div>
 
@@ -315,11 +315,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div class="sg" style="margin-bottom:20px">
-    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered" style="height:26px;width:50%"></div><div class="ssub">MTD Achieved Value PKR</div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf" style="height:26px;width:55%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf" style="height:26px;width:45%"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub">MTD Achieved Value PKR</div></div>
+    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub">Value not count</div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub">Value not count</div></div>
   </div>
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
   <div class="sh" style="margin-top:4px">
@@ -1893,19 +1893,19 @@ function renderDailyStats(){
       const g=ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
       gross.textContent=g>0?'PKR '+fmt(g):'—';
       gross.className='sv amber';
+      gross.style.height='';gross.style.width='';
       const gs=document.getElementById('s-shopify-gross-sub');
       if(gs)gs.textContent='Before discounts';
     }
     if(net){
-      // net_sales = gross - discounts - returns (Shopify formula)
-      // Returns are fetched async — store gross+disc so we can recalculate when returns arrive
       const g=ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
       const disc=ordersData.reduce((s,o)=>s+parseFloat(o.total_discounts||0),0);
       const returns=window._shopifyReturnValue||0;
       const n=g-disc-returns;
-      window._netSalesBase={gross:g,disc:disc}; // store for recalc when returns load
+      window._netSalesBase={gross:g,disc:disc};
       net.textContent=n>0?'PKR '+fmt(n):'—';
       net.className='sv green';
+      net.style.height='';net.style.width='';
       const ns=document.getElementById('s-shopify-net-sub');
       if(ns)ns.textContent='After discounts & returns';
     }
@@ -1914,6 +1914,7 @@ function renderDailyStats(){
       const disc=ordersData.reduce((s,o)=>s+parseFloat(o.total_discounts||0),0);
       discEl.textContent=disc>0?'PKR '+fmt(disc):'—';
       discEl.className=disc>0?'sv orange':'sv muted';
+      discEl.style.height='';discEl.style.width='';
       const ds=document.getElementById('s-shopify-discounts-sub');
       if(ds)ds.textContent=disc>0?fmt(ordersData.filter(o=>parseFloat(o.total_discounts||0)>0).length)+' orders discounted':'No discounts';
     }
