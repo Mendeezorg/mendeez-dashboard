@@ -886,21 +886,19 @@ async function loadShopify(){
 }
 async function loadProducts(){
   try{
-    let allProds=[],pageInfo=null,hasMore=true,retries=0,pageNum=0;
+    let allProds=[],sinceId=null,hasMore=true,retries=0,pageNum=0;
     while(hasMore&&pageNum<=20){
-      // Shopify REST requires cursor-based pagination (page_info), not ?page=
       const base=`/products.json?limit=250&fields=id,title,product_type,status,variants,images`;
-      const url=pageInfo?`${base}&page_info=${pageInfo}`:base;
+      const url=sinceId?`${base}&since_id=${sinceId}`:base;
       try{
-        const resp=await shopFetch(url);
-        const batch=resp.products||[];
-        pageInfo=resp._nextPageInfo||null;
+        const d=await shopFetch(url);
+        const batch=d.products||[];
         if(batch.length===0){hasMore=false;break;}
         allProds=allProds.concat(batch);
         retries=0;
-        hasMore=!!(pageInfo&&batch.length===250);
+        sinceId=batch[batch.length-1].id; // cursor for next page
+        hasMore=batch.length===250;
         pageNum++;
-        // Update progressively and re-render if tab active or search typed
         allProducts=[...allProds];
         updateProductCounts();
         const _s=(document.getElementById('prodSearch')?.value||'').trim();
@@ -923,6 +921,7 @@ async function loadProducts(){
     if(search||skuSearch||document.getElementById('panel-products')?.classList.contains('active')){
       renderProducts();
     }
+    console.log('[Products] Loaded',allProducts.length,'products in',pageNum,'pages');
   }catch(e){console.error('loadProducts fatal:',e);}
 }
 
