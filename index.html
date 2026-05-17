@@ -726,59 +726,56 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch ALL orders for a date range
-// Strategy: pure since_id pagination with NO date filters (avoids Shopify conflict)
-// Fetch pages of 250 until we pass the end date, then JS-filter to the requested range
+// Strategy: paginate using created_at_min only — shift the window forward after each page
+// This avoids since_id conflicts and works regardless of Shopify sort order
 const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fetchAllOrders(from, to, onProgress){
-  const fromISO=toLocalISO(new Date(from));
-  const toISO=toLocalISO(new Date(to));
-  const fromTime=new Date(from).getTime();
   const toTime=new Date(to).getTime();
-
   let allOrders=[];
-  let sinceId=null;
-  let hasMore=true;
+  let windowStart=new Date(from);
+  windowStart.setMilliseconds(0);
   let guard=0;
-  let pastEnd=false;
+  let seenIds=new Set();
 
-  while(hasMore&&!pastEnd&&guard<200){
+  while(guard<200){
     guard++;
-    await _sleep(60);
-
-    // First page: use created_at_min to jump to start of range (no max — avoids conflict)
-    // Subsequent pages: pure since_id, no date filters at all
-    let url;
-    if(!sinceId){
-      url=`/orders.json?status=any&created_at_min=${fromISO}&limit=250&order=created_at+asc`;
-    } else {
-      url=`/orders.json?status=any&limit=250&order=created_at+asc&since_id=${sinceId}`;
-    }
-
+    await _sleep(80);
+    const url=`/orders.json?status=any&created_at_min=${toLocalISO(windowStart)}&created_at_max=${toLocalISO(new Date(to))}&limit=250`;
+    let batch=[];
     try{
       const d=await shopFetch(url);
-      const batch=d.orders||[];
-
-      if(batch.length===0){hasMore=false;break;}
-
-      // JS-filter: only keep orders within our range
-      const inRange=batch.filter(o=>{
-        const t=new Date(o.created_at).getTime();
-        return t>=fromTime&&t<=toTime;
-      });
-      allOrders=allOrders.concat(inRange);
-
-      // Stop if last order in batch is already past our end date
-      const lastOrderTime=new Date(batch[batch.length-1].created_at).getTime();
-      if(lastOrderTime>toTime){pastEnd=true;break;}
-
-      if(batch.length<250){hasMore=false;}
-      else{sinceId=batch[batch.length-1].id;}
-
-      if(onProgress) onProgress(allOrders.length);
+      batch=d.orders||[];
     }catch(e){
       console.error('fetchAllOrders error:',e.message);
-      hasMore=false;
+      break;
     }
+
+    if(batch.length===0) break;
+
+    // Deduplicate and collect
+    let newCount=0;
+    for(const o of batch){
+      if(!seenIds.has(o.id)){
+        seenIds.add(o.id);
+        allOrders.push(o);
+        newCount++;
+      }
+    }
+    if(onProgress) onProgress(allOrders.length);
+
+    // If we got fewer than 250, we have everything
+    if(batch.length<250) break;
+
+    // If no new orders were added (all duplicates), we're stuck — stop
+    if(newCount===0) break;
+
+    // Advance window: set created_at_min to earliest timestamp in this batch
+    // (batch is newest-first by default, so last item is oldest)
+    const oldestInBatch=batch[batch.length-1].created_at;
+    const newStart=new Date(oldestInBatch);
+    // If window didn't advance, break to avoid infinite loop
+    if(newStart.getTime()<=windowStart.getTime()) break;
+    windowStart=newStart;
   }
 
   return allOrders;
