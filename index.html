@@ -514,6 +514,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <option value="stock_desc">Highest total stock first</option>
         <option value="stock_asc">Lowest stock first (clearance)</option>
         <option value="variants_desc">Most variants in stock first</option>
+        <option value="price_desc">Highest price first</option>
+        <option value="price_asc">Lowest price first</option>
       </select>
       <button class="btn btn-p btn-sm" style="margin-top:8px;width:100%" onclick="runSort()">▶ Auto-Sort</button>
     </div>
@@ -2922,6 +2924,7 @@ async function loadSorterCollection(){
 
     _sorterProds=prods;
     _lockedIds=new Set(); // clear locks when new collection loaded
+    _selectedIds=new Set(); // clear selection too
     document.getElementById('sortCount').textContent=prods.length+' products';
     sts.textContent='✓ '+prods.length+' products — showing current Shopify order. Drag to reorder.';
     document.getElementById('applyToShopifyBtn').style.display='block';
@@ -2932,15 +2935,21 @@ function renderSorterGrid(){
   const el=document.getElementById('sortResults');
   if(!_sorterProds.length){el.innerHTML='<div class="nodata">No products</div>';return;}
 
+  const lockedCount=_lockedIds.size;
+  const selectedCount=_selectedIds.size;
+
   el.innerHTML=`
     <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:11px;font-family:var(--mono);color:var(--muted);flex-wrap:wrap">
-      <span>👆 Drag cards to reorder · 🔒 Lock a card to pin its position during Auto-Sort</span>
-      <span style="margin-left:auto">
-        <span style="color:var(--green)">${_sorterProds.filter(p=>_lockedIds.has(p.id)).length} locked</span>
-        <span style="color:var(--muted);margin:0 4px">·</span>
-        ${_sorterProds.length} total
+      <span>👆 Drag to reorder · Ctrl+Click to multi-select · 🔒 Lock to pin position</span>
+      <span style="margin-left:auto;display:flex;gap:10px">
+        ${selectedCount>0?`<span style="color:var(--blue);font-weight:600">${selectedCount} selected</span>`:''}
+        ${lockedCount>0?`<span style="color:var(--accent)">${lockedCount} locked</span>`:''}
+        <span style="color:var(--muted)">${_sorterProds.length} total</span>
       </span>
     </div>
+    ${selectedCount>0?`<div style="margin-bottom:10px;padding:8px 12px;background:var(--blue-dim);border:1px solid var(--blue);border-radius:6px;font-size:11px;font-family:var(--mono);color:var(--blue)">
+      ${selectedCount} product${selectedCount!==1?'s':''} selected — drag any selected card to move them all together · <span style="cursor:pointer;text-decoration:underline" onclick="clearSelection()">Clear selection</span>
+    </div>`:''}
     <div id="sorterGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
       ${_sorterProds.map((p,i)=>{
         const variants=p.variants||[];
@@ -2954,17 +2963,26 @@ function renderSorterGrid(){
         const badgeTxt=allOut?'Out of Stock':lowStock?`${availV}/${totalV} sizes`:'In Stock';
         const price=parseFloat(variants[0]?.price||0);
         const locked=_lockedIds.has(p.id);
-        return`<div class="sorter-card${locked?' locked':''}" draggable="${!locked}" data-idx="${i}"
+        const selected=_selectedIds.has(p.id);
+        // Border: locked=amber, selected=blue, normal=border
+        const borderCol=locked?'var(--accent)':selected?'var(--blue)':'var(--border)';
+        const borderW=locked||selected?'2px':'1px';
+        return`<div class="sorter-card${locked?' locked':''}${selected?' s-selected':''}"
+          draggable="${!locked}"
+          data-idx="${i}"
+          onclick="sorterCardClick(event,${i},${p.id})"
           ondragstart="${locked?'':('sorterDragStart(event,'+i+')')}"
           ondragover="sorterDragOver(event,${i})"
           ondrop="sorterDrop(event,${i})"
           ondragend="sorterDragEnd(event)"
-          style="background:var(--surface);border:1.5px solid ${locked?'var(--accent)':'var(--border)'};border-radius:10px;overflow:hidden;cursor:${locked?'default':'grab'};user-select:none;transition:border-color .15s;position:relative;opacity:${locked?'1':'1'}">
+          style="background:var(--surface);border:${borderW} solid ${borderCol};border-radius:10px;overflow:hidden;cursor:${locked?'default':'grab'};user-select:none;transition:border-color .1s,transform .1s;position:relative;${selected?'box-shadow:0 0 0 2px var(--blue-dim)':''}">
           <!-- Position badge -->
           <div style="position:absolute;top:7px;left:7px;background:rgba(0,0,0,.7);color:#fff;font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;z-index:3">#${i+1}</div>
+          <!-- Selected checkmark -->
+          ${selected?`<div style="position:absolute;top:7px;left:7px;background:var(--blue);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;z-index:4">✓ ${i+1}</div>`:''}
           <!-- Lock button -->
-          <button onclick="toggleLock(${p.id})" title="${locked?'Unlock position':'Lock position'}"
-            style="position:absolute;top:7px;right:7px;z-index:3;background:${locked?'var(--accent)':'rgba(0,0,0,.55)'};border:none;border-radius:5px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;padding:0">
+          <button onclick="event.stopPropagation();toggleLock(${p.id})" title="${locked?'Unlock position':'Lock position'}"
+            style="position:absolute;top:7px;right:7px;z-index:3;background:${locked?'var(--accent)':'rgba(0,0,0,.55)'};border:none;border-radius:5px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${locked?'#000':'#fff'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               ${locked
                 ?'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
@@ -2995,6 +3013,24 @@ function renderSorterGrid(){
     </div>`;
 }
 
+// Ctrl+Click to select/deselect a card
+function sorterCardClick(e, idx, productId){
+  if(_lockedIds.has(productId)) return; // locked cards cant be selected
+  if(e.ctrlKey || e.metaKey){
+    // Ctrl/Cmd+Click — toggle selection
+    if(_selectedIds.has(productId)) _selectedIds.delete(productId);
+    else _selectedIds.add(productId);
+    renderSorterGrid();
+  } else if(!e.ctrlKey && !e.metaKey && _selectedIds.size === 0){
+    // Normal click with no selection active — do nothing (let drag handle it)
+  }
+}
+
+function clearSelection(){
+  _selectedIds.clear();
+  renderSorterGrid();
+}
+
 // Toggle lock on a product
 function toggleLock(productId){
   if(_lockedIds.has(productId)){
@@ -3007,16 +3043,66 @@ function toggleLock(productId){
   document.getElementById('sortSts').textContent=count>0?count+' product'+(count!==1?'s':'')+' locked — Auto-Sort will skip them':'No products locked';
 }
 
-function sorterDragStart(e,idx){_dragSrcIdx=idx;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
-function sorterDragOver(e){e.preventDefault();e.currentTarget.style.borderColor='var(--accent)';}
-function sorterDrop(e,targetIdx){
-  e.preventDefault();e.currentTarget.style.borderColor='';
-  if(_dragSrcIdx===null||_dragSrcIdx===targetIdx)return;
-  const moved=_sorterProds.splice(_dragSrcIdx,1)[0];_sorterProds.splice(targetIdx,0,moved);
-  _dragSrcIdx=null;renderSorterGrid();
-  document.getElementById('sortSts').textContent='✓ Reordered — click Apply to Shopify to save';
+function sorterDragStart(e,idx){
+  _dragSrcIdx=idx;
+  e.dataTransfer.effectAllowed='move';
+  // If dragging a selected card, all selected move together
+  // If dragging an unselected card, move just that one
+  if(!_selectedIds.has(_sorterProds[idx]?.id)){
+    _selectedIds.clear(); // dragging non-selected = move only that card
+  }
+  // Dim all selected cards
+  document.querySelectorAll('.sorter-card').forEach((el,i)=>{
+    if(_selectedIds.has(_sorterProds[i]?.id)||i===idx) el.style.opacity='0.4';
+  });
 }
-function sorterDragEnd(e){e.currentTarget.style.opacity='';e.currentTarget.style.borderColor='';_dragSrcIdx=null;document.querySelectorAll('.sorter-card').forEach(el=>el.style.borderColor='');}
+function sorterDragOver(e,targetIdx){
+  e.preventDefault();
+  document.querySelectorAll('.sorter-card').forEach(el=>el.style.borderColor='');
+  const el=document.querySelector(`.sorter-card[data-idx="${targetIdx}"]`);
+  if(el) el.style.borderColor='var(--accent)';
+}
+function sorterDrop(e,targetIdx){
+  e.preventDefault();
+  document.querySelectorAll('.sorter-card').forEach(el=>el.style.borderColor='');
+  if(_dragSrcIdx===null) return;
+
+  const selectedArr=[..._selectedIds];
+
+  if(selectedArr.length>1){
+    // Multi-move: extract all selected products, insert at target position
+    const toMove=_sorterProds.filter(p=>_selectedIds.has(p.id));
+    const remaining=_sorterProds.filter(p=>!_selectedIds.has(p.id));
+    // Find target position in remaining array
+    const targetProd=_sorterProds[targetIdx];
+    let insertAt=remaining.findIndex(p=>p.id===targetProd?.id);
+    if(insertAt===-1) insertAt=remaining.length;
+    // Insert moved products at target position
+    remaining.splice(insertAt,0,...toMove);
+    _sorterProds=remaining;
+    _selectedIds.clear();
+  } else {
+    // Single move
+    if(_dragSrcIdx===targetIdx){_dragSrcIdx=null;return;}
+    const moved=_sorterProds.splice(_dragSrcIdx,1)[0];
+    _sorterProds.splice(targetIdx,0,moved);
+  }
+
+  _dragSrcIdx=null;
+  renderSorterGrid();
+  document.getElementById('sortSts').textContent=
+    selectedArr.length>1
+      ?`✓ Moved ${selectedArr.length} products — click Apply to Shopify to save`
+      :'✓ Reordered — click Apply to Shopify to save';
+}
+function sorterDragEnd(e){
+  document.querySelectorAll('.sorter-card').forEach(el=>{
+    el.style.opacity='';
+    el.style.borderColor='';
+  });
+  _dragSrcIdx=null;
+}
+
 function runSort(){
   if(!_sorterProds.length){document.getElementById('sortSts').textContent='Select a collection first';return;}
   const rule=document.getElementById('sortRule').value;
@@ -3032,9 +3118,12 @@ function runSort(){
   });
 
   // Sort only the unlocked products
+  const gP=p=>parseFloat((p.variants||[{}])[0]?.price||0);
   unlocked.sort((a,b)=>{
     if(rule==='stock_asc')return gT(a)-gT(b);
     if(rule==='variants_desc')return gA(b)-gA(a);
+    if(rule==='price_desc')return gP(b)-gP(a);
+    if(rule==='price_asc')return gP(a)-gP(b);
     if(rule==='avail_desc'){const tA=(a.variants||[]).length,tB=(b.variants||[]).length,aA=gA(a),aB=gA(b),diff=aB-aA;if(diff!==0)return diff;return(aB===tB?1:0)-(aA===tA?1:0)||gT(b)-gT(a);}
     return gT(b)-gT(a);
   });
