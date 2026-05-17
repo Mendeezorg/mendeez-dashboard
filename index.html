@@ -733,7 +733,8 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch one chunk of orders using page_info pagination
-async function fetchChunk(fromISO, toISO){
+// onPage callback fires immediately after each page so dashboard can render without waiting
+async function fetchChunk(fromISO, toISO, onPage){
   let orders=[];
   let pageInfo=null;
   let guard=0;
@@ -748,6 +749,8 @@ async function fetchChunk(fromISO, toISO){
     const batch=d.orders||[];
     if(batch.length===0) break;
     orders=orders.concat(batch);
+    // Fire callback immediately with this page so progressive render doesn't wait for page 2+
+    if(onPage) onPage(batch);
     pageInfo=d._nextPageInfo||null;
     if(!pageInfo) break;
   }
@@ -783,11 +786,13 @@ async function fetchAllOrders(from, to, onProgress){
   console.log('fetchAllOrders: fetching',chunks.length,'chunks in parallel');
 
   // Fire all chunks simultaneously
+  // onPage fires per page (not per chunk) so even chunks needing page 2 render immediately
   let fetched=0;
   const results=await Promise.all(
-    chunks.map(c=>fetchChunk(toLocalISO(c.from),toLocalISO(c.to)).then(orders=>{
-      fetched+=orders.length;
-      if(onProgress) onProgress(fetched,orders); // pass chunk orders for progressive render
+    chunks.map(c=>fetchChunk(toLocalISO(c.from),toLocalISO(c.to),(page)=>{
+      fetched+=page.length;
+      if(onProgress) onProgress(fetched,page); // fires per page, not per chunk
+    }).then(orders=>{
       console.log('Chunk',c.from.toLocaleDateString(),'→',c.to.toLocaleDateString(),':',orders.length,'orders');
       return orders;
     }))
