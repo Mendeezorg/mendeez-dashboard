@@ -1662,22 +1662,20 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
   // sectionEnd from caller = start of NEXT month's block (or rows.length)
   // sectionStart = row where this month's header was found
   // Real data (ORDER STATUS, AGENTS) is in rows BEFORE sectionStart
-  const prevSectionStart = sectionEnd !== rows.length
-    ? Math.max(0, sectionStart - 200)   // bounded by previous month
-    : Math.max(0, sectionStart - 200);
-  const scanStart = prevSectionStart;
-  const scanEnd = Math.min(rows.length, sectionStart + 5); // include header row + a few below
+  const scanStart = Math.max(0, sectionStart);
+  // sectionEnd = start of NEXT month's section — scan the ENTIRE block for this month
+  const scanEnd = Math.min(rows.length, sectionEnd);
   console.log('[CS extract]', monthName, '| scanStart:', scanStart, 'scanEnd:', scanEnd, 'rows in window:', scanEnd-scanStart);
 
-  // Find date column for that month's "Dates" row
+  // Find date column for that month's "Dates" row — scan within the section
   let dateColIdx=-1;
   const now=new Date();
   const rangeDate2=getRange().from;
   const isCurrentMonth=(rangeDate2.getMonth()===now.getMonth()&&rangeDate2.getFullYear()===now.getFullYear());
   // For historical months always use the total column; for current month use today's day
-  for(let i=sectionStart;i<Math.min(sectionStart+60,rows.length);i++){
+  for(let i=scanStart;i<scanEnd;i++){
     const r=rows[i];
-    if(r[0]==='Dates'||r[1]==='Dates'||r[8]==='Dates'||r[9]==='Dates'){
+    if(r[0]==='Dates'||r[1]==='Dates'||r[8]==='Dates'||r[9]==='Dates'||r.includes('Dates')){
       const dp=r.findIndex(c=>c.trim()==='Dates');
       if(isCurrentMonth){
         dateColIdx=dp+now.getDate();
@@ -1729,38 +1727,74 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     if(rl.includes('mtd returns')&&!rl.includes('cf')&&!rl.includes('cf returns')){const v=achVal();if(v>0){result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}}
     if(rl.includes('cf returns')||rl.includes('returns cf')){const v=achVal();if(v>0){result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}}
 
-    // ── AGENTS: CS data is embedded in column 41 of the sheet ──
-    // Agent names appear as headers in col 41, metrics in col 41 of following rows
-    // Detect agent name in col 41 specifically
-    const col41=(r[41]||'').trim();
-    const col41L=col41.toLowerCase();
-    const isAgentNameInCol41=col41L.includes('abdullah')||col41L.includes('namra')||col41L.includes('nimra')||(col41L.startsWith('agent')&&col41L.length>7);
-    if(isAgentNameInCol41){
-      // Read next 5 rows' col41 values as: Chats, Inbound, Outbound, R/Returns, Complaints
-      const metrics=['chats','inbound','outbound','returns','complaints'];
+    // ── AGENTS: scan all columns for agent name patterns ──
+    // Agent names can appear in any column depending on sheet layout
+    // Common patterns: "Abdullah", "Namra", "Agent 1 A", "Agent 2 N" etc.
+    const agentNamePatterns=[/^agent\s*\d/i,/^(abdullah|namra|nimra|hamza|usman|ali|sara|sana|ayesha|kashif|waqas|bilal|noman)/i];
+    let agentColIdx=-1;
+    let agentName='';
+    for(let ci=0;ci<r.length;ci++){
+      const cell=(r[ci]||'').trim();
+      if(cell.length>2&&cell.length<50&&agentNamePatterns.some(rx=>rx.test(cell))){
+        agentColIdx=ci;agentName=cell;break;
+      }
+    }
+    // Also check col 41 explicitly as fallback (original hardcoded location)
+    if(agentColIdx===-1){
+      const col41=(r[41]||'').trim();
+      const col41L=col41.toLowerCase();
+      if(col41L.includes('abdullah')||col41L.includes('namra')||col41L.includes('nimra')||(col41L.startsWith('agent')&&col41L.length>7)){
+        agentColIdx=41;agentName=col41;
+      }
+    }
+    if(agentColIdx>=0&&agentName){
+      // Read next 5 rows' same column values as: Chats, Inbound, Outbound, R/Returns, Complaints
       const vals=[];
       for(let k=1;k<=5;k++){
         const nextRow=rows[i+k]||[];
-        vals.push(nc(nextRow[41])||0);
+        // Try to find numeric value in the same column or nearby columns
+        const v=nc(nextRow[agentColIdx])||nc(nextRow[agentColIdx+1])||0;
+        vals.push(v);
       }
-      result.agents.push({
-        name:col41,
-        chats:vals[0],inbound:vals[1],outbound:vals[2],
-        returns:vals[3],complaints:vals[4],
-        todayChats:0,todayOut:0
-      });
-      i+=5; continue; // skip the metric rows we just consumed
+      // Only add agent if at least one metric is non-zero
+      if(vals.some(v=>v>0)){
+        result.agents.push({
+          name:agentName,
+          chats:vals[0],inbound:vals[1],outbound:vals[2],
+          returns:vals[3],complaints:vals[4],
+          todayChats:0,todayOut:0
+        });
+        i+=5; continue; // skip the metric rows we just consumed
+      }
     }
 
-    // EWH — can be in any column
-    if(rowText.includes('e.com wh')||rowText.includes('ecom wh')||rowText.includes('f.com wh')){
-      // EWH data is either on same row or next row — read all numeric values
-      const dataRow=rows[i+1]||[];
-      const src=dataRow.some(c=>nc(c)>0)?dataRow:r;
-      const nums=src.map(nc).filter(v=>v>0);
-      result.ewh.exch=nums[0]||0;result.ewh.dispVal=nums[1]||0;
-      result.ewh.dispUnits=nums[2]||0;result.ewh.returnUnits=nums[3]||0;
-      i++;continue;
+    // EWH — can be in any column, scan multiple rows around the EWH header
+    if(rowText.includes('e.com wh')||rowText.includes('ecom wh')||rowText.includes('f.com wh')||rowText.includes('e.wh')){
+      // Try to find dispatch value, units, returns, exchanges in next 8 rows
+      // Look for labeled rows like "Total Dispatch Value", "Units Dispatched", "Return Units", "Exchanges"
+      let dispValFound=false,dispUnitsFound=false,returnUnitsFound=false,exchFound=false;
+      for(let wi=i;wi<Math.min(i+12,rows.length);wi++){
+        const wr=rows[wi];
+        const wt=wr.join(' ').toLowerCase();
+        const nums=wr.map(nc).filter(v=>v>0);
+        const lastNum=nums.length>0?nums[nums.length-1]:0;
+        const firstNum=nums.length>0?nums[0]:0;
+        if(!exchFound&&(wt.includes('exch')||wt.includes('exchange'))){result.ewh.exch=lastNum||firstNum;exchFound=true;}
+        if(!dispValFound&&(wt.includes('dispatch value')||wt.includes('disp value')||wt.includes('total dispatch'))){result.ewh.dispVal=lastNum||firstNum;dispValFound=true;}
+        if(!dispUnitsFound&&(wt.includes('dispatch unit')||wt.includes('disp unit')||wt.includes('unit dispatch'))){result.ewh.dispUnits=lastNum||firstNum;dispUnitsFound=true;}
+        if(!returnUnitsFound&&(wt.includes('return unit')||wt.includes('rtn unit'))){result.ewh.returnUnits=lastNum||firstNum;returnUnitsFound=true;}
+      }
+      // Fallback: if labeled rows not found, read the next data row numerically
+      if(!dispValFound&&!dispUnitsFound){
+        const dataRow=rows[i+1]||[];
+        const src=dataRow.some(c=>nc(c)>0)?dataRow:r;
+        const nums=src.map(nc).filter(v=>v>0);
+        if(nums.length>=1)result.ewh.exch=result.ewh.exch||nums[0];
+        if(nums.length>=2)result.ewh.dispVal=result.ewh.dispVal||nums[1];
+        if(nums.length>=3)result.ewh.dispUnits=result.ewh.dispUnits||nums[2];
+        if(nums.length>=4)result.ewh.returnUnits=result.ewh.returnUnits||nums[3];
+      }
+      continue;
     }
 
     // Cancel reasons — label can be in any column
@@ -1784,6 +1818,13 @@ function switchCSMonth(){
   const mtdHeader=document.getElementById('csMTDHeader');
   if(mtdHeader) mtdHeader.textContent=label+' — MTD Agent Performance';
 
+  // Also sync the overview month selector
+  const ovSel=document.getElementById('overviewMonthSel');
+  if(ovSel){
+    const opt=Array.from(ovSel.options).find(o=>o.value===label);
+    if(opt) opt.selected=true;
+  }
+
   if(allCsMonths[label]){
     csData=JSON.parse(JSON.stringify(allCsMonths[label]));
     renderCS();
@@ -1797,6 +1838,18 @@ function switchCSMonth(){
 
 
 function renderDailyStats(){
+  // ── Sync csData to the currently selected overview month ──
+  // This ensures the stats cards always reflect the chosen month, not stale data
+  const ovSel=document.getElementById('overviewMonthSel');
+  const ovVal=ovSel?.value||'';
+  if(ovVal&&allCsMonths[ovVal]){
+    // Only sync if csData doesn't already match (avoid unnecessary overwrite)
+    const csKey=Object.keys(allCsMonths).find(k=>allCsMonths[k]===csData);
+    if(csKey!==ovVal){
+      csData=JSON.parse(JSON.stringify(allCsMonths[ovVal]));
+    }
+  }
+
   const rev=ordersData.reduce((s,o)=>s+parseFloat(o.total_price||0),0);
   const ords=ordersData.length;
   const cntCrr=window._crrCnt||{dispatched:0,delivered:0,returned:0};
@@ -2307,24 +2360,25 @@ function renderProducts(){
   // If nothing loaded at all yet, show spinner
   if(allProducts.length===0){
     const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>${apiCount>0?apiCount.toLocaleString()+' products found — still downloading, results will appear as they load...':'Products loading from Shopify...'}</td></tr>`;
+    const hasSearch=(document.getElementById('prodSearch')?.value||'').trim().length>=2||(document.getElementById('skuSearch')?.value||'').trim().length>=1;
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>${apiCount>0?apiCount.toLocaleString()+' products found — still downloading, results will appear shortly...':'Products loading from Shopify...'}</td></tr>`;
     document.getElementById('prodCount').textContent='';
     return;
   }
 
-  // ── SEARCH GATE: require at least 2 chars before showing results ──
+  // ── SEARCH GATE: require at least 2 chars for name, 1 char for SKU ──
   if(!search && !skuSearch){
     const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
     document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" style="text-align:center;padding:48px 24px">
       <div style="font-size:32px;margin-bottom:12px">🔍</div>
       <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Search from ${apiCount>0?apiCount.toLocaleString():allProducts.length.toLocaleString()} products</div>
-      <div style="font-size:12px;color:var(--muted);font-family:var(--mono)">Type a product name or SKU above to see stock details</div>
+      <div style="font-size:12px;color:var(--muted);font-family:var(--mono)">Type a product name (2+ chars) or SKU to see stock details</div>
     </td></tr>`;
     document.getElementById('prodCount').textContent='—';
     return;
   }
-  if(search.length<2 && !skuSearch){
-    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:24px">Keep typing… (2+ characters to search)</td></tr>`;
+  if(search.length===1 && !skuSearch){
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:24px">Keep typing… (2+ characters for name search)</td></tr>`;
     document.getElementById('prodCount').textContent='';
     return;
   }
@@ -2954,20 +3008,13 @@ function switchOverviewMonth(){
   const sel=document.getElementById('overviewMonthSel');
   const val=sel?.value||'';
   if(!val)return;
-  
-  // Sync CS month selector
-  const csSel=document.getElementById('csMonthSel');
-  if(csSel){
-    const opt=Array.from(csSel.options).find(o=>o.value===val);
-    if(opt){opt.selected=true;switchCSMonth();}
-  }
-  
+
   // Parse month/year from label e.g. "May 2026"
   const parts=val.split(' ');
   const monthName=parts[0]?.toLowerCase();
   const year=parseInt(parts[1])||new Date().getFullYear();
   const monthIdx=['january','february','march','april','may','june','july','august','september','october','november','december'].indexOf(monthName);
-  
+
   if(monthIdx>=0){
     const from=new Date(year,monthIdx,1);
     const to=new Date(year,monthIdx+1,0,23,59,59);
@@ -2976,7 +3023,20 @@ function switchOverviewMonth(){
     _customFrom=_ld(from)+'T00:00:00';
     _customTo=_ld(to)+'T23:59:59';
   }
-  
+
+  // ── KEY FIX: update csData from allCsMonths for the selected month ──
+  // This ensures Returns MTD, Cancellations etc. on Overview tab match the chosen month
+  if(allCsMonths[val]){
+    csData=JSON.parse(JSON.stringify(allCsMonths[val]));
+  }
+
+  // Sync CS tab month selector
+  const csSel=document.getElementById('csMonthSel');
+  if(csSel){
+    const opt=Array.from(csSel.options).find(o=>o.value===val);
+    if(opt){opt.selected=true;}
+  }
+
   document.getElementById('todayDate').textContent=val;
   if(STORE&&STORE!=='demo'&&TOKEN) reloadShopifyData();
   else renderDailyStats();
