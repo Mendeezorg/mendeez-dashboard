@@ -414,7 +414,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <div class="alert al-blue"><div>ℹ</div><div>Pulled automatically from your Perf Report sheet. Shows MTD agent performance and today's date column data.</div></div>
   <!-- MTD SUMMARY -->
-  <div class="sh"><div class="st">MTD Agent Performance</div></div>
+  <div class="sh"><div class="st" id="csMTDHeader">MTD Agent Performance</div></div>
   <div class="tc" id="csAgentTable"><div class="ldrow"><span class="si"></span>Loading...</div></div>
   <!-- ORDER STATUS -->
   <div class="sh"><div class="st">Order Status MTD</div></div>
@@ -903,8 +903,11 @@ async function loadProducts(){
         updateProductCounts();
         const _s=(document.getElementById('prodSearch')?.value||'').trim();
         const _sk=(document.getElementById('skuSearch')?.value||'').trim();
-        if(_s||_sk||document.getElementById('panel-products')?.classList.contains('active')){
+        // Only render if there's an active search — else just show the search gate
+        if(_s||_sk){
           renderProducts();
+        } else if(document.getElementById('panel-products')?.classList.contains('active')){
+          renderProducts(); // shows the search-gate empty state
         }
         if(hasMore)await new Promise(r=>setTimeout(r,300));
       }catch(pageErr){
@@ -918,9 +921,8 @@ async function loadProducts(){
     updateProductCounts();
     const search=(document.getElementById('prodSearch')?.value||'').trim();
     const skuSearch=(document.getElementById('skuSearch')?.value||'').trim();
-    if(search||skuSearch||document.getElementById('panel-products')?.classList.contains('active')){
-      renderProducts();
-    }
+    // Always call renderProducts — it will show the search gate if no query entered
+    renderProducts();
     console.log('[Products] Loaded',allProducts.length,'products in',pageNum,'pages');
   }catch(e){console.error('loadProducts fatal:',e);}
 }
@@ -1582,6 +1584,12 @@ function processCS(rows){
 }
 
 function renderCS(){
+  // Sync header with selected month
+  const sel=document.getElementById('csMonthSel');
+  const monthLabel=sel?.value||'';
+  const mtdHeader=document.getElementById('csMTDHeader');
+  if(mtdHeader&&monthLabel) mtdHeader.textContent=monthLabel+' — MTD Agent Performance';
+
   // Agent table
   if(csData.agents.length){
     const rows=csData.agents.map(a=>`
@@ -1663,16 +1671,27 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
 
   // Find date column for that month's "Dates" row
   let dateColIdx=-1;
+  const now=new Date();
+  const rangeDate2=getRange().from;
+  const isCurrentMonth=(rangeDate2.getMonth()===now.getMonth()&&rangeDate2.getFullYear()===now.getFullYear());
+  // For historical months always use the total column; for current month use today's day
   for(let i=sectionStart;i<Math.min(sectionStart+60,rows.length);i++){
     const r=rows[i];
     if(r[0]==='Dates'||r[1]==='Dates'||r[8]==='Dates'||r[9]==='Dates'){
       const dp=r.findIndex(c=>c.trim()==='Dates');
-      // For historical months, use the last day (Total col) — use today's day for current month
-      const now=new Date();
-      const day=now.getDate();
-      dateColIdx=dp+day; break;
+      if(isCurrentMonth){
+        dateColIdx=dp+now.getDate();
+      } else {
+        // Historical month: find the "Total" column or use the last numeric column
+        const totIdx=r.findIndex(c=>c.trim().toLowerCase()==='total');
+        dateColIdx=totIdx>dp?totIdx:dp+31; // fallback to col 31 (last day of month)
+      }
+      break;
     }
-    if(r[2]==='1'&&r[3]==='2'&&r[4]==='3'){dateColIdx=2+(new Date().getDate()-1);break;}
+    if(r[2]==='1'&&r[3]==='2'&&r[4]==='3'){
+      dateColIdx=isCurrentMonth?2+(now.getDate()-1):r.findIndex(c=>c.trim().toLowerCase()==='total')||r.length-1;
+      break;
+    }
   }
 
   const getTotCol=(row)=>{
@@ -1760,11 +1779,18 @@ function switchCSMonth(){
   if(!sel)return;
   const label=sel.value;
   if(!label)return;
+
+  // Update the MTD header to reflect the selected month
+  const mtdHeader=document.getElementById('csMTDHeader');
+  if(mtdHeader) mtdHeader.textContent=label+' — MTD Agent Performance';
+
   if(allCsMonths[label]){
     csData=JSON.parse(JSON.stringify(allCsMonths[label]));
     renderCS();
+    // Update the subtitle
+    const dsub=document.querySelector('#panel-cs .dsub');
+    if(dsub) dsub.textContent='Showing: '+label+' MTD data · From Perf Report sheet';
   } else if(_csRows.length){
-    // Try to re-parse if we have raw rows but no cached month
     processCS(_csRows);
   }
 }
@@ -2282,6 +2308,23 @@ function renderProducts(){
   if(allProducts.length===0){
     const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
     document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:30px"><span class="si"></span>${apiCount>0?apiCount.toLocaleString()+' products found — still downloading, results will appear as they load...':'Products loading from Shopify...'}</td></tr>`;
+    document.getElementById('prodCount').textContent='';
+    return;
+  }
+
+  // ── SEARCH GATE: require at least 2 chars before showing results ──
+  if(!search && !skuSearch){
+    const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" style="text-align:center;padding:48px 24px">
+      <div style="font-size:32px;margin-bottom:12px">🔍</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Search from ${apiCount>0?apiCount.toLocaleString():allProducts.length.toLocaleString()} products</div>
+      <div style="font-size:12px;color:var(--muted);font-family:var(--mono)">Type a product name or SKU above to see stock details</div>
+    </td></tr>`;
+    document.getElementById('prodCount').textContent='—';
+    return;
+  }
+  if(search.length<2 && !skuSearch){
+    document.getElementById('prodTbl').innerHTML=`<tr><td colspan="3" class="nodata" style="padding:24px">Keep typing… (2+ characters to search)</td></tr>`;
     document.getElementById('prodCount').textContent='';
     return;
   }
