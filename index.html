@@ -587,7 +587,7 @@ let allCrr=[],filtCrr=[],crrPage=1;
 const PAGE=50;
 let adsLatest=null,adsTrend=[],adsIdx=null;
 let csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
-let _csDateMode='mtd'; // 'mtd' or 'custom'
+let _productsFullyLoaded=false;
 let allCsMonths={};   // keyed by "May 2026" label → csData snapshot
 let _csRows=[];       // raw sheet rows saved for re-parsing on month switch
 
@@ -918,12 +918,13 @@ async function loadShopify(){
   }
 }
 async function loadProducts(){
+  _productsFullyLoaded=false;
   try{
     let allProds=[],sinceId=null,hasMore=true,retries=0,pageNum=0;
     // No hard page cap — load ALL products regardless of catalog size
     // 250 per page × unlimited pages = full catalog always loaded
     while(hasMore){
-      const base=`/products.json?limit=250&fields=id,title,product_type,status,variants,images,tags`;
+      const base=`/products.json?limit=250&order=id+asc&fields=id,title,product_type,status,variants,images,tags`;
       const url=sinceId?`${base}&since_id=${sinceId}`:base;
       try{
         const d=await shopFetch(url);
@@ -954,6 +955,7 @@ async function loadProducts(){
       }
     }
     allProducts=allProds;
+    _productsFullyLoaded=true;
     updateProductCounts();
     // Final render — show full results or search gate
     renderProducts();
@@ -2338,7 +2340,7 @@ function renderProducts(){
 
   // Track whether products are still loading in background
   const apiCount=parseInt(document.getElementById('totalProductCount')?.textContent?.replace(/,/g,'')||'0');
-  const stillLoading=apiCount>0&&allProducts.length<apiCount;
+  const stillLoading=!_productsFullyLoaded;
 
   // If nothing loaded at all yet, show spinner — but only if no search typed
   if(allProducts.length===0){
@@ -2816,10 +2818,15 @@ window.addEventListener('load',()=>{
 // ═══ PRODUCT COUNTS ═══
 async function fetchProductCounts(){
   try{
-    const [pc,vc]=await Promise.all([shopFetch('/products/count.json?status=active'),shopFetch('/variants/count.json')]);
-    const e1=document.getElementById('totalProductCount'),e2=document.getElementById('totalSkuCount');
-    if(e1&&pc.count!=null)e1.textContent=pc.count.toLocaleString();
+    const vc=await shopFetch('/variants/count.json');
+    const e2=document.getElementById('totalSkuCount');
     if(e2&&vc.count!=null)e2.textContent=vc.count.toLocaleString();
+    // Only update product count if loadProducts hasn't finished yet
+    if(!_productsFullyLoaded){
+      const pc=await shopFetch('/products/count.json');
+      const e1=document.getElementById('totalProductCount');
+      if(e1&&pc.count!=null)e1.textContent=pc.count.toLocaleString();
+    }
   }catch(e){console.log('counts:',e.message);}
 }
 function updateProductCounts(){
