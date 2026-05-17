@@ -729,19 +729,43 @@ async function shopFetch(ep,method,body){
   return parsed;
 }
 
-// ONE request — the Cloudflare Worker handles all Shopify pagination server-side
-// and returns a single flat {orders:[...]} response. Nothing to loop over here.
+// Client-side pagination — fetches 250 orders per request, yields UI between pages
+// This prevents browser freeze on large date ranges (e.g. MTD = 1000+ orders)
 async function fetchAllOrders(from, to, onProgress){
   const fromISO = toLocalISO(from);
   const toISO   = toLocalISO(to);
-  const url = `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
-  let d;
-  try{ d = await shopFetch(url); }
-  catch(e){ console.error('fetchAllOrders error:',e.message); return []; }
-  const orders = d.orders || [];
-  if(onProgress) onProgress(orders.length, orders);
-  console.log('fetchAllOrders done:',orders.length,'orders (all fetched by Worker)');
-  return orders;
+  let allOrders = [];
+  let sinceId   = null;
+  let guard     = 0;
+  let hasMore   = true;
+
+  while(hasMore && guard < 100){
+    guard++;
+    // Build URL — use since_id cursor for pages 2+
+    const base = `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250&order=id+asc`;
+    const url  = sinceId ? base + `&since_id=${sinceId}` : base;
+    let d;
+    try{ d = await shopFetch(url); }
+    catch(e){ console.error('fetchAllOrders page',guard,'error:',e.message); break; }
+
+    const batch = d.orders || [];
+    allOrders = allOrders.concat(batch);
+
+    // Report progress after each page so UI stays responsive
+    if(onProgress) onProgress(allOrders.length, allOrders);
+
+    if(batch.length < 250){
+      hasMore = false; // last page
+    } else {
+      sinceId = batch[batch.length-1].id; // cursor for next page
+      hasMore = true;
+      // Yield to UI thread between pages — prevents browser freeze
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  console.log('fetchAllOrders done:',allOrders.length,'orders in',guard,'pages');
+  return allOrders;
 }
 // ═══════════ DATE RANGE STATE ═══════════
 let _preset='today', _customFrom=null, _customTo=null;
@@ -812,8 +836,16 @@ function applyCustom(){
   const tv=document.getElementById('dateTo').value;
   if(!fv||!tv){alert('Please select both From and To dates');return;}
   _preset='custom';
-  _customFrom=fv+'T00:00:00';
-  _customTo=tv+'T23:59:59';
+  // Parse date picker value (YYYY-MM-DD) as PKT midnight/end-of-day
+  // by using pktMidnight/pktEndOfDay so timezone is always consistent
+  const [fy,fm,fd]=fv.split('-').map(Number);
+  const [ty,tm,td]=tv.split('-').map(Number);
+  // Build a PKT-anchored UTC date for from (midnight PKT) and to (end of day PKT)
+  const fromPkt=new Date(Date.UTC(fy,fm-1,fd,0,0,0)); // treat as PKT wall clock
+  const toPkt  =new Date(Date.UTC(ty,tm-1,td,23,59,59));
+  // Subtract PKT offset to get real UTC
+  _customFrom=new Date(fromPkt.getTime()-PKT_OFFSET_MS).toISOString();
+  _customTo  =new Date(toPkt.getTime()  -PKT_OFFSET_MS).toISOString();
   document.querySelectorAll('.datebar .dp').forEach(b=>b.classList.remove('active'));
   document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
   applyDateRange();
@@ -841,8 +873,14 @@ async function reloadShopifyData(){
   document.getElementById('lastUpd').textContent='Loading...';
   setBadge('s','amber','Fetching orders...');
   try{
-    ordersData=await fetchAllOrders(from,to,(n)=>{
+    ordersData=await fetchAllOrders(from,to,(n, partialOrders)=>{
+      // Progressive rendering — update badge + stats after each page
       setBadge('s','amber',n+' orders...');
+      ordersData = partialOrders; // update global so renderDailyStats uses latest
+      // Only re-render lightweight stats (not full weekly top20) during loading
+      // to keep UI responsive without flooding the render loop
+      const countEl = document.getElementById('s-ord');
+      if(countEl){ countEl.textContent = n; countEl.className='sv'; }
     });
     setBadge('s','live',ordersData.length+' orders · '+rangeLabel());
     weeklyOrdersData=ordersData;
