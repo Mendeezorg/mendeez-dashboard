@@ -590,6 +590,7 @@ const PAGE=50;
 let adsLatest=null,adsTrend=[],adsIdx=null;
 let csData={agents:[],orderStatus:{},ewh:{},cancelReasons:[]};
 let _productsFullyLoaded=false;
+let _productById={}; // cache: id → product for O(1) lookup
 let allCsMonths={};   // keyed by "May 2026" label → csData snapshot
 let _csRows=[];       // raw sheet rows saved for re-parsing on month switch
 
@@ -889,10 +890,15 @@ async function reloadShopifyData(){
     document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
     if(_csRows.length){try{processCS(_csRows);}catch(e){console.warn('processCS error:',e.message);}}
     renderDailyStats();
-    renderWeeklyTop20();
-    renderNoSaleDiagnosis();
-    renderSpark();
-    document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+    // Defer heavy renders to next frame so UI stays responsive
+    setTimeout(()=>{
+      renderWeeklyTop20();
+      setTimeout(()=>{
+        renderNoSaleDiagnosis();
+        renderSpark();
+        document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+      },0);
+    },0);
   }catch(e){setBadge('s','error','Error');console.error(e);}
 }
 
@@ -956,6 +962,7 @@ async function loadProducts(){
       }
     }
     allProducts=allProds;
+    _productById=Object.fromEntries(allProds.map(p=>[p.id,p]));
     _productsFullyLoaded=true;
     updateProductCounts();
     // Final render — show full results or search gate
@@ -2219,87 +2226,42 @@ function renderWeeklyTop20(){
 }
 
 function renderNoSaleDiagnosis(){
-  // Products that exist in Shopify but had ZERO orders in last 7 days
+  // Pre-build sold set and typeCount ONCE — O(n) not O(n²)
   const soldIds=new Set();
-  const soldTitles=new Set();
-  weeklyOrdersData.forEach(o=>(o.line_items||[]).forEach(li=>{soldIds.add(li.product_id);soldTitles.add(li.title);}));
+  const typeCount={};
+  weeklyOrdersData.forEach(o=>(o.line_items||[]).forEach(li=>{
+    soldIds.add(li.product_id);
+    // build typeCount from line items using product lookup cache
+    const prod=_productById[li.product_id];
+    if(prod) typeCount[prod.product_type]=(typeCount[prod.product_type]||0)+1;
+  }));
 
   const noSale=allProducts.filter(p=>!soldIds.has(p.id)&&p.status==='active');
-
   if(!noSale.length){
     document.getElementById('noSaleTbl').innerHTML='<tr><td colspan="6" class="nodata">All active products had sales this week 🎉</td></tr>';
     return;
   }
 
-  // Diagnose each product
   const diagnosed=noSale.map(p=>{
     const stock=(p.variants||[]).reduce((s,v)=>s+(v.inventory_quantity||0),0);
     const availVariants=(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
     const totalVariants=(p.variants||[]).length;
     const price=parseFloat((p.variants||[{}])[0]?.price||0);
-    // images check only valid when connected to real Shopify (demo products have no images array)
-    const hasImages=STORE==='demo' ? true : (p.images||[]).length>0;
+    const hasImages=STORE==='demo'?true:(p.images||[]).length>0;
     const allOut=(p.variants||[]).every(v=>(v.inventory_quantity||0)===0);
-
-    // Score-based reason diagnosis
-    let reasons=[];
-    let action='';
-    let severity='pm'; // pill class
-
-    if(allOut){
-      reasons.push('All variants out of stock');action='Restock urgently';severity='pr';
-    } else if(stock<5){
-      reasons.push(`Only ${stock} units left — customers may not trust low stock`);
-      action='Restock soon';severity='pa';
-    }
-
-    if(availVariants<totalVariants/2&&totalVariants>1){
-      reasons.push(`${availVariants}/${totalVariants} variants in stock — key sizes missing`);
-      action=action||'Check size availability';severity=severity==='pm'?'pa':severity;
-    }
-
-    if(price>5000){
-      reasons.push('High price point — may need discount or bundle');
-      action=action||'Review pricing or bundle offer';severity=severity==='pm'?'pb':severity;
-    }
-
-    if(!hasImages){
-      reasons.push('No product images uploaded');
-      action=action||'Add product images immediately';severity='pr';
-    }
-
-    // Check if product type is a slow category based on weekly data
-    const typeCount={};
-    weeklyOrdersData.forEach(o=>(o.line_items||[]).forEach(li=>{
-      const prod=allProducts.find(pr=>pr.id===li.product_id);
-      if(prod){typeCount[prod.product_type]=(typeCount[prod.product_type]||0)+1;}
-    }));
-    const thisTypeTotal=typeCount[p.product_type]||0;
-    if(thisTypeTotal===0&&p.product_type){
-      reasons.push(`Whole category "${p.product_type}" has no sales this week`);
-      action=action||'Review category — may need campaign push';
-      severity=severity==='pm'?'pb':severity;
-    }
-
-    // New product with no history
-    const createdDaysAgo=Math.floor((Date.now()-new Date(p.created_at).getTime())/(86400*1000));
-    if(createdDaysAgo<14&&reasons.length===0){
-      reasons.push('New product — less than 2 weeks old, not enough exposure yet');
-      action='Push via ads or social';severity='pb';
-    }
-
-    // Default if no specific reason found
-    if(reasons.length===0){
-      reasons.push('Active but no traction — may need visibility boost');
-      action='Add to ads campaign or featured collection';severity='pb';
-    }
-
+    let reasons=[],action='',severity='pm';
+    if(allOut){reasons.push('All variants out of stock');action='Restock urgently';severity='pr';}
+    else if(stock<5){reasons.push(`Only ${stock} units left`);action='Restock soon';severity='pa';}
+    if(availVariants<totalVariants/2&&totalVariants>1){reasons.push(`${availVariants}/${totalVariants} variants in stock`);action=action||'Check size availability';severity=severity==='pm'?'pa':severity;}
+    if(price>5000){reasons.push('High price point');action=action||'Review pricing';severity=severity==='pm'?'pb':severity;}
+    if(!hasImages){reasons.push('No product images');action=action||'Add images immediately';severity='pr';}
+    // typeCount already built above — O(1) lookup
+    if((typeCount[p.product_type]||0)===0&&p.product_type){reasons.push(`Category "${p.product_type}" has no sales`);action=action||'Review category';severity=severity==='pm'?'pb':severity;}
+    const createdDaysAgo=Math.floor((Date.now()-new Date(p.created_at||Date.now()).getTime())/(86400*1000));
+    if(createdDaysAgo<14&&reasons.length===0){reasons.push('New product — less than 2 weeks old');action='Push via ads or social';severity='pb';}
+    if(reasons.length===0){reasons.push('Active but no traction');action='Add to ads campaign';severity='pb';}
     return{p,stock,price,reasons,action,severity};
-  }).sort((a,b)=>{
-    // Sort: out of stock first (urgent), then low stock, then others
-    const order={pr:0,pa:1,pb:2,pm:3};
-    return(order[a.severity]||3)-(order[b.severity]||3);
-  }).slice(0,25); // max 25 rows
+  }).sort((a,b)=>({pr:0,pa:1,pb:2,pm:3}[a.severity]||3)-({pr:0,pa:1,pb:2,pm:3}[b.severity]||3)).slice(0,25);
 
   document.getElementById('noSaleTbl').innerHTML=diagnosed.map(({p,stock,price,reasons,action,severity})=>{
     const stockLbl=stock===0?'Out of Stock':stock<5?`Low (${stock})`:stock<10?`${stock} left`:`${stock}`;
