@@ -726,53 +726,59 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch ALL orders for a date range
-// Strategy: 1-day chunks + since_id within the same day window if >250 orders in a day
+// Strategy: pure since_id pagination with NO date filters (avoids Shopify conflict)
+// Fetch pages of 250 until we pass the end date, then JS-filter to the requested range
 const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fetchAllOrders(from, to, onProgress){
+  const fromISO=toLocalISO(new Date(from));
+  const toISO=toLocalISO(new Date(to));
+  const fromTime=new Date(from).getTime();
+  const toTime=new Date(to).getTime();
+
   let allOrders=[];
+  let sinceId=null;
+  let hasMore=true;
+  let guard=0;
+  let pastEnd=false;
 
-  // Build 1-day chunks
-  const chunks=[];
-  let chunkStart=new Date(from);
-  chunkStart.setHours(0,0,0,0);
-  while(chunkStart<=to){
-    const chunkEnd=new Date(chunkStart);
-    chunkEnd.setHours(23,59,59,999);
-    const effectiveEnd=chunkEnd>to?new Date(to):chunkEnd;
-    chunks.push({from:new Date(chunkStart),to:new Date(effectiveEnd)});
-    chunkStart.setDate(chunkStart.getDate()+1);
-    chunkStart.setHours(0,0,0,0);
-  }
+  while(hasMore&&!pastEnd&&guard<200){
+    guard++;
+    await _sleep(60);
 
-  // Fetch each day — paginate within same day using since_id if needed
-  for(const chunk of chunks){
-    let dayOrders=[];
-    let sinceId=null;
-    let hasMore=true;
-    let guard=0;
-    while(hasMore&&guard<10){
-      guard++;
-      await _sleep(80);
-      // Always keep created_at_min/max fixed to THIS day — since_id stays scoped to the day
-      let url=`/orders.json?status=any&created_at_min=${toLocalISO(chunk.from)}&created_at_max=${toLocalISO(chunk.to)}&limit=250`;
-      if(sinceId) url+=`&since_id=${sinceId}`;
-      try{
-        const d=await shopFetch(url);
-        const batch=d.orders||[];
-        dayOrders=dayOrders.concat(batch);
-        if(batch.length<250){
-          hasMore=false;
-        } else {
-          // More orders exist in this same day — advance since_id within the day window
-          sinceId=batch[batch.length-1].id;
-        }
-      }catch(e){
-        console.error('fetchAllOrders day error:',e.message);
-        hasMore=false;
-      }
+    // First page: use created_at_min to jump to start of range (no max — avoids conflict)
+    // Subsequent pages: pure since_id, no date filters at all
+    let url;
+    if(!sinceId){
+      url=`/orders.json?status=any&created_at_min=${fromISO}&limit=250&order=created_at+asc`;
+    } else {
+      url=`/orders.json?status=any&limit=250&order=created_at+asc&since_id=${sinceId}`;
     }
-    allOrders=allOrders.concat(dayOrders);
-    if(onProgress) onProgress(allOrders.length);
+
+    try{
+      const d=await shopFetch(url);
+      const batch=d.orders||[];
+
+      if(batch.length===0){hasMore=false;break;}
+
+      // JS-filter: only keep orders within our range
+      const inRange=batch.filter(o=>{
+        const t=new Date(o.created_at).getTime();
+        return t>=fromTime&&t<=toTime;
+      });
+      allOrders=allOrders.concat(inRange);
+
+      // Stop if last order in batch is already past our end date
+      const lastOrderTime=new Date(batch[batch.length-1].created_at).getTime();
+      if(lastOrderTime>toTime){pastEnd=true;break;}
+
+      if(batch.length<250){hasMore=false;}
+      else{sinceId=batch[batch.length-1].id;}
+
+      if(onProgress) onProgress(allOrders.length);
+    }catch(e){
+      console.error('fetchAllOrders error:',e.message);
+      hasMore=false;
+    }
   }
 
   return allOrders;
