@@ -2853,40 +2853,23 @@ async function loadSorterCollection(){
   try{
     const collId=String(cat).replace('gid://shopify/Collection/','');
 
-    // STEP 1: Fetch collects — this gives us product_id + position in correct Shopify order
-    sts.textContent='Fetching positions...';
-    let allCollects=[];
-    let cu='/collects.json?collection_id='+collId+'&limit=250';
-    while(cu){
-      const d=await shopFetch(cu);
-      const b=d.collects||[];
-      allCollects=allCollects.concat(b);
-      if(b.length<250)cu=null;
-      else cu='/collects.json?collection_id='+collId+'&limit=250&since_id='+b[b.length-1].id;
-    }
-    // Sort collects by position — this is the true Shopify order
-    allCollects.sort((a,b)=>a.position-b.position);
-    const positionMap={}; // product_id → position
-    allCollects.forEach(c=>positionMap[String(c.product_id)]=c.position);
-
-    // STEP 2: Fetch all products in this collection
-    sts.textContent='Loading products...';
+    // Fetch products — Shopify returns them in current manual sort order for ALL collection types
+    sts.textContent='Loading products in current Shopify order...';
     let prods=[];
-    let url='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
-    while(url){
-      const d=await shopFetch(url);
+    // Use collection_id without since_id on first page to get correct sort order
+    // Then paginate with page_info cursor (link header) — preserves sort order
+    let nextUrl='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images';
+    let pageNum=0;
+    while(nextUrl){
+      pageNum++;
+      sts.textContent='Loading page '+pageNum+'...';
+      const d=await shopFetch(nextUrl);
       const batch=d.products||[];
       prods=prods.concat(batch);
-      if(batch.length<250)url=null;
-      else url='/products.json?collection_id='+collId+'&limit=250&since_id='+batch[batch.length-1].id+'&fields=id,title,product_type,status,variants,images';
+      if(batch.length<250){nextUrl=null;}
+      else{nextUrl='/products.json?collection_id='+collId+'&limit=250&fields=id,title,product_type,status,variants,images&since_id='+batch[batch.length-1].id;}
+      await new Promise(r=>setTimeout(r,0));
     }
-
-    // STEP 3: Sort products by their Shopify position using the collects map
-    prods.sort((a,b)=>{
-      const posA=positionMap[String(a.id)]||9999;
-      const posB=positionMap[String(b.id)]||9999;
-      return posA-posB;
-    });
 
     _sorterProds=prods;
     document.getElementById('sortCount').textContent=prods.length+' products';
@@ -2982,25 +2965,27 @@ async function applyCollectionSort(){
   btn.textContent='Applying...';btn.disabled=true;
   try{
     const collId=String(cat).replace('gid://shopify/Collection/','');
-    // Fetch all collects (collect_id maps product_id → position)
-    let allC=[];let cu='/collects.json?collection_id='+collId+'&limit=250';
-    while(cu){const d=await shopFetch(cu);const b=d.collects||[];allC=allC.concat(b);if(b.length<250)cu=null;else cu='/collects.json?collection_id='+collId+'&limit=250&since_id='+b[b.length-1].id;}
-    const cm={};allC.forEach(col=>cm[String(col.product_id)]=col.id);
-    // Send updates in batches of 5 concurrent requests — fast but doesn't hammer API
-    const BATCH=5;
+    // Use GraphQL collectionReorderProducts — works for ALL collection types (manual + smart)
+    // Build moves array: [{id: "gid://shopify/Product/123", newPosition: "0"}, ...]
+    const moves=_sorterProds.map((p,i)=>({
+      id:'gid://shopify/Product/'+p.id,
+      newPosition:String(i)
+    }));
+    const collGid='gid://shopify/Collection/'+collId;
+    // Send in batches of 250 (GraphQL limit per mutation)
+    const BATCH=250;
     let ok=0,fail=0;
-    for(let i=0;i<_sorterProds.length;i+=BATCH){
-      const slice=_sorterProds.slice(i,i+BATCH);
-      await Promise.all(slice.map(async(p,j)=>{
-        const cid=cm[String(p.id)];
-        if(!cid)return;
-        try{
-          await shopFetch('/collects/'+cid+'.json','PUT',{collect:{id:cid,position:i+j+1}});
-          ok++;
-        }catch(e){fail++;}
-      }));
-      sts.textContent=`Applying... ${Math.min(i+BATCH,_sorterProds.length)}/${_sorterProds.length}`;
-      await new Promise(r=>setTimeout(r,0)); // yield to UI
+    for(let i=0;i<moves.length;i+=BATCH){
+      const batch=moves.slice(i,i+BATCH);
+      sts.textContent=`Applying... ${Math.min(i+BATCH,moves.length)}/${moves.length}`;
+      const gql=`mutation{collectionReorderProducts(id:"${collGid}",moves:[${batch.map(m=>`{id:"${m.id}",newPosition:"${m.newPosition}"}`).join(',')}]){userErrors{field message}}}`;
+      try{
+        const d=await shopFetch('/graphql.json','POST',{query:gql});
+        const errs=d?.data?.collectionReorderProducts?.userErrors||[];
+        if(errs.length>0){fail++;console.warn('Reorder errors:',errs);}
+        else ok+=batch.length;
+      }catch(e){fail+=batch.length;console.error('Reorder batch error:',e.message);}
+      await new Promise(r=>setTimeout(r,0));
     }
     btn.textContent='✓ Applied!';btn.style.background='var(--green)';
     sts.textContent=`✓ Done! ${ok}/${_sorterProds.length} reordered on Shopify.${fail>0?' ('+fail+' skipped)':''}`;
