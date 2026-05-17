@@ -726,56 +726,52 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch ALL orders for a date range
-// Strategy: 3-day chunks to stay under 250 orders/chunk + page_info cursor pagination + sleep to prevent UI freeze
+// Strategy: 1-day chunks + since_id within the same day window if >250 orders in a day
 const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fetchAllOrders(from, to, onProgress){
   let allOrders=[];
 
-  // Build 3-day chunks (smaller = less likely to exceed 250, avoids pagination edge cases)
+  // Build 1-day chunks
   const chunks=[];
   let chunkStart=new Date(from);
+  chunkStart.setHours(0,0,0,0);
   while(chunkStart<=to){
     const chunkEnd=new Date(chunkStart);
-    chunkEnd.setDate(chunkEnd.getDate()+2);
     chunkEnd.setHours(23,59,59,999);
-    const effectiveEnd=chunkEnd>to?to:chunkEnd;
+    const effectiveEnd=chunkEnd>to?new Date(to):chunkEnd;
     chunks.push({from:new Date(chunkStart),to:new Date(effectiveEnd)});
-    chunkStart=new Date(effectiveEnd);
     chunkStart.setDate(chunkStart.getDate()+1);
     chunkStart.setHours(0,0,0,0);
   }
 
-  // Fetch each chunk sequentially
+  // Fetch each day — paginate within same day using since_id if needed
   for(const chunk of chunks){
-    let chunkOrders=[];
-    let nextPageInfo=null;
+    let dayOrders=[];
+    let sinceId=null;
     let hasMore=true;
     let guard=0;
-    while(hasMore&&guard<20){
+    while(hasMore&&guard<10){
       guard++;
-      await _sleep(50); // yield to browser — prevents "Page Unresponsive" crash
-      let url;
-      if(nextPageInfo){
-        // Cursor page: only page_info + limit (Shopify ignores date params here anyway)
-        url=`/orders.json?limit=250&page_info=${encodeURIComponent(nextPageInfo)}`;
-      } else {
-        url=`/orders.json?status=any&created_at_min=${toLocalISO(chunk.from)}&created_at_max=${toLocalISO(chunk.to)}&limit=250`;
-      }
+      await _sleep(80);
+      // Always keep created_at_min/max fixed to THIS day — since_id stays scoped to the day
+      let url=`/orders.json?status=any&created_at_min=${toLocalISO(chunk.from)}&created_at_max=${toLocalISO(chunk.to)}&limit=250`;
+      if(sinceId) url+=`&since_id=${sinceId}`;
       try{
         const d=await shopFetch(url);
         const batch=d.orders||[];
-        chunkOrders=chunkOrders.concat(batch);
-        if(d._nextPageInfo&&batch.length===250){
-          nextPageInfo=d._nextPageInfo;
-        } else {
+        dayOrders=dayOrders.concat(batch);
+        if(batch.length<250){
           hasMore=false;
+        } else {
+          // More orders exist in this same day — advance since_id within the day window
+          sinceId=batch[batch.length-1].id;
         }
       }catch(e){
-        console.error('fetchAllOrders chunk error:',e.message);
+        console.error('fetchAllOrders day error:',e.message);
         hasMore=false;
       }
     }
-    allOrders=allOrders.concat(chunkOrders);
+    allOrders=allOrders.concat(dayOrders);
     if(onProgress) onProgress(allOrders.length);
   }
 
