@@ -419,12 +419,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- ORDER STATUS -->
   <div class="sh"><div class="st">Order Status MTD</div></div>
   <div class="sg" id="csOrderStats">
-    <div class="sc"><div class="sl">Landed MTD</div><div class="sv shimmer" id="cs-landed" style="height:24px;width:70%"></div></div>
-    <div class="sc"><div class="sl">Dispatched MTD</div><div class="sv shimmer" id="cs-dispatched" style="height:24px;width:65%"></div></div>
     <div class="sc"><div class="sl">Delivered MTD</div><div class="sv shimmer" id="cs-delivered" style="height:24px;width:65%"></div></div>
-    <div class="sc"><div class="sl">Pending</div><div class="sv shimmer" id="cs-pending" style="height:24px;width:55%"></div></div>
     <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel" style="height:24px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="cs-cancel-cf" style="height:24px;width:55%"></div></div>
     <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns" style="height:24px;width:55%"></div></div>
+    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="cs-returns-cf" style="height:24px;width:55%"></div></div>
   </div>
   <!-- EWH WAREHOUSE -->
   <div class="sh"><div class="st">Warehouse (EWH) MTD</div></div>
@@ -1606,12 +1605,11 @@ function renderCS(){
 
   // Order stats
   const os=csData.orderStatus;
-  setV('cs-landed',os.landedVal?fPKR(os.landedVal):'—','amber');
-  setV('cs-dispatched',os.dispatched?fmt(os.dispatched):'—','blue');
-  setV('cs-delivered',os.delivered?fPKR(os.delivered):'—','green');
-  setV('cs-pending',os.pending?fmt(os.pending):'—','');
-  setV('cs-cancel',os.cancelMTDVal?fPKR(os.cancelMTDVal):'—','red');
-  setV('cs-returns',os.returnsMTDVal?fPKR(os.returnsMTDVal):'—','red');
+  setV('cs-delivered', os.delivered   ? fPKR(os.delivered)   : '—', 'green');
+  setV('cs-cancel',   os.cancelMTDVal? fPKR(os.cancelMTDVal): '—', 'red');
+  setV('cs-cancel-cf',os.cancelCFVal ? fPKR(os.cancelCFVal) : '—', 'red');
+  setV('cs-returns',  os.returnsMTDVal? fPKR(os.returnsMTDVal): '—', 'red');
+  setV('cs-returns-cf',os.returnsCFVal? fPKR(os.returnsCFVal): '—', 'red');
 
   // Warehouse
   const ewh=csData.ewh;
@@ -1695,61 +1693,45 @@ function extractCSDataForMonth(rows, sectionStart, monthName, sectionEnd){
     const firstCell=r.find(c=>c&&c.trim())||'';
     const firstCellL=firstCell.toLowerCase().trim();
 
-    // Order status — Sheet columns: [0:Label] [1:Total Target] [2:Target Till Date] [3:No Of Orders] [4:Achieved Value] [5:ACH%] [6:Units]
-    // Find label cell index first, then offset to get Achieved Value
+    // Order status — Sheet columns: [0:Label][1:Total Target][2:Target Till Date][3:No Of Orders][4:Achieved Value][5:ACH%][6:Units]
     const rl=rowText;
-    const labelIdx=r.findIndex(c=>{const cl=(c||'').toLowerCase().trim();return cl.includes('landed mtd')||cl.includes('delivered to customer')||cl.includes('cancelations')||cl.includes('mtd returns')||cl.includes('pending orders')||cl.includes('total dispatch')||cl.includes('total dispach');});
-    const achVal=()=>{
-      // Achieved Value is 4 cols after the label cell
-      if(labelIdx>=0&&nc(r[labelIdx+4])>0)return nc(r[labelIdx+4]);
-      // Fallback: find a value smaller than Total Target (second-largest number)
-      const nums=r.slice(1).map(nc).filter(v=>v>0).sort((a,b)=>b-a);
-      return nums[1]||nums[0]||0;
-    };
-    const cntVal=()=>{
-      if(labelIdx>=0&&nc(r[labelIdx+3])>0)return nc(r[labelIdx+3]);
-      return r.slice(1).map(nc).find(v=>v>0&&v<100000)||0;
-    };
-    if(rl.includes('landed mtd')){const v=achVal();result.orderStatus.landed=v;result.orderStatus.landedVal=v;}
-    if(rl.includes('total dispatch')||rl.includes('total dispach')||rl.includes('dispatched orders')){const v=cntVal();result.orderStatus.dispatched=v;}
-    if(rl.includes('delivered to customer')){const v=achVal();result.orderStatus.delivered=v;}
-    if(rl.includes('pending orders')){const v=cntVal();result.orderStatus.pending=v;}
-    if(rl.includes('cancelations mtd')&&!rl.includes('cf')){const v=achVal();result.orderStatus.cancelMTD=v;result.orderStatus.cancelMTDVal=v;result.orderStatus.cancel=v;}
-    if(rl.includes('cancelations cf')||rl.includes('cancellations cf')){const v=achVal();result.orderStatus.cancelCF=v;result.orderStatus.cancelCFVal=v;}
-    if(rl.includes('mtd returns')&&!rl.includes('cf')&&!rl.includes('cf returns')){const v=achVal();result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}
-    if(rl.includes('cf returns')||rl.includes('returns cf')){const v=achVal();result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}
+    const labelIdx=r.findIndex(c=>{const cl=(c||'').toLowerCase().trim();
+      return cl==='landed mtd'||cl.includes('delivered to customer')||cl.includes('cancelations mtd')||
+             cl.includes('cancelations cf')||cl.includes('mtd returns')||cl.includes('cf returns')||
+             cl.includes('pending orders')||cl.includes('total dispatch')||cl.includes('total dispach');
+    });
+    const achVal=()=>labelIdx>=0?nc(r[labelIdx+4])||nc(r[labelIdx+3])||0:0;
+    const cntVal=()=>labelIdx>=0?nc(r[labelIdx+3])||0:0;
+    if(rl.includes('landed mtd')){const v=achVal();if(v>0){result.orderStatus.landed=v;result.orderStatus.landedVal=v;}}
+    if(rl.includes('total dispatch')||rl.includes('total dispach')){const v=cntVal();if(v>0)result.orderStatus.dispatched=v;}
+    if(rl.includes('delivered to customer')){const v=achVal();if(v>0)result.orderStatus.delivered=v;}
+    if(rl.includes('pending orders')){const v=cntVal();if(v>0)result.orderStatus.pending=v;}
+    if(rl.includes('cancelations mtd')&&!rl.includes('cf')){const v=achVal();if(v>0){result.orderStatus.cancelMTD=v;result.orderStatus.cancelMTDVal=v;result.orderStatus.cancel=v;}}
+    if(rl.includes('cancelations cf')||rl.includes('cancellations cf')){const v=achVal();if(v>0){result.orderStatus.cancelCF=v;result.orderStatus.cancelCFVal=v;}}
+    if(rl.includes('mtd returns')&&!rl.includes('cf')&&!rl.includes('cf returns')){const v=achVal();if(v>0){result.orderStatus.returnsMTD=v;result.orderStatus.returnsMTDVal=v;result.orderStatus.returns=v;}}
+    if(rl.includes('cf returns')||rl.includes('returns cf')){const v=achVal();if(v>0){result.orderStatus.returnsCF=v;result.orderStatus.returnsCFVal=v;}}
 
-    // ── AGENTS: horizontal layout ──
-    // Each agent row: [...] [Agent Name (Abdullah/Namra)] [Chats] [Inbound] [Outbound] [R/Returns] [Solve Compl]
-    // Skip header rows (rows that contain "chats" or "inbound" as text labels)
-    const isAgentName=(c)=>{
-      const cl=(c||'').toLowerCase().trim();
-      return cl.includes('abdullah')||cl.includes('namra')||cl.includes('nimra')||
-             (cl.startsWith('agent')&&cl.length>7&&!cl.includes('agent performance'));
-    };
-    // Only process if this row has numbers (not a header row)
-    const rowHasNumbers=r.some(c=>c&&!isNaN(parseFloat((c||'').replace(/,/g,'')))&&parseFloat((c||'').replace(/,/g,''))>0);
-    const agentCellIdx=rowHasNumbers?r.findIndex(c=>isAgentName(c)):-1;
-    if(agentCellIdx>=0){
-      const agentName=r[agentCellIdx].trim();
-      // Read next 5 numeric cells after the agent name
-      let vals=[],k=agentCellIdx+1;
-      while(vals.length<5&&k<r.length){
-        const cell=(r[k]||'').trim();
-        // Push numeric value (0 for dash/empty)
-        vals.push(cell==='-'||cell==='—'||cell===''?0:nc(cell));
-        k++;
+    // ── AGENTS: CS data is embedded in column 41 of the sheet ──
+    // Agent names appear as headers in col 41, metrics in col 41 of following rows
+    // Detect agent name in col 41 specifically
+    const col41=(r[41]||'').trim();
+    const col41L=col41.toLowerCase();
+    const isAgentNameInCol41=col41L.includes('abdullah')||col41L.includes('namra')||col41L.includes('nimra')||(col41L.startsWith('agent')&&col41L.length>7);
+    if(isAgentNameInCol41){
+      // Read next 5 rows' col41 values as: Chats, Inbound, Outbound, R/Returns, Complaints
+      const metrics=['chats','inbound','outbound','returns','complaints'];
+      const vals=[];
+      for(let k=1;k<=5;k++){
+        const nextRow=rows[i+k]||[];
+        vals.push(nc(nextRow[41])||0);
       }
       result.agents.push({
-        name:agentName,
-        chats:vals[0]||0,
-        inbound:vals[1]||0,
-        outbound:vals[2]||0,
-        returns:vals[3]||0,
-        complaints:vals[4]||0,
+        name:col41,
+        chats:vals[0],inbound:vals[1],outbound:vals[2],
+        returns:vals[3],complaints:vals[4],
         todayChats:0,todayOut:0
       });
-      continue;
+      i+=5; continue; // skip the metric rows we just consumed
     }
 
     // EWH — can be in any column
