@@ -726,17 +726,17 @@ async function shopFetch(ep,method,body){
 }
 
 // Fetch ALL orders for a date range
-// Strategy: chunk by week — each week fetches ≤250 orders per call, no pagination needed
-// This avoids all since_id + order= conflicts and the 1000-order REST API limit
+// Strategy: 3-day chunks to stay under 250 orders/chunk + page_info cursor pagination + sleep to prevent UI freeze
+const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fetchAllOrders(from, to, onProgress){
   let allOrders=[];
 
-  // Build weekly chunks
+  // Build 3-day chunks (smaller = less likely to exceed 250, avoids pagination edge cases)
   const chunks=[];
   let chunkStart=new Date(from);
   while(chunkStart<=to){
     const chunkEnd=new Date(chunkStart);
-    chunkEnd.setDate(chunkEnd.getDate()+6);
+    chunkEnd.setDate(chunkEnd.getDate()+2);
     chunkEnd.setHours(23,59,59,999);
     const effectiveEnd=chunkEnd>to?to:chunkEnd;
     chunks.push({from:new Date(chunkStart),to:new Date(effectiveEnd)});
@@ -748,21 +748,27 @@ async function fetchAllOrders(from, to, onProgress){
   // Fetch each chunk sequentially
   for(const chunk of chunks){
     let chunkOrders=[];
-    let sinceId=null;
+    let nextPageInfo=null;
     let hasMore=true;
     let guard=0;
     while(hasMore&&guard<20){
       guard++;
-      let url=`/orders.json?status=any&created_at_min=${toLocalISO(chunk.from)}&created_at_max=${toLocalISO(chunk.to)}&limit=250`;
-      if(sinceId) url+=`&since_id=${sinceId}`;
+      await _sleep(50); // yield to browser — prevents "Page Unresponsive" crash
+      let url;
+      if(nextPageInfo){
+        // Cursor page: only page_info + limit (Shopify ignores date params here anyway)
+        url=`/orders.json?limit=250&page_info=${encodeURIComponent(nextPageInfo)}`;
+      } else {
+        url=`/orders.json?status=any&created_at_min=${toLocalISO(chunk.from)}&created_at_max=${toLocalISO(chunk.to)}&limit=250`;
+      }
       try{
         const d=await shopFetch(url);
         const batch=d.orders||[];
         chunkOrders=chunkOrders.concat(batch);
-        if(batch.length<250){
-          hasMore=false;
+        if(d._nextPageInfo&&batch.length===250){
+          nextPageInfo=d._nextPageInfo;
         } else {
-          sinceId=batch[batch.length-1].id;
+          hasMore=false;
         }
       }catch(e){
         console.error('fetchAllOrders chunk error:',e.message);
