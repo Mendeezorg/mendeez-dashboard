@@ -725,81 +725,45 @@ async function shopFetch(ep,method,body){
   return parsed;
 }
 
-// Fetch ALL orders for a date range — handles 1000+ orders correctly
-// Uses page_info cursor if worker passes Link header, falls back to created_at chunking
+// Fetch ALL orders for a date range
 async function fetchAllOrders(from, to, onProgress){
   let allOrders=[];
+  let sinceId=null;
+  let hasMore=true;
+  let guard=0;
 
-  // Strategy 1: Try page_info cursor pagination (needs worker to pass Link header)
-  try{
-    let pageInfo=null;
-    let hasMore=true;
-    let guard=0;
-    while(hasMore&&guard<40){
-      guard++;
-      let url;
-      if(pageInfo){
-        // page_info replaces all other params
-        url=`/orders.json?limit=250&page_info=${pageInfo}`;
-      } else {
-        url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250`;
-      }
+  while(hasMore && guard<100){
+    guard++;
+    let url=`/orders.json?status=any&created_at_min=${toLocalISO(from)}&created_at_max=${toLocalISO(to)}&limit=250&order=created_at+asc`;
+    if(sinceId) url+=`&since_id=${sinceId}`;
+
+    try{
       const d=await shopFetch(url);
       const batch=d.orders||[];
       allOrders=allOrders.concat(batch);
       if(onProgress) onProgress(allOrders.length);
-      if(d._nextPageInfo){
-        pageInfo=d._nextPageInfo;
-      } else if(batch.length<250){
+
+      if(batch.length<250){
         hasMore=false;
       } else {
-        // Worker not passing Link header — fall back to date chunking
-        throw new Error('NO_PAGE_INFO');
+        sinceId=batch[batch.length-1].id;
+      }
+    }catch(e){
+      console.error('fetchAllOrders error at guard',guard,':',e.message);
+      // Wait and retry once on error
+      await new Promise(r=>setTimeout(r,1500));
+      try{
+        const d=await shopFetch(url);
+        const batch=d.orders||[];
+        allOrders=allOrders.concat(batch);
+        if(onProgress) onProgress(allOrders.length);
+        if(batch.length<250){hasMore=false;}
+        else{sinceId=batch[batch.length-1].id;}
+      }catch(e2){
+        console.error('fetchAllOrders retry failed:',e2.message);
+        hasMore=false;
       }
     }
-    return allOrders;
-  } catch(e){
-    if(e.message!=='NO_PAGE_INFO') throw e;
-  }
-
-  // Strategy 2: Parallel day chunking — fetch multiple days simultaneously
-  // Much faster than sequential: 18 days at 3 parallel = 6 rounds instead of 18
-  console.log('Falling back to day-by-day chunking (parallel)...');
-  allOrders=[];
-  const totalDays=Math.ceil((to-from)/(86400*1000))+1;
-
-  // Build all day ranges first
-  const dayRanges=[];
-  for(let d=0;d<totalDays;d++){
-    const dayFrom=new Date(from);dayFrom.setDate(dayFrom.getDate()+d);dayFrom.setHours(0,0,0,0);
-    const dayTo=new Date(dayFrom);dayTo.setHours(23,59,59,999);
-    const effectiveTo=dayTo>to?to:dayTo;
-    dayRanges.push({dayFrom,effectiveTo});
-  }
-
-  // Fetch one day's orders
-  const fetchDay=async({dayFrom,effectiveTo})=>{
-    let dayOrders=[],sinceId=null,hasMore=true,guard=0;
-    while(hasMore&&guard<10){
-      guard++;
-      let url=`/orders.json?status=any&created_at_min=${toLocalISO(dayFrom)}&created_at_max=${toLocalISO(effectiveTo)}&limit=250`;
-      if(sinceId) url+=`&since_id=${sinceId}`;
-      const data=await shopFetch(url);
-      const batch=data.orders||[];
-      dayOrders=dayOrders.concat(batch);
-      if(batch.length<250){hasMore=false;}
-      else{sinceId=batch[batch.length-1].id;}
-    }
-    return dayOrders;
-  };
-
-  // Process in parallel batches of 5 days at a time (safe for rate limits)
-  const BATCH=5;
-  for(let i=0;i<dayRanges.length;i+=BATCH){
-    const chunk=dayRanges.slice(i,i+BATCH);
-    const results=await Promise.all(chunk.map(fetchDay));
-    results.forEach(r=>allOrders=allOrders.concat(r));
-    if(onProgress) onProgress(allOrders.length);
   }
   return allOrders;
 }
