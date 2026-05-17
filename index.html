@@ -732,28 +732,14 @@ async function shopFetch(ep,method,body){
   return parsed;
 }
 
-// Fetch one chunk of orders using page_info pagination
-// onPage callback fires immediately after each page so dashboard can render without waiting
+// Fetch one chunk of orders — single request, Worker handles all pagination server-side
 async function fetchChunk(fromISO, toISO, onPage){
-  let orders=[];
-  let pageInfo=null;
-  let guard=0;
-  while(guard<30){
-    guard++;
-    const url=pageInfo
-      ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
-      : `/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
-    let d;
-    try{d=await shopFetch(url);}
-    catch(e){console.error('fetchChunk error:',e.message);break;}
-    const batch=d.orders||[];
-    if(batch.length===0) break;
-    orders=orders.concat(batch);
-    // Fire callback immediately with this page so progressive render doesn't wait for page 2+
-    if(onPage) onPage(batch);
-    pageInfo=d._nextPageInfo||null;
-    if(!pageInfo) break;
-  }
+  const url=`/orders.json?status=any&created_at_min=${fromISO}&created_at_max=${toISO}&limit=250`;
+  let d;
+  try{d=await shopFetch(url);}
+  catch(e){console.error('fetchChunk error:',e.message);return[];}
+  const orders=d.orders||[];
+  if(onPage&&orders.length) onPage(orders);
   return orders;
 }
 
@@ -927,9 +913,16 @@ async function reloadShopifyData(){
 async function loadShopify(){
   try{
     const {from,to}=getRange();
-    // 1. Fetch orders first (critical path)
-    const allOrders=await fetchAllOrders(from,to,(n)=>{
+    // 1. Fetch orders with progressive rendering (same as reloadShopifyData)
+    let _liveOrders=[];
+    const allOrders=await fetchAllOrders(from,to,(n,page)=>{
       setBadge('s','amber',n+' orders...');
+      if(page&&page.length){
+        _liveOrders=_liveOrders.concat(page).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+        ordersData=_liveOrders;
+        renderDailyStats();
+        renderSpark();
+      }
     });
     ordersData=allOrders;
     setBadge('s','live',ordersData.length+' orders');
