@@ -4009,6 +4009,8 @@ function cgParseRows(rows, fileName){
     const vendor  =cols.vendor>=0&&row[cols.vendor]?String(row[cols.vendor]).trim():'MENDEEZ';
     const status  =cols.status>=0&&row[cols.status]?String(row[cols.status]).trim():'draft';
     if(!name&&!type&&!skuRaw&&!price)return;
+    // Skip instruction/note rows — they have text in SKU column instead of numbers
+    if(skuRaw && isNaN(parseInt(skuRaw.replace(/[^0-9]/g,''))))return;
     if(!name||!type||!sizesRaw||!skuRaw||!price){errors.push('Row '+(ri+headerIdx+2)+': incomplete — skipped');return;}
     const sizes=sizesRaw.split(/[,،\s]+/).map(s=>s.trim()).filter(Boolean);
     const skuPrefix=skuRaw.replace(/\d+$/,'');
