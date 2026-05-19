@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mendeez Ops Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -239,8 +238,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="tab" onclick="switchTab('cs',this)">CS & Confirmations</div>
   <div class="tab" onclick="switchTab('products',this)">Products & Stock</div>
   <div class="tab" onclick="switchTab('sorter',this)">Catalog Sorter</div>
-  <div class="tab" onclick="switchTab('converter',this)">📄 CSV Converter</div>
-  <div class="tab" onclick="switchTab('imgupload',this)">🖼 Image Uploader</div>
+  <div class="tab" onclick="switchTab('manual',this)">Manual Inputs</div>
+  <div class="tab" onclick="switchTab('report',this)">Daily Report</div>
 </div>
 
 <!-- DATE RANGE BAR -->
@@ -534,153 +533,43 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <div id="sortResults"></div>
 
-<!-- ══ CSV CONVERTER ══ -->
-<div class="panel" id="panel-converter">
-  <div class="ds">
-    <div><div class="dt">CSV Converter</div><div class="dsub">Upload Excel file → Generate Shopify-ready CSV</div></div>
-  </div>
-
-  <div class="alert al-blue" style="margin-bottom:16px">
-    <div>ℹ</div>
-    <div>Fill your Excel template with product details → upload here → download Shopify CSV → import in Shopify Admin → Products → Import. All 74 required columns included automatically.</div>
-  </div>
-
-  <!-- Steps -->
-  <div style="display:flex;gap:0;margin-bottom:18px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
-    <div style="flex:1;padding:10px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);border-right:1px solid var(--border);text-align:center;background:var(--surface)" id="cv-step1">
-      <div style="font-size:16px;font-weight:700;color:var(--accent)">①</div>Upload Excel
+<!-- ══ MANUAL INPUTS ══ -->
+<div class="panel" id="panel-manual">
+  <div class="ds"><div><div class="dt">Manual Inputs</div><div class="dsub">Shopify, Ads, Courier & CS are automatic — only log issue flags here</div></div></div>
+  <div class="alert al-green"><div>✓</div><div>All four data sources load automatically. Only log issue flags below. Takes ~2 minutes.</div></div>
+  <div class="two-col">
+    <div class="ic">
+      <div class="ict">Issue Flags <span class="ibg">MANUAL</span></div>
+      <div class="fg"><div class="fl">Stock Issues</div><input class="fi" id="i-stock" placeholder="e.g. Blue polo L/XL out of stock"></div>
+      <div class="fg"><div class="fl">Website Issues</div><input class="fi" id="i-web" placeholder="e.g. None"></div>
+      <div class="fg"><div class="fl">Courier Issues</div><input class="fi" id="i-crr" placeholder="e.g. BlueEx delay Karachi"></div>
+      <div class="fg"><div class="fl">Main Observation</div><input class="fi" id="i-obs" placeholder="e.g. AOV up 12% today"></div>
+      <button class="btn btn-p btn-sm" style="margin-top:6px" onclick="saveManual()">Save Flags</button>
     </div>
-    <div style="flex:1;padding:10px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);border-right:1px solid var(--border);text-align:center;background:var(--surface)" id="cv-step2">
-      <div style="font-size:16px;font-weight:700">②</div>Review Data
-    </div>
-    <div style="flex:1;padding:10px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);text-align:center;background:var(--surface)" id="cv-step3">
-      <div style="font-size:16px;font-weight:700">③</div>Download CSV
-    </div>
-  </div>
-
-  <!-- Drop zone -->
-  <div class="tc" style="margin-bottom:14px">
-    <div id="cvDropZone" onclick="document.getElementById('cvFileInput').click()"
-      style="border:2px dashed var(--border2);border-radius:8px;padding:40px;text-align:center;cursor:pointer;transition:all .2s">
-      <div style="font-size:36px;margin-bottom:10px">📊</div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:5px">Drop your Excel file here or click to browse</div>
-      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">.xlsx or .xls · Product Name, Category, Sizes, SKU, Price, Description columns</div>
-      <input type="file" id="cvFileInput" accept=".xlsx,.xls" style="display:none" onchange="cvHandleFile(this.files[0])">
-    </div>
-  </div>
-
-  <!-- File loaded info -->
-  <div id="cvFileInfo" style="display:none;margin-bottom:14px">
-    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
-      <span style="font-size:22px" id="cvFileIcon">📄</span>
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:600" id="cvFileName">—</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="cvFileMeta">—</div>
+    <div class="ic">
+      <div class="ict">CS Manual Override <span class="ibg">OPTIONAL</span></div>
+      <div class="alert al-amber" style="font-size:11px;margin-bottom:12px"><div>ℹ</div><div>CS data loads automatically from the sheet. Use these fields only if today's sheet hasn't been updated yet.</div></div>
+      <div class="fr">
+        <div class="fg"><div class="fl">Total Called</div><input class="fi" id="i-called" type="number" placeholder="e.g. 58"></div>
+        <div class="fg"><div class="fl">Confirmed</div><input class="fi" id="i-confirmed" type="number" placeholder="e.g. 54"></div>
       </div>
-      <button onclick="cvReset()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
-    </div>
-  </div>
-
-  <!-- Stats -->
-  <div id="cvStats" style="display:none;display:none;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-    <div class="sc"><div class="sl">Products</div><div class="sv green" id="cvStatProds">0</div></div>
-    <div class="sc"><div class="sl">CSV Rows</div><div class="sv amber" id="cvStatRows">0</div></div>
-    <div class="sc"><div class="sl">Errors</div><div class="sv red" id="cvStatErrs">0</div></div>
-    <div class="sc"><div class="sl">Status</div><div class="sv muted" id="cvStatStatus">—</div></div>
-  </div>
-
-  <!-- Errors -->
-  <div id="cvErrors" style="display:none;margin-bottom:14px"></div>
-
-  <!-- Preview table -->
-  <div id="cvPreview" style="display:none;margin-bottom:14px">
-    <div class="sh"><div class="st">Preview</div><div class="ss" id="cvPreviewNote"></div></div>
-    <div class="tc">
-      <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
-        <table>
-          <thead><tr id="cvPreviewHead" style="position:sticky;top:0;background:var(--surface2)"></tr></thead>
-          <tbody id="cvPreviewBody"></tbody>
-        </table>
+      <div class="fr">
+        <div class="fg"><div class="fl">Cancelled</div><input class="fi" id="i-cancelled" type="number" placeholder="e.g. 4"></div>
+        <div class="fg"><div class="fl">Returns</div><input class="fi" id="i-returns" type="number" placeholder="e.g. 11"></div>
       </div>
+      <button class="btn btn-p btn-sm" style="margin-top:6px" onclick="saveCSOverride()">Save CS Override</button>
     </div>
-  </div>
-
-  <!-- Generate button -->
-  <div id="cvGenWrap" style="display:none;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:3px">Ready to generate Shopify CSV</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="cvGenInfo">—</div>
-      </div>
-      <button class="btn btn-p" id="cvGenBtn" onclick="cvGenerate()" style="padding:10px 24px">⬇ Generate Shopify CSV</button>
-    </div>
-    <div id="cvGenResult" style="margin-top:12px;display:none"></div>
   </div>
 </div>
 
-<!-- ══ IMAGE UPLOADER ══ -->
-<div class="panel" id="panel-imgupload">
+<!-- ══ DAILY REPORT ══ -->
+<div class="panel" id="panel-report">
   <div class="ds">
-    <div><div class="dt">Image Uploader</div><div class="dsub">Bulk upload 500+ images → auto-matches to products by SKU</div></div>
+    <div><div class="dt">Daily Report</div><div class="dsub">Auto-built from Shopify + Sheet + Manual flags</div></div>
+    <button class="bcopy" id="copyBtn" onclick="copyReport()">⎘ Copy for WhatsApp</button>
   </div>
-
-  <div class="alert al-blue" style="margin-bottom:14px">
-    <div>ℹ</div>
-    <div>Name your images as <strong>SKU-Position.jpg</strong> — e.g. <strong style="color:var(--accent)">0024200-1.jpg</strong>, <strong style="color:var(--accent)">0024200-2.jpg</strong>, <strong style="color:var(--accent)">0024200-3.jpg</strong>, <strong style="color:var(--accent)">0024200-4.jpg</strong><br>
-    SKU = S size SKU of the product · 1=Front, 2=Side, 3=Side, 4=Back, 5=Extra · JPG, PNG, WEBP supported</div>
-  </div>
-
-  <!-- Image drop zone -->
-  <div class="tc" style="margin-bottom:14px">
-    <div id="imgDropZone" onclick="document.getElementById('imgFileInput').click()"
-      style="border:2px dashed var(--border2);border-radius:8px;padding:40px;text-align:center;cursor:pointer;transition:all .2s">
-      <div style="font-size:36px;margin-bottom:10px">🖼️</div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:5px">Drop all images here or click to browse</div>
-      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">500+ images supported · all at once · JPG · PNG · WEBP</div>
-      <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="imgHandleFiles(this.files)">
-    </div>
-  </div>
-
-  <!-- Image stats -->
-  <div id="imgStatsBar" style="display:none;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px">
-    <div class="sc"><div class="sl">Total Images</div><div class="sv blue" id="imgStTotal">0</div></div>
-    <div class="sc"><div class="sl">Matched</div><div class="sv green" id="imgStMatched">0</div></div>
-    <div class="sc"><div class="sl">Products</div><div class="sv green" id="imgStProds">0</div></div>
-    <div class="sc"><div class="sl">Unmatched</div><div class="sv amber" id="imgStUnmatched">0</div></div>
-    <div class="sc"><div class="sl">Status</div><div class="sv muted" id="imgStStatus">Ready</div></div>
-  </div>
-
-  <!-- Unmatched warning -->
-  <div id="imgUnmatchedWarn" style="display:none;margin-bottom:14px"></div>
-
-  <!-- Product preview grid -->
-  <div id="imgPreviewSection" style="display:none">
-    <div class="sh">
-      <div class="st">Matched Products</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-s btn-sm" onclick="imgReset()">✕ Clear</button>
-        <button class="btn btn-p btn-sm" id="imgUploadBtn" onclick="imgStartUpload()">↑ Upload All to Shopify</button>
-      </div>
-    </div>
-    <div id="imgProdGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px;margin-bottom:14px"></div>
-  </div>
-
-  <!-- Progress -->
-  <div id="imgProgressWrap" style="display:none;margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:6px">
-      <span id="imgProgLabel">Uploading...</span>
-      <span id="imgProgPct">0%</span>
-    </div>
-    <div style="height:7px;background:var(--border);border-radius:4px;overflow:hidden">
-      <div id="imgProgBar" style="height:100%;background:var(--accent);border-radius:4px;width:0%;transition:width .3s"></div>
-    </div>
-  </div>
-
-  <!-- Log -->
-  <div id="imgLogWrap" style="display:none">
-    <div class="sh"><div class="st">Upload Log</div></div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;max-height:280px;overflow-y:auto;font-family:var(--mono);font-size:11px;line-height:1.9" id="imgLogBox"></div>
-  </div>
+  <button class="btn btn-p btn-sm" onclick="buildReport()" style="margin-bottom:12px">↺ Generate Report</button>
+  <div class="rbox" id="reportBox" style="color:var(--muted)">Click Generate Report to build today's full report from all live data.</div>
 </div>
 
 </div><!-- end .content -->
@@ -3376,338 +3265,6 @@ function switchOverviewMonth(){
   document.getElementById('todayDate').textContent=val+' — MTD';
   if(STORE&&STORE!=='demo'&&TOKEN) reloadShopifyData();
   else renderDailyStats();
-}
-
-// ═══════════════════════════════════════════════════════════
-// CSV CONVERTER
-// ═══════════════════════════════════════════════════════════
-let _cvParsed=[];
-
-// Drag & drop for CSV converter
-document.addEventListener('DOMContentLoaded',()=>{
-  const cvDz=document.getElementById('cvDropZone');
-  if(cvDz){
-    cvDz.addEventListener('dragover',e=>{e.preventDefault();cvDz.style.borderColor='var(--accent)';});
-    cvDz.addEventListener('dragleave',()=>{cvDz.style.borderColor='var(--border2)';});
-    cvDz.addEventListener('drop',e=>{e.preventDefault();cvDz.style.borderColor='var(--border2)';const f=e.dataTransfer.files[0];if(f)cvHandleFile(f);});
-  }
-  const imgDz=document.getElementById('imgDropZone');
-  if(imgDz){
-    imgDz.addEventListener('dragover',e=>{e.preventDefault();imgDz.style.borderColor='var(--accent)';});
-    imgDz.addEventListener('dragleave',()=>{imgDz.style.borderColor='var(--border2)';});
-    imgDz.addEventListener('drop',e=>{e.preventDefault();imgDz.style.borderColor='var(--border2)';imgHandleFiles(e.dataTransfer.files);});
-  }
-});
-
-function cvSetStep(n){
-  [1,2,3].forEach(i=>{
-    const el=document.getElementById('cv-step'+i);
-    if(!el)return;
-    el.style.color=i<n?'var(--green)':i===n?'var(--accent)':'var(--muted)';
-    el.querySelector('div').style.color=i<n?'var(--green)':i===n?'var(--accent)':'var(--muted)';
-  });
-}
-
-function cvHandleFile(file){
-  if(!file||!file.name.match(/\.(xlsx|xls)$/i)){alert('Please upload an .xlsx or .xls file');return;}
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      cvProcessRows(rows,file.name);
-    }catch(err){alert('Could not read file: '+err.message);}
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function cvDetectColumns(headerRow){
-  const h=headerRow.map(c=>String(c||'').toLowerCase().trim());
-  const find=keys=>{
-    for(const k of keys){const i=h.findIndex(c=>c===k);if(i>=0)return i;}
-    for(const k of keys){const i=h.findIndex(c=>c.includes(k));if(i>=0)return i;}
-    return -1;
-  };
-  return{
-    name:    find(['product name','name','title']),
-    type:    find(['category / type','category','type','product type']),
-    sizes:   find(['sizes','size']),
-    sku:     find(['sku (s size)','sku']),
-    price:   find(['price (pkr)','price','selling price']),
-    compare: find(['compare at (pkr)','compare at','compare']),
-    tags:    find(['tags','tag']),
-    desc:    find(['description (html)','description','body (html)','body','desc']),
-    vendor:  find(['vendor','brand']),
-    status:  find(['status']),
-  };
-}
-
-function cvProcessRows(rows,fileName){
-  if(!rows||rows.length<2){alert('File is empty');return;}
-  let headerIdx=0;
-  for(let i=0;i<Math.min(10,rows.length);i++){
-    const j=rows[i].join('|').toLowerCase();
-    if(j.includes('product name')&&j.includes('sku')){headerIdx=i;break;}
-  }
-  const header=rows[headerIdx];
-  const cols=cvDetectColumns(header);
-  const missing=[];
-  if(cols.name<0)missing.push('Product Name');
-  if(cols.type<0)missing.push('Category/Type');
-  if(cols.sizes<0)missing.push('Sizes');
-  if(cols.sku<0)missing.push('SKU');
-  if(cols.price<0)missing.push('Price');
-  if(missing.length){
-    document.getElementById('cvErrors').style.display='block';
-    document.getElementById('cvErrors').innerHTML=`<div class="alert al-red"><div>✗</div><div>Missing columns: ${missing.join(', ')}</div></div>`;
-    return;
-  }
-  const dataRows=rows.slice(headerIdx+1);
-  _cvParsed=[];
-  const errors=[];
-  dataRows.forEach((row,ri)=>{
-    const name=String(row[cols.name]||'').trim();
-    const type=String(row[cols.type]||'').trim();
-    const sizesRaw=String(row[cols.sizes]||'').trim();
-    const skuRaw=String(row[cols.sku]||'').trim().replace(/^'+/,'');
-    const price=String(row[cols.price]||'').trim();
-    const compare=cols.compare>=0?String(row[cols.compare]||'').trim():'';
-    const tags=cols.tags>=0?String(row[cols.tags]||'').trim():'';
-    const desc=cols.desc>=0?String(row[cols.desc]||'').trim():'';
-    const vendor=cols.vendor>=0&&row[cols.vendor]?String(row[cols.vendor]).trim():'MENDEEZ';
-    const status=cols.status>=0&&row[cols.status]?String(row[cols.status]).trim():'draft';
-    if(!name&&!type&&!skuRaw&&!price)return;
-    const rowNum=ri+headerIdx+2;
-    if(!name)errors.push('Row '+rowNum+': Product Name empty');
-    if(!type)errors.push('Row '+rowNum+': Category empty');
-    if(!sizesRaw)errors.push('Row '+rowNum+': Sizes empty');
-    if(!skuRaw)errors.push('Row '+rowNum+': SKU empty');
-    if(!price)errors.push('Row '+rowNum+': Price empty');
-    if(!name||!type||!sizesRaw||!skuRaw||!price)return;
-    const sizes=sizesRaw.split(/[,،\s]+/).map(s=>s.trim()).filter(Boolean);
-    const skuPrefix=skuRaw.replace(/\d+$/,'');
-    const skuBase=parseInt(skuRaw.replace(skuPrefix,''))||0;
-    const skuPad=skuRaw.replace(skuPrefix,'').length||7;
-    _cvParsed.push({name,type,sizes,skuPrefix,skuBase,skuPad,price:String(parseFloat(price)||''),compare:compare?String(parseFloat(compare)||''):'',tags,desc,vendor,status});
-  });
-  const totalRows=_cvParsed.reduce((s,p)=>s+p.sizes.length,0);
-  // Show file info
-  document.getElementById('cvFileInfo').style.display='block';
-  document.getElementById('cvFileIcon').textContent=errors.length?'⚠️':'✅';
-  document.getElementById('cvFileName').textContent=fileName;
-  document.getElementById('cvFileMeta').textContent=_cvParsed.length+' products · '+totalRows+' rows · '+(errors.length?errors.length+' errors':'No errors');
-  // Stats
-  const statsEl=document.getElementById('cvStats');
-  statsEl.style.display='grid';
-  document.getElementById('cvStatProds').textContent=_cvParsed.length;
-  document.getElementById('cvStatRows').textContent=totalRows;
-  document.getElementById('cvStatErrs').textContent=errors.length;
-  document.getElementById('cvStatStatus').textContent=errors.length?'Has Errors':'Ready';
-  // Errors
-  if(errors.length){
-    document.getElementById('cvErrors').style.display='block';
-    document.getElementById('cvErrors').innerHTML=`<div class="alert al-red"><div>⚠</div><div><strong>${errors.length} error${errors.length!==1?'s':''}</strong><br>${errors.slice(0,8).map(e=>'• '+e).join('<br>')}${errors.length>8?'<br>...and '+(errors.length-8)+' more':''}</div></div>`;
-  }else{document.getElementById('cvErrors').style.display='none';}
-  // Preview
-  document.getElementById('cvPreviewHead').innerHTML='<th>#</th><th>Product Name</th><th>Type</th><th>Sizes</th><th>SKU(S)</th><th>Price</th><th>Compare At</th><th>Description</th><th>Status</th>';
-  document.getElementById('cvPreviewBody').innerHTML=_cvParsed.slice(0,20).map((p,i)=>{
-    const skuS=p.skuPrefix+String(p.skuBase).padStart(p.skuPad,'0');
-    return`<tr>
-      <td class="tm tmut">${i+1}</td>
-      <td style="font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</td>
-      <td class="tm tmut">${p.type}</td>
-      <td style="color:var(--accent);font-family:var(--mono)">${p.sizes.join(',')}</td>
-      <td class="tm">${skuS}</td>
-      <td class="tm">${p.price?'PKR '+parseInt(p.price).toLocaleString():'<span style="color:var(--muted2)">empty</span>'}</td>
-      <td class="tm tmut">${p.compare?'PKR '+parseInt(p.compare).toLocaleString():'—'}</td>
-      <td style="color:${p.desc?'var(--green)':'var(--muted2)'};font-size:11px">${p.desc?'✓ Has description':'empty'}</td>
-      <td class="tm tmut">${p.status}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('cvPreviewNote').textContent=_cvParsed.length+' products · '+totalRows+' rows'+(errors.length?' · '+errors.length+' skipped':'');
-  document.getElementById('cvPreview').style.display='block';
-  // Generate section
-  document.getElementById('cvGenWrap').style.display='block';
-  document.getElementById('cvGenInfo').textContent=_cvParsed.length+' products → '+totalRows+' CSV rows · all 74 Shopify columns · Design Code & images empty';
-  cvSetStep(2);
-}
-
-function cvMakeHandle(t){return t.toLowerCase().replace(/[^a-z0-9 -]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-');}
-function cvMakeSKU(p,si){return p.skuPrefix+String(p.skuBase+si).padStart(p.skuPad,'0');}
-
-const SHOPIFY_HEADERS=['Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published','Option1 Name','Option1 Value','Option1 Linked To','Option2 Name','Option2 Value','Option2 Linked To','Option3 Name','Option3 Value','Option3 Linked To','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Unit Price Total Measure','Unit Price Total Measure Unit','Unit Price Base Measure','Unit Price Base Measure Unit','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card','SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product','Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2','Google Shopping / Custom Label 3','Google Shopping / Custom Label 4','related products (product.metafields.custom.related_products)','EComposer product countdown end at (product.metafields.ecomposer.countdown)','EComposer product countdown start at (product.metafields.ecomposer.countdown_from)','Google: Custom Product (product.metafields.mm-google-shopping.custom_product)','Design Code (product.metafields.my_fields.design_code)','Product rating count (product.metafields.reviews.rating_count)','Activewear clothing features (product.metafields.shopify.activewear-clothing-features)','Activity (product.metafields.shopify.activity)','Age group (product.metafields.shopify.age-group)','Clothing accessory material (product.metafields.shopify.clothing-accessory-material)','Color (product.metafields.shopify.color-pattern)','Pants length type (product.metafields.shopify.pants-length-type)','Size (product.metafields.shopify.size)','Target gender (product.metafields.shopify.target-gender)','Complementary products (product.metafields.shopify--discovery--product_recommendation.complementary_products)','Related products (product.metafields.shopify--discovery--product_recommendation.related_products)','Related products settings (product.metafields.shopify--discovery--product_recommendation.related_products_display)','Search product boosts (product.metafields.shopify--discovery--product_search_boost.queries)','Variant Image','Variant Weight Unit','Variant Tax Code','Cost per item','Included / Pakistan','Price / Pakistan','Compare At Price / Pakistan','Status'];
-
-function cvGenerate(){
-  if(!_cvParsed.length)return;
-  const btn=document.getElementById('cvGenBtn');
-  btn.textContent='⏳ Generating...';btn.disabled=true;
-  setTimeout(()=>{
-    const rows=[SHOPIFY_HEADERS];
-    _cvParsed.forEach(p=>{
-      const handle=cvMakeHandle(p.name);
-      const seo='Buy '+p.name+' Online in Pakistan from Mendeez';
-      p.sizes.forEach((sz,si)=>{
-        const isFirst=si===0;
-        const sku=cvMakeSKU(p,si);
-        const row=new Array(SHOPIFY_HEADERS.length).fill('');
-        const s=(col,val)=>{const i=SHOPIFY_HEADERS.indexOf(col);if(i>=0)row[i]=String(val==null?'':val);};
-        s('Handle',handle);s('Title',isFirst?p.name:'');s('Body (HTML)',isFirst?(p.desc||''):'');
-        s('Vendor',isFirst?p.vendor:'');s('Type',isFirst?p.type:'');s('Tags',isFirst?p.tags:'');
-        s('Published','TRUE');s('Option1 Name','Size');s('Option1 Value',sz);
-        s('Variant SKU',sku);s('Variant Grams','0');s('Variant Inventory Tracker','shopify');
-        s('Variant Inventory Policy','deny');s('Variant Fulfillment Service','manual');
-        s('Variant Price',p.price);s('Variant Compare At Price',p.compare);
-        s('Variant Requires Shipping','TRUE');s('Variant Taxable','FALSE');
-        s('Variant Barcode',sku);s('Image Src','');s('Image Position',String(si+1));
-        s('Image Alt Text',isFirst?p.name+'-MENDEEZ':'');s('Gift Card','FALSE');
-        s('SEO Title',isFirst?seo:'');s('SEO Description',isFirst?seo:'');
-        s('Design Code (product.metafields.my_fields.design_code)','');
-        s('Variant Weight Unit','kg');s('Included / Pakistan',isFirst?'TRUE':'');
-        s('Price / Pakistan',p.price);s('Compare At Price / Pakistan',p.compare);s('Status',p.status);
-        rows.push(row);
-      });
-    });
-    const csv=rows.map(row=>row.map(cell=>{const s2=String(cell==null?'':cell);return(s2.includes(',')||s2.includes('"')||s2.includes('\n'))?'"'+s2.replace(/"/g,'""')+'"':s2;}).join(',')).join('\r\n');
-    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;
-    a.download='mendeez_'+_cvParsed.length+'products_'+new Date().toISOString().slice(0,10)+'.csv';
-    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-    const totalRows=rows.length-1;
-    document.getElementById('cvGenResult').style.display='block';
-    document.getElementById('cvGenResult').innerHTML='<div class="alert al-green"><div>✅</div><div><strong>CSV downloaded!</strong> '+_cvParsed.length+' products · '+totalRows+' rows · ready to import in Shopify Admin → Products → Import</div></div>';
-    btn.textContent='⬇ Generate Shopify CSV';btn.disabled=false;
-    cvSetStep(3);
-  },50);
-}
-
-function cvReset(){
-  _cvParsed=[];
-  ['cvFileInfo','cvStats','cvErrors','cvPreview','cvGenWrap'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
-  document.getElementById('cvFileInput').value='';
-  cvSetStep(1);
-}
-
-// ═══════════════════════════════════════════════════════════
-// IMAGE UPLOADER
-// ═══════════════════════════════════════════════════════════
-let _imgMatched={};
-let _imgUnmatched=[];
-
-function imgHandleFiles(fileList){
-  const files=Array.from(fileList).filter(f=>f.type.startsWith('image/')||f.name.match(/\.(jpg|jpeg|png|webp)$/i));
-  if(!files.length){alert('No image files found');return;}
-  _imgMatched={};_imgUnmatched=[];
-  files.forEach(f=>{
-    const nameNoExt=f.name.replace(/\.[^.]+$/,'');
-    const m=nameNoExt.match(/^(.+)-(\d+)$/);
-    if(!m){_imgUnmatched.push(f.name);return;}
-    const sku=m[1].trim();const pos=parseInt(m[2]);
-    if(pos<1||pos>10){_imgUnmatched.push(f.name);return;}
-    if(!_imgMatched[sku])_imgMatched[sku]={sku,productId:null,title:'Looking up...',images:[]};
-    _imgMatched[sku].images.push({file:f,pos});
-  });
-  Object.values(_imgMatched).forEach(p=>p.images.sort((a,b)=>a.pos-b.pos));
-  const matchedCount=Object.values(_imgMatched).reduce((s,p)=>s+p.images.length,0);
-  const prodCount=Object.keys(_imgMatched).length;
-  // Stats
-  const sb=document.getElementById('imgStatsBar');sb.style.display='grid';
-  document.getElementById('imgStTotal').textContent=files.length;
-  document.getElementById('imgStMatched').textContent=matchedCount;
-  document.getElementById('imgStProds').textContent=prodCount;
-  document.getElementById('imgStUnmatched').textContent=_imgUnmatched.length;
-  document.getElementById('imgStStatus').textContent='Ready';
-  // Unmatched
-  if(_imgUnmatched.length>0){
-    document.getElementById('imgUnmatchedWarn').style.display='block';
-    document.getElementById('imgUnmatchedWarn').innerHTML=`<div class="alert al-amber"><div>⚠</div><div><strong>${_imgUnmatched.length} images not matched</strong> — wrong filename format. Expected: SKU-1.jpg<br><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${_imgUnmatched.slice(0,5).map(n=>'• '+n).join('<br>')}${_imgUnmatched.length>5?'<br>...and '+(_imgUnmatched.length-5)+' more':''}</span></div></div>`;
-  }else{document.getElementById('imgUnmatchedWarn').style.display='none';}
-  imgRenderGrid();
-  imgLookupProducts();
-}
-
-function imgRenderGrid(){
-  document.getElementById('imgPreviewSection').style.display='block';
-  document.getElementById('imgProdGrid').innerHTML=Object.values(_imgMatched).map(p=>{
-    const thumbs=p.images.map(({file,pos})=>`<div style="text-align:center"><img src="${URL.createObjectURL(file)}" style="width:42px;height:42px;object-fit:cover;border-radius:4px;border:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--muted);margin-top:1px">#${pos}</div></div>`).join('');
-    const statusCol=p.productId?'var(--green)':p.title==='Not found'?'var(--red)':'var(--muted)';
-    const statusTxt=p.productId?'✓ Found in Shopify':p.title==='Not found'?'✗ Not in Shopify':'Searching...';
-    return`<div style="background:var(--surface2);border:1px solid ${p.productId?'var(--green)':p.title==='Not found'?'var(--red)':'var(--border)'};border-radius:8px;padding:10px 12px;transition:border-color .2s" id="imgcard-${p.sku}">
-      <div style="font-size:10px;font-family:var(--mono);color:var(--accent);margin-bottom:3px">${p.sku}</div>
-      <div style="font-size:11px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title}</div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${thumbs}</div>
-      <div style="font-size:10px;font-family:var(--mono);color:${statusCol}">${statusTxt} · ${p.images.length} img${p.images.length!==1?'s':''}</div>
-    </div>`;
-  }).join('');
-}
-
-async function imgLookupProducts(){
-  if(!STORE||!TOKEN)return;
-  let allProds=[],sinceId=null,hasMore=true;
-  try{
-    while(hasMore){
-      const url=`/products.json?limit=250&fields=id,title,variants${sinceId?'&since_id='+sinceId:''}`;
-      const d=await shopFetch(url);
-      const batch=d.products||[];
-      allProds=allProds.concat(batch);
-      hasMore=batch.length===250;
-      if(hasMore)sinceId=batch[batch.length-1].id;
-    }
-  }catch(e){console.error('imgLookup:',e.message);return;}
-  const skuMap={};
-  allProds.forEach(p=>(p.variants||[]).forEach(v=>{if(v.sku)skuMap[v.sku.trim()]={id:p.id,title:p.title};}));
-  let found=0,notFound=0;
-  Object.keys(_imgMatched).forEach(sku=>{
-    const match=skuMap[sku]||skuMap[sku.replace(/^0+/,'')];
-    if(match){_imgMatched[sku].productId=match.id;_imgMatched[sku].title=match.title;found++;}
-    else{_imgMatched[sku].title='Not found';notFound++;}
-  });
-  document.getElementById('imgStProds').textContent=found;
-  imgRenderGrid();
-}
-
-async function imgStartUpload(){
-  if(!STORE||!TOKEN){alert('Connect to Shopify first — credentials are loaded from your main dashboard connection');return;}
-  const toUpload=Object.values(_imgMatched).filter(p=>p.productId);
-  if(!toUpload.length){alert('No matched products found. Make sure you are connected to Shopify and SKUs match.');return;}
-  const totalImgs=toUpload.reduce((s,p)=>s+p.images.length,0);
-  let doneImgs=0,okProds=0,failProds=0;
-  document.getElementById('imgUploadBtn').disabled=true;
-  document.getElementById('imgProgressWrap').style.display='block';
-  document.getElementById('imgLogWrap').style.display='block';
-  document.getElementById('imgStStatus').textContent='Uploading';
-  const log=(msg,col='var(--muted)')=>{const el=document.getElementById('imgLogBox');el.innerHTML+=`<div style="color:${col}">${msg}</div>`;el.scrollTop=el.scrollHeight;};
-  const setProg=(done,total,label)=>{const pct=total>0?Math.round(done/total*100):0;document.getElementById('imgProgBar').style.width=pct+'%';document.getElementById('imgProgPct').textContent=pct+'%';document.getElementById('imgProgLabel').textContent=label;};
-  log('🚀 Starting upload — '+toUpload.length+' products · '+totalImgs+' images','var(--accent)');
-  for(const p of toUpload){
-    const card=document.getElementById('imgcard-'+p.sku);
-    if(card){card.style.borderColor='var(--accent)';card.querySelector('div:last-child').textContent='⏳ Uploading...';}
-    let ok=true;
-    for(const {file,pos} of p.images){
-      setProg(doneImgs,totalImgs,'Uploading "'+p.title+'" — image '+pos);
-      try{
-        const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
-        await shopFetch('/products/'+p.productId+'/images.json','POST',{image:{attachment:b64,filename:file.name,position:pos,alt:p.title+'-'+pos+'-MENDEEZ'}});
-        doneImgs++;
-        await new Promise(r=>setTimeout(r,0));
-      }catch(e){ok=false;log('  ✗ Img '+pos+' for "'+p.title+'": '+e.message.slice(0,60),'var(--red)');doneImgs++;}
-    }
-    if(ok){okProds++;log('✓ '+p.title+' — '+p.images.length+' images uploaded','var(--green)');if(card){card.style.borderColor='var(--green)';card.querySelector('div:last-child').textContent='✓ Done';card.querySelector('div:last-child').style.color='var(--green)';}}
-    else{failProds++;if(card){card.style.borderColor='var(--red)';}}
-  }
-  setProg(totalImgs,totalImgs,'Complete!');
-  document.getElementById('imgStStatus').textContent=failProds>0?'Done*':'Done ✓';
-  log('━━━━━━━━━━━━━━━━━━━━━━━','var(--muted2)');
-  log('Upload complete — '+okProds+' products ✓  '+failProds+' failed',failProds>0?'var(--accent)':'var(--green)');
-  document.getElementById('imgUploadBtn').disabled=false;
-}
-
-function imgReset(){
-  _imgMatched={};_imgUnmatched=[];
-  ['imgStatsBar','imgPreviewSection','imgProgressWrap','imgLogWrap','imgUnmatchedWarn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
-  document.getElementById('imgFileInput').value='';
-  document.getElementById('imgUploadBtn').disabled=false;
 }
 
 </script>
