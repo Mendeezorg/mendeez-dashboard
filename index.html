@@ -602,7 +602,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <div style="font-size:28px;margin-bottom:6px">🖼️</div>
           <div style="font-size:12px;font-weight:600;margin-bottom:3px">Drop all images here or click to browse</div>
           <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">500+ images · JPG · PNG · WEBP · all at once</div>
-          <input type="file" id="upImgInput" accept="image/*" multiple style="display:none" onchange="upHandleImages(this.files)">
+          <input type="file" id="upImgInput" accept="image/*,.jfif,.jfif" multiple style="display:none" onchange="upHandleImages(this.files)">
         </div>
 
         <div id="upImgStatus" style="display:none;margin-bottom:10px">
@@ -3530,7 +3530,8 @@ function upParseCSV(rows, fileName){
     const skuRaw  = String(row[cols.sku]   ||'').trim().replace(/^'+/,'');
     const price   = String(row[cols.price] ||'').trim();
     const compare = cols.compare>=0 ? String(row[cols.compare]||'').trim() : '';
-    const tags    = cols.tags>=0    ? String(row[cols.tags]   ||'').trim() : '';
+    const tagsRaw = cols.tags>=0    ? String(row[cols.tags]   ||'').trim() : '';
+    const tags    = tagsRaw || getAutoTags(type); // auto-fill from category if empty
     const desc    = cols.desc>=0    ? String(row[cols.desc]   ||'').trim() : '';
     const vendor  = cols.vendor>=0 && row[cols.vendor] ? String(row[cols.vendor]).trim() : 'MENDEEZ';
     const status  = cols.status>=0 && row[cols.status] ? String(row[cols.status]).trim() : 'draft';
@@ -3595,7 +3596,7 @@ function upHandleImages(fileList){
   _upImgUnmatched= [];
   files.forEach(f=>{
     const nameNoExt = f.name.replace(/\.[^.]+$/,'');
-    const m = nameNoExt.match(/^(.+)-(\d+)$/);
+    const m = nameNoExt.match(/^(.+?)\s*-\s*(\d+)$/);
     if(!m){ _upImgUnmatched.push(f.name); return; }
     const sku = m[1].trim();
     const pos = parseInt(m[2]);
@@ -3667,6 +3668,56 @@ function upUpdateSubmitBtn(){
 
 // ── SUBMIT ──
 const SHOPIFY_HDRS=['Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published','Option1 Name','Option1 Value','Option1 Linked To','Option2 Name','Option2 Value','Option2 Linked To','Option3 Name','Option3 Value','Option3 Linked To','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Unit Price Total Measure','Unit Price Total Measure Unit','Unit Price Base Measure','Unit Price Base Measure Unit','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card','SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product','Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2','Google Shopping / Custom Label 3','Google Shopping / Custom Label 4','related products (product.metafields.custom.related_products)','EComposer product countdown end at (product.metafields.ecomposer.countdown)','EComposer product countdown start at (product.metafields.ecomposer.countdown_from)','Google: Custom Product (product.metafields.mm-google-shopping.custom_product)','Design Code (product.metafields.my_fields.design_code)','Product rating count (product.metafields.reviews.rating_count)','Activewear clothing features (product.metafields.shopify.activewear-clothing-features)','Activity (product.metafields.shopify.activity)','Age group (product.metafields.shopify.age-group)','Clothing accessory material (product.metafields.shopify.clothing-accessory-material)','Color (product.metafields.shopify.color-pattern)','Pants length type (product.metafields.shopify.pants-length-type)','Size (product.metafields.shopify.size)','Target gender (product.metafields.shopify.target-gender)','Complementary products (product.metafields.shopify--discovery--product_recommendation.complementary_products)','Related products (product.metafields.shopify--discovery--product_recommendation.related_products)','Related products settings (product.metafields.shopify--discovery--product_recommendation.related_products_display)','Search product boosts (product.metafields.shopify--discovery--product_search_boost.queries)','Variant Image','Variant Weight Unit','Variant Tax Code','Cost per item','Included / Pakistan','Price / Pakistan','Compare At Price / Pakistan','Status'];
+
+// ── AUTO TAG MAP — based on real Shopify tags per category ──
+const AUTO_TAGS = {
+  'T-Shirts':     'b1g1, T-shirts Sale, Tops Sale',
+  'Polo':         'b1g1, Polo Sale, Tops Sale',
+  'Jogger Pants': 'b1g1, Bottoms Sale, comfortable, jogger pants, Jogger Pants Sale, woven',
+  'Boxers':       'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
+  'Boxer Trunks': 'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
+  'Boxer Shorts': 'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
+  'Boxer Briefs': 'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
+  'Vest':         'b1g1, cotton, underwear, Underwear Sale, vest, Vests Sale',
+  'Undershirt':   'b1g1, cotton, underwear, Underwear Sale',
+  'Brief':        'b1g1, cotton, underwear, Underwear Sale',
+  'Hoodies':      'b1g1, Hoodie Sale, Tops Sale',
+  'Sweatshirts':  'b1g1, Sweatshirt Sale, Tops Sale',
+  'Shorts':       'b1g1, Bottoms Sale, Shorts Sale',
+  'Shirts':       'b1g1, Shirts Sale, Tops Sale',
+  'Jackets':      'b1g1, Jackets Sale, Tops Sale',
+  'Pajama':       'b1g1, comfortable, Pajama Sale',
+  'Pajama Sets':  'b1g1, comfortable, Pajama Sale',
+  'Socks':        'b1g1, Ankle Socks, No Show Socks, Socks Sale',
+  'Cargo Pants':  'b1g1, Bottoms Sale, Cargo Pants Sale',
+  'Caps':         'b1g1, Caps Sale, Accessories',
+  'Beanies':      'b1g1, Beanies Sale, Accessories',
+  'Sunglasses':   'b1g1, Sunglasses Sale, Accessories',
+  'Belts':        'b1g1, Belts Sale, Accessories',
+  'Bags':         'b1g1, Bags Sale, Accessories',
+  'Jewelry':      'b1g1, Jewelry Sale, Accessories',
+  'Keychains':    'b1g1, Keychains Sale, Accessories',
+  'Shoes':        'b1g1, Shoes Sale',
+  'Slides':       'b1g1, Slides Sale',
+  'Trunks':       'b1g1, Bottoms Sale, Trunks Sale',
+  'Tanktops':     'b1g1, Tops Sale, Tanktops Sale',
+  'Sweaters':     'b1g1, Tops Sale, Sweaters Sale',
+  'sweaters':     'b1g1, Tops Sale, Sweaters Sale',
+  'Bottom':       'b1g1, Bottoms Sale',
+  'Tie & Dye':    'b1g1, Tops Sale, Tie & Dye Sale',
+  'Blazers':      'b1g1, Tops Sale, Blazers Sale',
+  'Gift Boxes':   'b1g1, Gift Boxes Sale',
+  'Perfume & Cologne': 'b1g1, Perfume Sale, Accessories',
+};
+
+function getAutoTags(type){
+  if(!type) return '';
+  // Exact match first
+  if(AUTO_TAGS[type]) return AUTO_TAGS[type];
+  // Case-insensitive match
+  const key = Object.keys(AUTO_TAGS).find(k=>k.toLowerCase()===type.toLowerCase());
+  return key ? AUTO_TAGS[key] : '';
+}
 
 async function upSubmit(){
   const btn=document.getElementById('upSubmitBtn');
@@ -3952,7 +4003,8 @@ function cgParseRows(rows, fileName){
     const skuRaw  =String(row[cols.sku]   ||'').trim().replace(/^'+/,'');
     const price   =String(row[cols.price] ||'').trim();
     const compare =cols.compare>=0?String(row[cols.compare]||'').trim():'';
-    const tags    =cols.tags>=0   ?String(row[cols.tags]   ||'').trim():'';
+    const tagsRaw =cols.tags>=0   ?String(row[cols.tags]   ||'').trim():'';
+    const tags    = tagsRaw || getAutoTags(type);
     const desc    =cols.desc>=0   ?String(row[cols.desc]   ||'').trim():'';
     const vendor  =cols.vendor>=0&&row[cols.vendor]?String(row[cols.vendor]).trim():'MENDEEZ';
     const status  =cols.status>=0&&row[cols.status]?String(row[cols.status]).trim():'draft';
