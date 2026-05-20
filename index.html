@@ -657,6 +657,60 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 </div>
 
+<!-- ══ COMPLAINTS PAGE OVERLAY ══ -->
+<div id="complaintsOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;overflow-y:auto">
+  <div style="max-width:1200px;margin:0 auto;padding:24px 28px">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:20px;font-weight:700;color:var(--text)">🔴 Complaints Review</div>
+        <div style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:3px">CS & Confirmations · Perf Report 26</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <!-- Month selector -->
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Month:</span>
+          <select id="cmpMonthSel" class="fi" style="width:160px;font-size:12px" onchange="renderComplaintsPage()">
+            <option value="">-- Select month --</option>
+          </select>
+        </div>
+        <button onclick="closeComplaintsPage()" style="background:none;border:1px solid var(--border2);color:var(--muted);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:12px">✕ Close</button>
+      </div>
+    </div>
+
+    <!-- Summary Cards Row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px" id="cmpSummaryCards"></div>
+
+    <!-- Complaint Nature Cards -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin-bottom:12px">Complaint Nature Breakdown</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px" id="cmpNatureCards"></div>
+    </div>
+
+    <!-- Filter + Table -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)">Complaint Log</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Filter by nature:</span>
+          <select id="cmpNatureFilter" class="fi" style="width:220px;font-size:11px" onchange="renderComplaintsTable()">
+            <option value="">All Complaints</option>
+          </select>
+          <span style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="cmpTableCount"></span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead id="cmpTableHead" style="position:sticky;top:0;background:var(--surface2)"></thead>
+          <tbody id="cmpTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 </div><!-- end .content -->
 
 <!-- STATUS BAR -->
@@ -1765,6 +1819,70 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
     });
   }
 
+  // ── COMPLAINT NATURE parsing ──
+  // Look for rows that have complaint nature labels like BlueEx, PostEx, QC, Missing Product etc.
+  const complaintNatureKeywords = [
+    {key:'blueex',      label:'Courier (BlueEx) DT'},
+    {key:'postex',      label:'Courier (PostEx) DT'},
+    {key:'qc',          label:'QC Department'},
+    {key:'missing product by team',  label:'Missing Product By Team'},
+    {key:'missing product by courier', label:'Missing Product By Courier'},
+    {key:'missing product',label:'Missing Product'},
+    {key:'wrong product',  label:'Wrong Product'},
+    {key:'size issue',     label:'Size Issue'},
+    {key:'damage',         label:'Damaged Product'},
+    {key:'late delivery',  label:'Late Delivery'},
+  ];
+  const complaintNatures = [];
+  let totalComplaints = 0;
+  let solvedComplaints = 0;
+  let activeComplaints = 0;
+  // Also look for complaint detail rows with solved/active status
+  const complaintRows = []; // full complaint log rows
+  rows.forEach((r, ri) => {
+    const col0 = String(r[0]||'').replace(/^"+|"+$/g,'').trim().toLowerCase();
+    const col1 = String(r[1]||'').replace(/^"+|"+$/g,'').trim().toLowerCase();
+    // Check for complaint nature rows
+    complaintNatureKeywords.forEach(cn => {
+      if(col0.includes(cn.key) || col1.includes(cn.key)){
+        const count = nc2(r[2])||nc2(r[3])||nc2(r[1])||0;
+        if(count > 0){
+          const existing = complaintNatures.find(n=>n.label===cn.label);
+          if(existing) existing.count += count;
+          else complaintNatures.push({label:cn.label, count});
+          totalComplaints += count;
+        }
+      }
+    });
+    // Look for solved/active rows
+    if(col0.includes('solved') || col1.includes('solved')){
+      solvedComplaints = nc2(r[2])||nc2(r[3])||0;
+    }
+    if(col0.includes('active') || col0.includes('open') || col1.includes('active')){
+      activeComplaints = nc2(r[2])||nc2(r[3])||0;
+    }
+    // Collect complaint detail rows (order id, nature, status etc)
+    // A complaint row typically has: date, order id, complaint nature, agent, status
+    const hasOrderId = String(r[1]||'').match(/^\d{4,}/);
+    const hasNature = complaintNatureKeywords.some(cn=>
+      String(r[2]||'').toLowerCase().includes(cn.key)||
+      String(r[3]||'').toLowerCase().includes(cn.key)||
+      String(r[4]||'').toLowerCase().includes(cn.key)
+    );
+    if(hasOrderId || hasNature){
+      // Try to identify as a complaint detail row
+      const rowData = r.map(c=>String(c||'').replace(/^"+|"+$/g,'').trim());
+      if(rowData.filter(c=>c).length >= 3){
+        complaintRows.push(rowData);
+      }
+    }
+  });
+  result.complaintNatures = complaintNatures;
+  result.totalComplaints = totalComplaints || result.agents.reduce((s,a)=>s+(a.complaints||0),0);
+  result.solvedComplaints = solvedComplaints;
+  result.activeComplaints = activeComplaints;
+  result.complaintRows = complaintRows;
+
   // EWH data — from EWH metric rows
   // April row33: [21, 5772966, 2904, 137] → exch=21, dispVal=5772966, dispUnits=2904, rtnUnits=137
   // May row67:   [11, 1679369, 916, 18]   → same layout
@@ -2784,6 +2902,23 @@ function loadDemo(){
     ],
     orderStatus:{landed:726,dispatched:501,delivered:431,pending:85,cancel:27,returns:12},
     ewh:{exch:21,dispVal:1679369,dispUnits:916,returnUnits:18},
+    complaintNatures:[
+      {label:'Courier (BlueEx) DT',count:42},
+      {label:'Courier (PostEx) DT',count:31},
+      {label:'QC Department',count:18},
+      {label:'Missing Product By Team',count:12},
+      {label:'Missing Product By Courier',count:9},
+    ],
+    totalComplaints:112,
+    solvedComplaints:87,
+    activeComplaints:25,
+    complaintRows:[
+      ['01/05/2026','1234567','Courier (BlueEx) DT','Agent 1','Solved','Customer received wrong parcel'],
+      ['02/05/2026','1234568','QC Department','Agent 2','Active','Product quality issue'],
+      ['03/05/2026','1234569','Courier (PostEx) DT','Agent 1','Solved','Late delivery complaint'],
+      ['04/05/2026','1234570','Missing Product By Team','Agent 2','Active','Item missing from order'],
+      ['05/05/2026','1234571','Courier (BlueEx) DT','Agent 1','Solved','Wrong address delivery'],
+    ],
     cancelReasons:[
       {reason:'Not Interested',count:48},{reason:'No Answer',count:35},{reason:'Wrong Product',count:12},
       {reason:'High Price',count:9},{reason:'Size Issue',count:7},{reason:'Duplicate Order',count:4},
@@ -3868,6 +4003,154 @@ function upReset(){
   document.getElementById('upLog').innerHTML='';
   document.getElementById('upSubmitBtn').textContent='↑ Submit to Shopify';
 }
+// ══════════════════════════════════════════════════
+// COMPLAINTS PAGE
+// ══════════════════════════════════════════════════
+function openComplaintsPage(){
+  // Populate month selector from allCsMonths
+  const sel = document.getElementById('cmpMonthSel');
+  sel.innerHTML = '<option value="">-- Select month --</option>';
+  Object.keys(allCsMonths).sort().reverse().forEach(month=>{
+    const opt = document.createElement('option');
+    opt.value = month;
+    opt.textContent = month;
+    sel.appendChild(opt);
+  });
+  // Auto-select current month
+  const curSel = document.getElementById('overviewMonthSel');
+  if(curSel && curSel.value) sel.value = curSel.value;
+  else if(sel.options.length > 1) sel.selectedIndex = 1;
+
+  document.getElementById('complaintsOverlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  renderComplaintsPage();
+}
+
+function closeComplaintsPage(){
+  document.getElementById('complaintsOverlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function getComplaintsData(){
+  const sel = document.getElementById('cmpMonthSel');
+  const month = sel.value;
+  if(month && allCsMonths[month]) return allCsMonths[month];
+  return csData;
+}
+
+function renderComplaintsPage(){
+  const data = getComplaintsData();
+  const natures = data.complaintNatures || [];
+  const total = data.totalComplaints || data.agents?.reduce((s,a)=>s+(a.complaints||0),0) || 0;
+  const solved = data.solvedComplaints || 0;
+  const active = data.activeComplaints || (total - solved);
+
+  // ── Summary Cards ──
+  const cards = [
+    {label:'Total Complaints', val: total, col:'var(--red)'},
+    {label:'Solved',           val: solved, col:'var(--green)'},
+    {label:'Active / Open',    val: active, col:'var(--accent)'},
+    {label:'Solve Rate',       val: total>0?Math.round(solved/total*100)+'%':'—', col:'var(--blue)'},
+  ];
+  document.getElementById('cmpSummaryCards').innerHTML = cards.map(c=>`
+    <div class="sc" style="border-color:${c.col}20">
+      <div class="sl">${c.label}</div>
+      <div class="sv" style="color:${c.col};font-size:22px;font-weight:700;font-family:var(--mono)">${c.val}</div>
+    </div>`).join('');
+
+  // ── Nature Cards ──
+  const natColors = [
+    'var(--red)','var(--accent)','var(--blue)','var(--green)','var(--orange)',
+    'var(--muted)','#c084fc','#fb923c','#34d399','#60a5fa'
+  ];
+  document.getElementById('cmpNatureCards').innerHTML = natures.length > 0
+    ? natures.map((n,i)=>`
+      <div class="sc" style="border-color:${natColors[i%natColors.length]}30;cursor:pointer" onclick="filterByNature('${n.label}')">
+        <div class="sl" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${n.label}">${n.label}</div>
+        <div class="sv" style="color:${natColors[i%natColors.length]};font-size:22px;font-weight:700;font-family:var(--mono)">${n.count}</div>
+        <div class="ssub">${total>0?Math.round(n.count/total*100)+'% of total':'—'}</div>
+      </div>`).join('')
+    : '<div style="color:var(--muted);font-size:12px;font-family:var(--mono);padding:8px">No complaint nature data found in sheet</div>';
+
+  // ── Nature Filter dropdown ──
+  const filterSel = document.getElementById('cmpNatureFilter');
+  filterSel.innerHTML = '<option value="">All Complaints</option>';
+  natures.forEach(n=>{
+    const opt = document.createElement('option');
+    opt.value = n.label;
+    opt.textContent = n.label + ' (' + n.count + ')';
+    filterSel.appendChild(opt);
+  });
+
+  renderComplaintsTable();
+}
+
+function filterByNature(nature){
+  document.getElementById('cmpNatureFilter').value = nature;
+  renderComplaintsTable();
+  // Scroll to table
+  document.getElementById('cmpTableHead').scrollIntoView({behavior:'smooth'});
+}
+
+function renderComplaintsTable(){
+  const data = getComplaintsData();
+  const filterVal = document.getElementById('cmpNatureFilter').value;
+  let rows = data.complaintRows || [];
+
+  // Filter by nature if selected
+  if(filterVal){
+    rows = rows.filter(row=>
+      row.some(cell=>String(cell).toLowerCase().includes(filterVal.toLowerCase()))
+    );
+  }
+
+  document.getElementById('cmpTableCount').textContent = rows.length + ' complaint' + (rows.length!==1?'s':'');
+
+  if(rows.length === 0){
+    document.getElementById('cmpTableHead').innerHTML = '';
+    document.getElementById('cmpTableBody').innerHTML =
+      '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">' +
+      (filterVal ? 'No complaints found for "'+filterVal+'"' : 'No complaint log data in sheet') +
+      '</td></tr>';
+    return;
+  }
+
+  // Auto-detect columns from first row
+  const maxCols = Math.max(...rows.map(r=>r.length));
+  // Try to detect column headers from context
+  const colHeaders = rows[0].map((_, ci) => {
+    const vals = rows.map(r=>String(r[ci]||'').toLowerCase());
+    if(vals.some(v=>v.match(/^\d{2}\/\d{2}\/\d{4}/))) return 'Date';
+    if(vals.some(v=>v.match(/^\d{6,}/))) return 'Order ID';
+    const uniq = [...new Set(vals.filter(Boolean))];
+    // Check if this col is nature column
+    const natureKeywords = ['blueex','postex','qc','missing','courier','wrong','damage','late'];
+    if(uniq.some(v=>natureKeywords.some(k=>v.includes(k)))) return 'Nature';
+    if(uniq.some(v=>v.includes('agent')||v.includes('(a)')||v.includes('(n)'))) return 'Agent';
+    if(uniq.some(v=>v==='solved'||v==='active'||v==='open'||v==='pending'||v==='closed')) return 'Status';
+    return 'Col '+(ci+1);
+  });
+
+  document.getElementById('cmpTableHead').innerHTML =
+    '<tr>'+colHeaders.map(h=>
+      `<th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap">${h}</th>`
+    ).join('')+'</tr>';
+
+  document.getElementById('cmpTableBody').innerHTML = rows.map(row=>{
+    const cells = row.map((cell,ci)=>{
+      const val = String(cell||'').trim();
+      const lv = val.toLowerCase();
+      let style = 'padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;';
+      let display = val;
+      // Color status cells
+      if(lv==='solved'||lv==='closed') display=`<span style="color:var(--green);font-weight:600">${val}</span>`;
+      else if(lv==='active'||lv==='open'||lv==='pending') display=`<span style="color:var(--accent);font-weight:600">${val}</span>`;
+      return `<td style="${style}">${display||'—'}</td>`;
+    });
+    return '<tr style="transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">' + cells.join('') + '</tr>';
+  }).join('');
+}
+
 </script>
 </body>
 </html>
