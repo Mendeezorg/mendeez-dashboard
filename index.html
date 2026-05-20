@@ -4147,7 +4147,7 @@ function renderComplaintsTable(){
       else if(lv==='active'||lv==='open'||lv==='pending') display=`<span style="color:var(--accent);font-weight:600">${val}</span>`;
       return `<td style="${style}">${display||'—'}</td>`;
     });
-    return '<tr style="transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">' + cells.join('') + '</tr>';
+    return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${cells.join('')}</tr>`;
   }).join('');
 }
 
