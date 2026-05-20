@@ -435,10 +435,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="panel" id="panel-cs">
   <div class="ds">
     <div><div class="dt">CS & Confirmations</div><div class="dsub">Live from Perf Report 26 · Select month below</div></div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <select class="fi" id="csMonthSel" style="width:150px" onchange="switchCSMonth()">
         <option value="">Loading...</option>
       </select>
+      <button class="btn btn-s btn-sm" onclick="openComplaintsPage()" style="border-color:var(--red);color:var(--red)">🔴 Review Complaints</button>
       <button class="btn btn-s btn-sm" onclick="fetchSheets()">↻ Refresh</button>
     </div>
   </div>
