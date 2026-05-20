@@ -205,6 +205,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div class="fg"><div class="fl">Courier Tab</div><input class="fi" id="cfgCrr" value="Courier Data 26"></div>
     </div>
     <div class="fg"><div class="fl">CS / Performance Tab</div><input class="fi" id="cfgCS" value="Perf Report 26"></div>
+    <div class="fg"><div class="fl">Complaints Tab</div><input class="fi" id="cfgComplaints" value="Complaints Data 26"></div>
 
     <button class="btn btn-p btn-full" onclick="connectAll()">Connect & Load Dashboard</button>
     <button class="btn btn-s btn-full" style="margin-top:6px;font-size:11px" onclick="testShopifyDirect()">🔧 Test Shopify Connection</button>
@@ -664,48 +665,58 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:20px;font-weight:700;color:var(--text)">🔴 Complaints Review</div>
-        <div style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:3px">CS & Confirmations · Perf Report 26</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <!-- Month selector -->
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Month:</span>
-          <select id="cmpMonthSel" class="fi" style="width:160px;font-size:12px" onchange="renderComplaintsPage()">
-            <option value="">-- Select month --</option>
-          </select>
+      <div style="display:flex;align-items:center;gap:14px">
+        <button onclick="closeComplaintsPage()" style="background:none;border:1px solid var(--border2);color:var(--muted);padding:7px 14px;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:12px;display:flex;align-items:center;gap:6px">
+          ← Back to CS & Confirmations
+        </button>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text)">🔴 Complaints Review</div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px">Complaints Data 26 — independent data</div>
         </div>
-        <button onclick="closeComplaintsPage()" style="background:none;border:1px solid var(--border2);color:var(--muted);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:12px">✕ Close</button>
       </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Month:</span>
+        <select id="cmpMonthSel" class="fi" style="width:160px;font-size:12px" onchange="renderComplaintsPage()">
+          <option value="all">All Months</option>
+        </select>
+        <button onclick="fetchComplaintsData()" class="btn btn-s btn-sm">↻ Refresh</button>
+        <div id="cmpLoadingStatus" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></div>
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="cmpLoading" style="display:none;text-align:center;padding:60px;font-family:var(--mono);color:var(--muted)">
+      Loading complaints data...
     </div>
 
     <!-- Summary Cards Row -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px" id="cmpSummaryCards"></div>
+    <div id="cmpSummarySection" style="display:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px" id="cmpSummaryCards"></div>
 
-    <!-- Complaint Nature Cards -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin-bottom:12px">Complaint Nature Breakdown</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px" id="cmpNatureCards"></div>
-    </div>
-
-    <!-- Filter + Table -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)">Complaint Log</div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Filter by nature:</span>
-          <select id="cmpNatureFilter" class="fi" style="width:220px;font-size:11px" onchange="renderComplaintsTable()">
-            <option value="">All Complaints</option>
-          </select>
-          <span style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="cmpTableCount"></span>
-        </div>
+      <!-- Complaint Nature Cards -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin-bottom:12px">Complaint Nature Breakdown</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px" id="cmpNatureCards"></div>
       </div>
-      <div style="overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead id="cmpTableHead" style="position:sticky;top:0;background:var(--surface2)"></thead>
-          <tbody id="cmpTableBody"></tbody>
-        </table>
+
+      <!-- Filter + Table -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)">Complaint Log</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Filter by nature:</span>
+            <select id="cmpNatureFilter" class="fi" style="width:220px;font-size:11px" onchange="renderComplaintsTable()">
+              <option value="">All Complaints</option>
+            </select>
+            <span style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="cmpTableCount"></span>
+          </div>
+        </div>
+        <div style="overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead id="cmpTableHead" style="position:sticky;top:0;background:var(--surface2)"></thead>
+            <tbody id="cmpTableBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -798,6 +809,7 @@ function loadConfig(){
     ADS_TAB=c.ADS_TAB||'Think Spendin PW 26';
     CRR_TAB=c.CRR_TAB||'Courier Data 26';
     CS_TAB=c.CS_TAB||'Perf Report 26';
+    COMPLAINTS_TAB=c.COMPLAINTS_TAB||'Complaints Data 26';
     const m=localStorage.getItem('mndz3_m_'+todayKey());
     if(m)manualData=JSON.parse(m);
   }catch(e){}
@@ -812,6 +824,7 @@ async function connectAll(){
   ADS_TAB=document.getElementById('cfgAds').value.trim();
   CRR_TAB=document.getElementById('cfgCrr').value.trim();
   CS_TAB=document.getElementById('cfgCS').value.trim();
+  COMPLAINTS_TAB=document.getElementById('cfgComplaints').value.trim()||'Complaints Data 26';
   if(!STORE||!TOKEN){alert('Please enter Shopify store URL and API token');return;}
   saveConfig();
   document.getElementById('setupOverlay').innerHTML='<div class="setup-box" style="text-align:center"><div class="spinner"></div><div style="color:var(--accent);font-size:15px;font-weight:600">Connecting...</div><div style="color:var(--muted);font-size:12px;margin-top:6px">'+STORE+'</div></div>';
@@ -4005,26 +4018,17 @@ function upReset(){
   document.getElementById('upSubmitBtn').textContent='↑ Submit to Shopify';
 }
 // ══════════════════════════════════════════════════
-// COMPLAINTS PAGE
+// COMPLAINTS PAGE — fetches ONLY from Complaints Data 26
 // ══════════════════════════════════════════════════
-function openComplaintsPage(){
-  // Populate month selector from allCsMonths
-  const sel = document.getElementById('cmpMonthSel');
-  sel.innerHTML = '<option value="">-- Select month --</option>';
-  Object.keys(allCsMonths).sort().reverse().forEach(month=>{
-    const opt = document.createElement('option');
-    opt.value = month;
-    opt.textContent = month;
-    sel.appendChild(opt);
-  });
-  // Auto-select current month
-  const curSel = document.getElementById('overviewMonthSel');
-  if(curSel && curSel.value) sel.value = curSel.value;
-  else if(sel.options.length > 1) sel.selectedIndex = 1;
+let _complaintsData = [];      // raw rows from sheet
+let _complaintsHeaders = [];   // column headers
+let _complaintsMonths = {};    // month → rows
 
+function openComplaintsPage(){
   document.getElementById('complaintsOverlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  renderComplaintsPage();
+  // Fetch fresh data from Complaints Data 26 sheet
+  fetchComplaintsData();
 }
 
 function closeComplaintsPage(){
@@ -4032,56 +4036,148 @@ function closeComplaintsPage(){
   document.body.style.overflow = '';
 }
 
-function getComplaintsData(){
-  const sel = document.getElementById('cmpMonthSel');
-  const month = sel.value;
-  if(month && allCsMonths[month]) return allCsMonths[month];
-  return csData;
+async function fetchComplaintsData(){
+  const tab = COMPLAINTS_TAB || 'Complaints Data 26';
+  const statusEl = document.getElementById('cmpLoadingStatus');
+  const loadingEl = document.getElementById('cmpLoading');
+  const summaryEl = document.getElementById('cmpSummarySection');
+
+  loadingEl.style.display = 'block';
+  summaryEl.style.display = 'none';
+  statusEl.textContent = 'Loading...';
+
+  if(!SHEET_ID){ statusEl.textContent = '✗ No Sheet ID configured'; loadingEl.textContent = 'Configure your Google Sheet ID in settings first.'; return; }
+
+  try{
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
+    const resp = await fetch(url);
+    const text = await resp.text();
+    const json = JSON.parse(text.replace(/^[^(]+\(/, '').replace(/\);?$/, ''));
+    const rows = json.table?.rows || [];
+    const cols = json.table?.cols || [];
+
+    if(!rows.length){ statusEl.textContent = '✗ No data found in '+tab; return; }
+
+    // Parse headers from first non-empty row
+    _complaintsHeaders = cols.map(c=>String(c.label||'').trim()).filter(Boolean);
+    if(!_complaintsHeaders.length && rows[0]){
+      _complaintsHeaders = rows[0].c.map(c=>String(c?.v||'').trim());
+      rows.shift();
+    }
+
+    // Parse all rows
+    _complaintsData = rows.map(row=>(row.c||[]).map(c=>String(c?.v||c?.f||'').trim()));
+    _complaintsData = _complaintsData.filter(row=>row.some(c=>c));
+
+    // Group by month (look for date column)
+    _complaintsMonths = {};
+    _complaintsData.forEach(row=>{
+      // Try to find a date in any cell
+      let month = 'All';
+      for(const cell of row){
+        const dateMatch = cell.match(/(\w+ \d{4})/);
+        if(dateMatch){ month = dateMatch[1]; break; }
+        const d = new Date(cell);
+        if(!isNaN(d) && cell.length > 4){
+          month = d.toLocaleString('en-US',{month:'long',year:'numeric'});
+          break;
+        }
+      }
+      if(!_complaintsMonths[month]) _complaintsMonths[month] = [];
+      _complaintsMonths[month].push(row);
+    });
+
+    // Populate month selector
+    const sel = document.getElementById('cmpMonthSel');
+    sel.innerHTML = '<option value="all">All Months ('+_complaintsData.length+' complaints)</option>';
+    Object.keys(_complaintsMonths).sort().reverse().forEach(m=>{
+      if(m==='All') return;
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m + ' ('+_complaintsMonths[m].length+')';
+      sel.appendChild(opt);
+    });
+
+    statusEl.textContent = '✓ '+_complaintsData.length+' complaints loaded from '+tab;
+    loadingEl.style.display = 'none';
+    summaryEl.style.display = 'block';
+    renderComplaintsPage();
+
+  }catch(e){
+    statusEl.textContent = '✗ Error: '+e.message.slice(0,60);
+    loadingEl.textContent = 'Could not load complaints sheet. Check sheet name: '+tab;
+    loadingEl.style.display = 'block';
+  }
+}
+
+function getFilteredRows(){
+  const month = document.getElementById('cmpMonthSel').value;
+  if(month === 'all' || !month) return _complaintsData;
+  return _complaintsMonths[month] || [];
 }
 
 function renderComplaintsPage(){
-  const data = getComplaintsData();
-  const natures = data.complaintNatures || [];
-  const total = data.totalComplaints || data.agents?.reduce((s,a)=>s+(a.complaints||0),0) || 0;
-  const solved = data.solvedComplaints || 0;
-  const active = data.activeComplaints || (total - solved);
+  const rows = getFilteredRows();
+  if(!rows.length){ document.getElementById('cmpSummaryCards').innerHTML='<div style="color:var(--muted);font-family:var(--mono);font-size:12px">No complaints for selected period</div>'; return; }
+
+  // ── Detect columns ──
+  const headers = _complaintsHeaders.length ? _complaintsHeaders : rows[0];
+  const dataRows = _complaintsHeaders.length ? rows : rows.slice(1);
+
+  // Find nature and status column indices
+  const natureKeywords = ['nature','type','complaint type','complaint nature','category'];
+  const statusKeywords = ['status','state','resolution'];
+  const natureIdx = headers.findIndex(h=>natureKeywords.some(k=>h.toLowerCase().includes(k)));
+  const statusIdx = headers.findIndex(h=>statusKeywords.some(k=>h.toLowerCase().includes(k)));
+
+  // Count by nature
+  const natureCounts = {};
+  let solved=0, active=0;
+  dataRows.forEach(row=>{
+    if(natureIdx>=0 && row[natureIdx]){
+      const n = row[natureIdx];
+      natureCounts[n] = (natureCounts[n]||0)+1;
+    }
+    if(statusIdx>=0){
+      const s = (row[statusIdx]||'').toLowerCase();
+      if(s.includes('solve')||s.includes('close')||s.includes('done')) solved++;
+      else if(s.includes('active')||s.includes('open')||s.includes('pending')) active++;
+    }
+  });
+
+  const total = dataRows.length;
+  if(solved===0 && active===0){ active=total; } // if no status col, all are active
 
   // ── Summary Cards ──
-  const cards = [
-    {label:'Total Complaints', val: total, col:'var(--red)'},
-    {label:'Solved',           val: solved, col:'var(--green)'},
-    {label:'Active / Open',    val: active, col:'var(--accent)'},
-    {label:'Solve Rate',       val: total>0?Math.round(solved/total*100)+'%':'—', col:'var(--blue)'},
-  ];
-  document.getElementById('cmpSummaryCards').innerHTML = cards.map(c=>`
-    <div class="sc" style="border-color:${c.col}20">
-      <div class="sl">${c.label}</div>
-      <div class="sv" style="color:${c.col};font-size:22px;font-weight:700;font-family:var(--mono)">${c.val}</div>
-    </div>`).join('');
+  const natColors=['var(--red)','var(--accent)','var(--blue)','var(--green)'];
+  document.getElementById('cmpSummaryCards').innerHTML = [
+    {label:'Total Complaints', val:total,   col:'var(--red)'},
+    {label:'Solved',           val:solved,  col:'var(--green)'},
+    {label:'Active / Open',    val:active,  col:'var(--accent)'},
+    {label:'Solve Rate',       val:total>0?Math.round(solved/total*100)+'%':'—', col:'var(--blue)'},
+  ].map(c=>`<div class="sc" style="border-color:${c.col}40">
+    <div class="sl">${c.label}</div>
+    <div class="sv" style="color:${c.col};font-size:22px;font-weight:700;font-family:var(--mono)">${c.val}</div>
+  </div>`).join('');
 
-  // ── Nature Cards ──
-  const natColors = [
-    'var(--red)','var(--accent)','var(--blue)','var(--green)','var(--orange)',
-    'var(--muted)','#c084fc','#fb923c','#34d399','#60a5fa'
-  ];
-  document.getElementById('cmpNatureCards').innerHTML = natures.length > 0
-    ? natures.map((n,i)=>`
-      <div class="sc" style="border-color:${natColors[i%natColors.length]}30;cursor:pointer" onclick="filterByNature('${n.label}')">
-        <div class="sl" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${n.label}">${n.label}</div>
-        <div class="sv" style="color:${natColors[i%natColors.length]};font-size:22px;font-weight:700;font-family:var(--mono)">${n.count}</div>
-        <div class="ssub">${total>0?Math.round(n.count/total*100)+'% of total':'—'}</div>
-      </div>`).join('')
-    : '<div style="color:var(--muted);font-size:12px;font-family:var(--mono);padding:8px">No complaint nature data found in sheet</div>';
-
-  // ── Nature Filter dropdown ──
+  // ── Nature Breakdown Cards ──
+  const natures = Object.entries(natureCounts).sort((a,b)=>b[1]-a[1]);
   const filterSel = document.getElementById('cmpNatureFilter');
   filterSel.innerHTML = '<option value="">All Complaints</option>';
-  natures.forEach(n=>{
-    const opt = document.createElement('option');
-    opt.value = n.label;
-    opt.textContent = n.label + ' (' + n.count + ')';
+  natures.forEach(([name,count])=>{
+    const opt=document.createElement('option');
+    opt.value=name; opt.textContent=name+' ('+count+')';
     filterSel.appendChild(opt);
   });
+
+  document.getElementById('cmpNatureCards').innerHTML = natures.length > 0
+    ? natures.map(([name,count],i)=>`
+      <div class="sc" style="border-color:${natColors[i%natColors.length]}40;cursor:pointer" onclick="filterByNature('${name.replace(/'/g,"\\'")}')">
+        <div class="sl" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${name}">${name}</div>
+        <div class="sv" style="color:${natColors[i%natColors.length]};font-size:22px;font-weight:700;font-family:var(--mono)">${count}</div>
+        <div class="ssub">${total>0?Math.round(count/total*100)+'% of total':'—'}</div>
+      </div>`).join('')
+    : '<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Could not detect complaint nature column — check sheet column headers</div>';
 
   renderComplaintsTable();
 }
@@ -4089,64 +4185,50 @@ function renderComplaintsPage(){
 function filterByNature(nature){
   document.getElementById('cmpNatureFilter').value = nature;
   renderComplaintsTable();
-  // Scroll to table
-  document.getElementById('cmpTableHead').scrollIntoView({behavior:'smooth'});
+  document.getElementById('cmpTableBody').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function renderComplaintsTable(){
-  const data = getComplaintsData();
   const filterVal = document.getElementById('cmpNatureFilter').value;
-  let rows = data.complaintRows || [];
+  const allRows = getFilteredRows();
+  const headers = _complaintsHeaders.length ? _complaintsHeaders : (allRows[0]||[]);
+  const dataRows = _complaintsHeaders.length ? allRows : allRows.slice(1);
 
-  // Filter by nature if selected
+  const statusKeywords = ['status','state','resolution'];
+  const natureKeywords = ['nature','type','complaint type','complaint nature','category'];
+  const statusIdx = headers.findIndex(h=>statusKeywords.some(k=>h.toLowerCase().includes(k)));
+  const natureIdx = headers.findIndex(h=>natureKeywords.some(k=>h.toLowerCase().includes(k)));
+
+  let rows = dataRows;
   if(filterVal){
-    rows = rows.filter(row=>
-      row.some(cell=>String(cell).toLowerCase().includes(filterVal.toLowerCase()))
-    );
+    rows = rows.filter(row=>row.some(cell=>String(cell).toLowerCase().includes(filterVal.toLowerCase())));
   }
 
-  document.getElementById('cmpTableCount').textContent = rows.length + ' complaint' + (rows.length!==1?'s':'');
+  document.getElementById('cmpTableCount').textContent = rows.length+' complaint'+(rows.length!==1?'s':'');
 
-  if(rows.length === 0){
-    document.getElementById('cmpTableHead').innerHTML = '';
+  // Table headers
+  document.getElementById('cmpTableHead').innerHTML = '<tr>'+
+    headers.map(h=>`<th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap">${h||'—'}</th>`).join('')+
+  '</tr>';
+
+  if(!rows.length){
     document.getElementById('cmpTableBody').innerHTML =
-      '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">' +
-      (filterVal ? 'No complaints found for "'+filterVal+'"' : 'No complaint log data in sheet') +
-      '</td></tr>';
+      `<tr><td colspan="${headers.length||5}" style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No complaints found${filterVal?' for "'+filterVal+'"':''}</td></tr>`;
     return;
   }
 
-  // Auto-detect columns from first row
-  const maxCols = Math.max(...rows.map(r=>r.length));
-  // Try to detect column headers from context
-  const colHeaders = rows[0].map((_, ci) => {
-    const vals = rows.map(r=>String(r[ci]||'').toLowerCase());
-    if(vals.some(v=>v.match(/^\d{2}\/\d{2}\/\d{4}/))) return 'Date';
-    if(vals.some(v=>v.match(/^\d{6,}/))) return 'Order ID';
-    const uniq = [...new Set(vals.filter(Boolean))];
-    // Check if this col is nature column
-    const natureKeywords = ['blueex','postex','qc','missing','courier','wrong','damage','late'];
-    if(uniq.some(v=>natureKeywords.some(k=>v.includes(k)))) return 'Nature';
-    if(uniq.some(v=>v.includes('agent')||v.includes('(a)')||v.includes('(n)'))) return 'Agent';
-    if(uniq.some(v=>v==='solved'||v==='active'||v==='open'||v==='pending'||v==='closed')) return 'Status';
-    return 'Col '+(ci+1);
-  });
-
-  document.getElementById('cmpTableHead').innerHTML =
-    '<tr>'+colHeaders.map(h=>
-      `<th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap">${h}</th>`
-    ).join('')+'</tr>';
-
   document.getElementById('cmpTableBody').innerHTML = rows.map(row=>{
-    const cells = row.map((cell,ci)=>{
-      const val = String(cell||'').trim();
+    const cells = headers.map((_,ci)=>{
+      const val = String(row[ci]||'').trim();
       const lv = val.toLowerCase();
-      let style = 'padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;';
-      let display = val;
-      // Color status cells
-      if(lv==='solved'||lv==='closed') display=`<span style="color:var(--green);font-weight:600">${val}</span>`;
-      else if(lv==='active'||lv==='open'||lv==='pending') display=`<span style="color:var(--accent);font-weight:600">${val}</span>`;
-      return `<td style="${style}">${display||'—'}</td>`;
+      let display = val||'—';
+      if(ci===statusIdx){
+        if(lv.includes('solve')||lv.includes('close')||lv.includes('done'))
+          display=`<span style="color:var(--green);font-weight:600">${val}</span>`;
+        else if(lv.includes('active')||lv.includes('open')||lv.includes('pending'))
+          display=`<span style="color:var(--accent);font-weight:600">${val}</span>`;
+      }
+      return `<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px">${display}</td>`;
     });
     return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${cells.join('')}</tr>`;
   }).join('');
