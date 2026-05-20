@@ -240,7 +240,6 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="tab" onclick="switchTab('products',this)">Products & Stock</div>
   <div class="tab" onclick="switchTab('sorter',this)">Catalog Sorter</div>
   <div class="tab" onclick="switchTab('uploader',this)">📦 Product Uploader</div>
-  <div class="tab" onclick="switchTab('csvgen',this)">📄 CSV Generator</div>
 </div>
 
 <!-- DATE RANGE BAR -->
@@ -299,13 +298,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
       Shopify — Live Orders
     </div>
   </div>
-  <div class="sg" id="statGrid" style="margin-bottom:20px">
+  <div id="statGrid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px">
+    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders</div><div class="sv amber shimmer" id="s-ord"></div><div class="ssub">Shopify orders</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Gross Sales</div><div class="sv amber shimmer" id="s-shopify-gross"></div><div class="ssub" id="s-shopify-gross-sub">Before discounts</div></div>
-    <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts</div><div class="sv muted shimmer" id="s-shopify-discounts"></div><div class="ssub" id="s-shopify-discounts-sub">Total discounts given</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Net Sales</div><div class="sv amber shimmer" id="s-shopify-net"></div><div class="ssub" id="s-shopify-net-sub">After discounts</div></div>
+    <div class="sc" style="border-color:var(--orange-dim)"><div class="sl">Discounts</div><div class="sv muted shimmer" id="s-shopify-discounts"></div><div class="ssub" id="s-shopify-discounts-sub">Total discounts</div></div>
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev"></div><div class="ssub">Net after discounts</div></div>
-    <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Orders</div><div class="sv shimmer" id="s-ord"></div><div class="ssub">Orders in selected range</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Shopify Returns · <span id="returns-range-lbl">Range</span></div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns · <span id="returns-range-lbl">Range</span></div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div></div>
+    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Net Sales</div><div class="sv green shimmer" id="s-shopify-net"></div><div class="ssub" id="s-shopify-net-sub">After discounts & returns</div></div>
   </div>
 
   <!-- ── PERF REPORT (SHEET) CARDS ── -->
@@ -315,13 +314,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
       Perf Report 26 — MTD
     </div>
   </div>
-  <div class="sg" style="margin-bottom:20px">
-    <div class="sc"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub" id="s-delivered-sub">MTD Achieved Value PKR</div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub" id="s-cancel-mtd-sub">Value not count</div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub" id="s-cancel-cf-sub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub" id="s-returns-mtd-sub">Value not count</div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub" id="s-returns-cf-sub">Value not count</div></div>
-    <div class="sc"><div class="sl">Order Adjustment (Returns)</div><div class="sv red shimmer" id="s-order-adj"></div><div class="ssub" id="s-order-adj-sub">Value not count</div></div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:20px">
+    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Total Dispatched MTD</div><div class="sv blue shimmer" id="s-disp">—</div><div class="ssub">Perf Report 26</div></div>
+    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub" id="s-delivered-sub">Perf Report 26</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub" id="s-cancel-mtd-sub">Perf Report 26</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub" id="s-cancel-cf-sub">Perf Report 26</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Return MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub" id="s-returns-mtd-sub">Perf Report 26</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Return CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub" id="s-returns-cf-sub">Perf Report 26</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Order Adj. Returns</div><div class="sv red shimmer" id="s-order-adj"></div><div class="ssub" id="s-order-adj-sub">Perf Report 26</div></div>
   </div>
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
   <div class="sh" style="margin-top:4px">
@@ -654,95 +654,6 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
     <!-- Log -->
     <div id="upLog" style="display:none;margin-top:10px;max-height:280px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--mono);font-size:11px;line-height:1.9"></div>
-  </div>
-</div>
-
-<!-- ══ CSV GENERATOR ══ -->
-<div class="panel" id="panel-csvgen">
-  <div class="ds">
-    <div><div class="dt">CSV Generator</div><div class="dsub">Upload Excel → Generate Shopify-ready CSV file → Import manually in Shopify Admin</div></div>
-  </div>
-
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:12px;line-height:1.9;color:var(--muted)">
-    <div style="font-weight:600;color:var(--text);margin-bottom:4px">When to use this instead of Product Uploader:</div>
-    <div>• You want to <strong style="color:var(--accent)">review the CSV</strong> before uploading to Shopify</div>
-    <div>• You want to import via <strong style="color:var(--accent)">Shopify Admin → Products → Import</strong> manually</div>
-    <div>• You want a backup CSV file saved on your computer</div>
-  </div>
-
-  <!-- Steps indicator -->
-  <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:18px">
-    <div style="flex:1;padding:10px 14px;text-align:center;background:var(--surface);border-right:1px solid var(--border)" id="cg-s1">
-      <div style="font-size:16px;font-weight:700;color:var(--accent)">①</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--accent)">Upload Excel</div>
-    </div>
-    <div style="flex:1;padding:10px 14px;text-align:center;background:var(--surface);border-right:1px solid var(--border)" id="cg-s2">
-      <div style="font-size:16px;font-weight:700;color:var(--muted)">②</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--muted)">Review Data</div>
-    </div>
-    <div style="flex:1;padding:10px 14px;text-align:center;background:var(--surface)" id="cg-s3">
-      <div style="font-size:16px;font-weight:700;color:var(--muted)">③</div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--muted)">Download CSV</div>
-    </div>
-  </div>
-
-  <!-- Drop zone -->
-  <div class="tc" style="margin-bottom:14px">
-    <div id="cgDropZone" onclick="document.getElementById('cgFileInput').click()"
-      style="border:2px dashed var(--border2);border-radius:8px;padding:44px;text-align:center;cursor:pointer;transition:all .2s">
-      <div style="font-size:36px;margin-bottom:10px">📊</div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:5px">Drop your Excel file here or click to browse</div>
-      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">.xlsx or .xls · same template as Product Uploader</div>
-      <input type="file" id="cgFileInput" accept=".xlsx,.xls" style="display:none" onchange="cgHandleFile(this.files[0])">
-    </div>
-  </div>
-
-  <!-- File status -->
-  <div id="cgFileStatus" style="display:none;margin-bottom:14px">
-    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
-      <span style="font-size:20px" id="cgFileIcon">📄</span>
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:600" id="cgFileName">—</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="cgFileMeta">—</div>
-      </div>
-      <button onclick="cgReset()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
-    </div>
-  </div>
-
-  <!-- Stats -->
-  <div id="cgStats" style="display:none;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-    <div class="sc"><div class="sl">Products</div><div class="sv green" id="cgStatProds">0</div></div>
-    <div class="sc"><div class="sl">CSV Rows</div><div class="sv amber" id="cgStatRows">0</div></div>
-    <div class="sc"><div class="sl">Errors</div><div class="sv red" id="cgStatErrs">0</div></div>
-    <div class="sc"><div class="sl">Status</div><div class="sv muted" id="cgStatStatus">—</div></div>
-  </div>
-
-  <!-- Errors -->
-  <div id="cgErrors" style="display:none;margin-bottom:14px"></div>
-
-  <!-- Preview table -->
-  <div id="cgPreview" style="display:none;margin-bottom:14px">
-    <div class="sh"><div class="st">Preview</div><div class="ss" id="cgPreviewNote"></div></div>
-    <div class="tc">
-      <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
-        <table>
-          <thead><tr id="cgPreviewHead" style="position:sticky;top:0;background:var(--surface2)"></tr></thead>
-          <tbody id="cgPreviewBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- Generate button -->
-  <div id="cgGenWrap" style="display:none;padding:18px 20px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:3px">Ready to generate Shopify CSV</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="cgGenInfo">—</div>
-      </div>
-      <button class="btn btn-p" id="cgGenBtn" onclick="cgGenerate()" style="padding:11px 28px;font-size:13px">⬇ Generate & Download CSV</button>
-    </div>
-    <div id="cgGenResult" style="display:none;margin-top:12px"></div>
   </div>
 </div>
 
@@ -3530,8 +3441,9 @@ function upParseCSV(rows, fileName){
     const skuRaw  = String(row[cols.sku]   ||'').trim().replace(/^'+/,'');
     const price   = String(row[cols.price] ||'').trim();
     const compare = cols.compare>=0 ? String(row[cols.compare]||'').trim() : '';
+    const design  = cols.design>=0  ? String(row[cols.design] ||'').trim() : '';
     const tagsRaw = cols.tags>=0    ? String(row[cols.tags]   ||'').trim() : '';
-    const tags    = tagsRaw || getAutoTags(type); // auto-fill from category if empty
+    const tags    = tagsRaw; // tags fetched async in upSubmit // auto-fill from category if empty
     const desc    = cols.desc>=0    ? String(row[cols.desc]   ||'').trim() : '';
     const vendor  = cols.vendor>=0 && row[cols.vendor] ? String(row[cols.vendor]).trim() : 'MENDEEZ';
     const status  = cols.status>=0 && row[cols.status] ? String(row[cols.status]).trim() : 'draft';
@@ -3576,7 +3488,11 @@ function upParseCSV(rows, fileName){
   upUpdateSubmitBtn();
 }
 
-function upMakeHandle(t){ return t.toLowerCase().replace(/[^a-z0-9 -]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-'); }
+function upMakeHandle(t, sku){
+  const base = t.toLowerCase().replace(/[^a-z0-9 -]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-');
+  const skuClean = (sku||'').toString().replace(/[^a-z0-9]/gi,'').toLowerCase();
+  return skuClean ? base+'-'+skuClean : base;
+}
 function upMakeSKU(p,si){ return p.skuPrefix+String(p.skuBase+si).padStart(p.skuPad,'0'); }
 
 function upClearCSV(){
@@ -3669,54 +3585,66 @@ function upUpdateSubmitBtn(){
 // ── SUBMIT ──
 const SHOPIFY_HDRS=['Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published','Option1 Name','Option1 Value','Option1 Linked To','Option2 Name','Option2 Value','Option2 Linked To','Option3 Name','Option3 Value','Option3 Linked To','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Unit Price Total Measure','Unit Price Total Measure Unit','Unit Price Base Measure','Unit Price Base Measure Unit','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card','SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product','Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2','Google Shopping / Custom Label 3','Google Shopping / Custom Label 4','related products (product.metafields.custom.related_products)','EComposer product countdown end at (product.metafields.ecomposer.countdown)','EComposer product countdown start at (product.metafields.ecomposer.countdown_from)','Google: Custom Product (product.metafields.mm-google-shopping.custom_product)','Design Code (product.metafields.my_fields.design_code)','Product rating count (product.metafields.reviews.rating_count)','Activewear clothing features (product.metafields.shopify.activewear-clothing-features)','Activity (product.metafields.shopify.activity)','Age group (product.metafields.shopify.age-group)','Clothing accessory material (product.metafields.shopify.clothing-accessory-material)','Color (product.metafields.shopify.color-pattern)','Pants length type (product.metafields.shopify.pants-length-type)','Size (product.metafields.shopify.size)','Target gender (product.metafields.shopify.target-gender)','Complementary products (product.metafields.shopify--discovery--product_recommendation.complementary_products)','Related products (product.metafields.shopify--discovery--product_recommendation.related_products)','Related products settings (product.metafields.shopify--discovery--product_recommendation.related_products_display)','Search product boosts (product.metafields.shopify--discovery--product_search_boost.queries)','Variant Image','Variant Weight Unit','Variant Tax Code','Cost per item','Included / Pakistan','Price / Pakistan','Compare At Price / Pakistan','Status'];
 
-// ── AUTO TAG MAP — based on real Shopify tags per category ──
-const AUTO_TAGS = {
-  'T-Shirts':     'b1g1, T-shirts Sale, Tops Sale',
-  'Polo':         'b1g1, Polo Sale, Tops Sale',
-  'Jogger Pants': 'b1g1, Bottoms Sale, comfortable, jogger pants, Jogger Pants Sale, woven',
-  'Boxers':       'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
-  'Boxer Trunks': 'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
-  'Boxer Shorts': 'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
-  'Boxer Briefs': 'b1g1, boxer, Boxer Shorts Sale, comfortable, cotton, underwear, Underwear Sale',
-  'Vest':         'b1g1, cotton, underwear, Underwear Sale, vest, Vests Sale',
-  'Undershirt':   'b1g1, cotton, underwear, Underwear Sale',
-  'Brief':        'b1g1, cotton, underwear, Underwear Sale',
-  'Hoodies':      'b1g1, Hoodie Sale, Tops Sale',
-  'Sweatshirts':  'b1g1, Sweatshirt Sale, Tops Sale',
-  'Shorts':       'b1g1, Bottoms Sale, Shorts Sale',
-  'Shirts':       'b1g1, Shirts Sale, Tops Sale',
-  'Jackets':      'b1g1, Jackets Sale, Tops Sale',
-  'Pajama':       'b1g1, comfortable, Pajama Sale',
-  'Pajama Sets':  'b1g1, comfortable, Pajama Sale',
-  'Socks':        'b1g1, Ankle Socks, No Show Socks, Socks Sale',
-  'Cargo Pants':  'b1g1, Bottoms Sale, Cargo Pants Sale',
-  'Caps':         'b1g1, Caps Sale, Accessories',
-  'Beanies':      'b1g1, Beanies Sale, Accessories',
-  'Sunglasses':   'b1g1, Sunglasses Sale, Accessories',
-  'Belts':        'b1g1, Belts Sale, Accessories',
-  'Bags':         'b1g1, Bags Sale, Accessories',
-  'Jewelry':      'b1g1, Jewelry Sale, Accessories',
-  'Keychains':    'b1g1, Keychains Sale, Accessories',
-  'Shoes':        'b1g1, Shoes Sale',
-  'Slides':       'b1g1, Slides Sale',
-  'Trunks':       'b1g1, Bottoms Sale, Trunks Sale',
-  'Tanktops':     'b1g1, Tops Sale, Tanktops Sale',
-  'Sweaters':     'b1g1, Tops Sale, Sweaters Sale',
-  'sweaters':     'b1g1, Tops Sale, Sweaters Sale',
-  'Bottom':       'b1g1, Bottoms Sale',
-  'Tie & Dye':    'b1g1, Tops Sale, Tie & Dye Sale',
-  'Blazers':      'b1g1, Tops Sale, Blazers Sale',
-  'Gift Boxes':   'b1g1, Gift Boxes Sale',
-  'Perfume & Cologne': 'b1g1, Perfume Sale, Accessories',
-};
+// ── DYNAMIC TAG CACHE — fetched live from Shopify per category ──
+const _tagCache = {}; // type → tags string
 
-function getAutoTags(type){
+async function getAutoTags(type){
   if(!type) return '';
-  // Exact match first
-  if(AUTO_TAGS[type]) return AUTO_TAGS[type];
-  // Case-insensitive match
-  const key = Object.keys(AUTO_TAGS).find(k=>k.toLowerCase()===type.toLowerCase());
-  return key ? AUTO_TAGS[key] : '';
+  const typeKey = type.toLowerCase().trim();
+  // Return cached if available
+  if(_tagCache[typeKey]) return _tagCache[typeKey];
+  // Fetch latest product of this type from Shopify (exclude factory outlet)
+  if(STORE && TOKEN){
+    try{
+      const d = await shopFetch('/products.json?limit=10&product_type='+encodeURIComponent(type)+'&fields=tags&order=created_at+desc');
+      const products = d.products||[];
+      // Find first product that doesn't have factory outlet tags
+      for(const p of products){
+        const tags = p.tags||[];
+        const tagStr = Array.isArray(tags) ? tags.join(', ') : String(tags);
+        if(!tagStr.toLowerCase().includes('factory outlet') && tags.length > 0){
+          _tagCache[typeKey] = tagStr;
+          return tagStr;
+        }
+      }
+    }catch(e){ console.log('Tag fetch failed for',type,e.message); }
+  }
+  // Fallback static map if not connected or no products found
+  const FALLBACK = {
+    'polo':         'b1g1, Polo Sale, Tops Sale',
+    't-shirts':     'b1g1, T-shirts Sale, Tops Sale',
+    'jogger pants': 'b1g1, Bottoms Sale, Jogger Pants Sale',
+    'shorts':       'b1g1, Bottoms Sale, Shorts Sale',
+    'hoodies':      'b1g1, Hoodie Sale, Tops Sale',
+    'sweatshirts':  'b1g1, Sweatshirt Sale, Tops Sale',
+    'shirts':       'b1g1, Shirts Sale, Tops Sale',
+    'jackets':      'b1g1, Jackets Sale, Tops Sale',
+    'boxer trunks': 'b1g1, boxer, Boxer Shorts Sale, underwear, Underwear Sale',
+    'boxer shorts': 'b1g1, boxer, Boxer Shorts Sale, underwear, Underwear Sale',
+    'boxer briefs': 'b1g1, boxer, Boxer Shorts Sale, underwear, Underwear Sale',
+    'boxers':       'b1g1, boxer, Boxer Shorts Sale, underwear, Underwear Sale',
+    'brief':        'b1g1, underwear, Underwear Sale',
+    'vest':         'b1g1, underwear, Underwear Sale, vest, Vests Sale',
+    'undershirt':   'b1g1, underwear, Underwear Sale',
+    'pajama':       'b1g1, comfortable, Pajama Sale',
+    'pajama sets':  'b1g1, comfortable, Pajama Sale',
+    'socks':        'b1g1, Socks Sale',
+    'cargo pants':  'b1g1, Bottoms Sale, Cargo Pants Sale',
+    'caps':         'b1g1, Caps Sale, Accessories',
+    'beanies':      'b1g1, Beanies Sale, Accessories',
+    'sunglasses':   'b1g1, Sunglasses Sale, Accessories',
+    'belts':        'b1g1, Belts Sale, Accessories',
+    'bags':         'b1g1, Bags Sale, Accessories',
+    'jewelry':      'b1g1, Jewelry Sale, Accessories',
+    'shoes':        'b1g1, Shoes Sale',
+    'slides':       'b1g1, Slides Sale',
+    'trunks':       'b1g1, Bottoms Sale, Trunks Sale',
+    'tanktops':     'b1g1, Tops Sale, Tanktops Sale',
+    'sweaters':     'b1g1, Tops Sale, Sweaters Sale',
+    'tie & dye':    'b1g1, Tops Sale, Tie & Dye Sale',
+    'blazers':      'b1g1, Tops Sale, Blazers Sale',
+  };
+  return FALLBACK[typeKey] || '';
 }
 
 async function upSubmit(){
@@ -3770,13 +3698,16 @@ async function upSubmit(){
             weight_unit:   'kg',
             grams:         0
           }));
+          // Fetch latest tags from Shopify for this category (live, not cached static)
+          const autoTags = p.tags || (await getAutoTags(p.type));
+          const handle = upMakeHandle(p.name, upMakeSKU(p,0));
           const payload = {
             product:{
               title:        p.name,
               body_html:    p.desc||'',
               vendor:       p.vendor||'MENDEEZ',
               product_type: p.type||'',
-              tags:         p.tags||'',
+              tags:         autoTags,
               status:       p.status||'draft',
               options:      [{name:'Size'}],
               variants:     variants
@@ -3792,8 +3723,17 @@ async function upSubmit(){
               // Also map without leading zeros
               window._upNewProductSkuMap[sku.replace(/^0+/,'')] = {id:prodId, title:p.name};
             });
+            // Save design code to metafield if provided
+            if(p.design){
+              try{
+                await shopFetch('/products/'+result.product.id+'/metafields.json','POST',{
+                  metafield:{namespace:'my_fields',key:'design_code',value:p.design,type:'single_line_text_field'}
+                });
+                log('    ↳ Design Code saved: '+p.design,'var(--muted)');
+              }catch(me){log('    ↳ Design Code failed: '+me.message.slice(0,50),'var(--red)');}
+            }
             csvOk++;
-            log('  ✓ Created: '+p.name+' ('+p.sizes.length+' sizes, '+p.status+')','var(--green)');
+            log('  ✓ Created: '+p.name+' ('+p.sizes.length+' sizes, '+(p.design?'DC:'+p.design+', ':'')+p.status+')','var(--green)');
           } else {
             csvFail++;
             log('  ✗ Failed: '+p.name+' — '+(JSON.stringify(result&&result.errors||result)).slice(0,80),'var(--red)');
@@ -3911,219 +3851,4 @@ function upReset(){
   document.getElementById('upSubmitBtn').textContent='↑ Submit to Shopify';
 }
 
-// ══════════════════════════════════════════════════
-// CSV GENERATOR TAB
-// ══════════════════════════════════════════════════
-let _cgProducts = [];
 
-(function(){
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const dz = document.getElementById('cgDropZone');
-    if(!dz) return;
-    dz.addEventListener('dragover',  e => { e.preventDefault(); dz.style.borderColor='var(--accent)'; });
-    dz.addEventListener('dragleave', () => { dz.style.borderColor='var(--border2)'; });
-    dz.addEventListener('drop', e => {
-      e.preventDefault(); dz.style.borderColor='var(--border2)';
-      const f = e.dataTransfer.files[0];
-      if(f) cgHandleFile(f);
-    });
-  });
-})();
-
-function cgSetStep(n){
-  [1,2,3].forEach(i=>{
-    const el=document.getElementById('cg-s'+i);
-    if(!el) return;
-    const col = i<n?'var(--green)':i===n?'var(--accent)':'var(--muted)';
-    el.children[0].style.color=col;
-    el.children[1].style.color=col;
-  });
-}
-
-function cgHandleFile(file){
-  if(!file||!file.name.match(/\.(xlsx|xls)$/i)){ alert('Please upload an .xlsx or .xls file'); return; }
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      cgParseRows(rows, file.name);
-    }catch(err){ alert('Could not read file: '+err.message); }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function cgDetectCols(headerRow){
-  const h=headerRow.map(c=>String(c||'').toLowerCase().trim());
-  const find=keys=>{
-    for(const k of keys){const i=h.findIndex(c=>c===k);if(i>=0)return i;}
-    for(const k of keys){const i=h.findIndex(c=>c.includes(k));if(i>=0)return i;}
-    return -1;
-  };
-  return{
-    name:    find(['product name','name','title']),
-    type:    find(['category / type','category','type']),
-    sizes:   find(['sizes','size']),
-    sku:     find(['sku (s size)','sku']),
-    price:   find(['price (pkr)','price']),
-    compare: find(['compare at (pkr)','compare at','compare']),
-    tags:    find(['tags','tag']),
-    desc:    find(['description (html)','description','body (html)','body','desc']),
-    vendor:  find(['vendor']),
-    status:  find(['status']),
-  };
-}
-
-function cgParseRows(rows, fileName){
-  if(!rows||rows.length<2){alert('File is empty');return;}
-  let headerIdx=0;
-  for(let i=0;i<Math.min(10,rows.length);i++){
-    const j=rows[i].join('|').toLowerCase();
-    if(j.includes('product name')&&j.includes('sku')){headerIdx=i;break;}
-  }
-  const cols=cgDetectCols(rows[headerIdx]);
-  const missing=[];
-  if(cols.name<0)  missing.push('Product Name');
-  if(cols.type<0)  missing.push('Category/Type');
-  if(cols.sizes<0) missing.push('Sizes');
-  if(cols.sku<0)   missing.push('SKU');
-  if(cols.price<0) missing.push('Price');
-  if(missing.length){
-    document.getElementById('cgErrors').style.display='block';
-    document.getElementById('cgErrors').innerHTML='<div class="alert al-red"><div>✗</div><div>Missing columns: '+missing.join(', ')+'</div></div>';
-    return;
-  }
-  _cgProducts=[];
-  const errors=[];
-  rows.slice(headerIdx+1).forEach((row,ri)=>{
-    const name    =String(row[cols.name]  ||'').trim();
-    const type    =String(row[cols.type]  ||'').trim();
-    const sizesRaw=String(row[cols.sizes] ||'').trim();
-    const skuRaw  =String(row[cols.sku]   ||'').trim().replace(/^'+/,'');
-    const price   =String(row[cols.price] ||'').trim();
-    const compare =cols.compare>=0?String(row[cols.compare]||'').trim():'';
-    const tagsRaw =cols.tags>=0   ?String(row[cols.tags]   ||'').trim():'';
-    const tags    = tagsRaw || getAutoTags(type);
-    const desc    =cols.desc>=0   ?String(row[cols.desc]   ||'').trim():'';
-    const vendor  =cols.vendor>=0&&row[cols.vendor]?String(row[cols.vendor]).trim():'MENDEEZ';
-    const status  =cols.status>=0&&row[cols.status]?String(row[cols.status]).trim():'draft';
-    if(!name&&!type&&!skuRaw&&!price)return;
-    // Skip instruction/note rows — they have text in SKU column instead of numbers
-    if(skuRaw && isNaN(parseInt(skuRaw.replace(/[^0-9]/g,''))))return;
-    if(!name||!type||!sizesRaw||!skuRaw||!price){errors.push('Row '+(ri+headerIdx+2)+': incomplete — skipped');return;}
-    const sizes=sizesRaw.split(/[,،\s]+/).map(s=>s.trim()).filter(Boolean);
-    const skuPrefix=skuRaw.replace(/\d+$/,'');
-    const skuBase=parseInt(skuRaw.replace(skuPrefix,''))||0;
-    const skuPad=skuRaw.replace(skuPrefix,'').length||7;
-    _cgProducts.push({name,type,sizes,skuPrefix,skuBase,skuPad,
-      price:String(parseFloat(price)||''),compare:compare?String(parseFloat(compare)||''):'',
-      tags,desc,vendor,status});
-  });
-  const totalRows=_cgProducts.reduce((s,p)=>s+p.sizes.length,0);
-  // File status
-  document.getElementById('cgFileStatus').style.display='block';
-  document.getElementById('cgFileIcon').textContent=errors.length?'⚠️':'✅';
-  document.getElementById('cgFileName').textContent=fileName;
-  document.getElementById('cgFileMeta').textContent=_cgProducts.length+' products · '+totalRows+' rows'+(errors.length?' · '+errors.length+' skipped':'');
-  // Stats
-  const st=document.getElementById('cgStats'); st.style.display='grid';
-  document.getElementById('cgStatProds').textContent=_cgProducts.length;
-  document.getElementById('cgStatRows').textContent=totalRows;
-  document.getElementById('cgStatErrs').textContent=errors.length;
-  document.getElementById('cgStatStatus').textContent=errors.length?'Has Errors':'Ready ✓';
-  // Errors
-  if(errors.length){
-    document.getElementById('cgErrors').style.display='block';
-    document.getElementById('cgErrors').innerHTML='<div class="alert al-amber"><div>⚠</div><div>'+errors.slice(0,8).join('<br>')+(errors.length>8?'<br>...and '+(errors.length-8)+' more':'')+'</div></div>';
-  } else { document.getElementById('cgErrors').style.display='none'; }
-  // Preview
-  document.getElementById('cgPreviewHead').innerHTML='<th>#</th><th>Product Name</th><th>Type</th><th>Sizes</th><th>SKU (S)</th><th>Price</th><th>Compare At</th><th>Description</th><th>Status</th>';
-  document.getElementById('cgPreviewBody').innerHTML=_cgProducts.slice(0,50).map((p,i)=>{
-    const skuS=p.skuPrefix+String(p.skuBase).padStart(p.skuPad,'0');
-    return'<tr>'
-      +'<td class="tm tmut">'+(i+1)+'</td>'
-      +'<td style="font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</td>'
-      +'<td class="tm tmut">'+p.type+'</td>'
-      +'<td style="color:var(--accent);font-family:var(--mono)">'+p.sizes.join(', ')+'</td>'
-      +'<td class="tm">'+skuS+'</td>'
-      +'<td class="tm">PKR '+parseInt(p.price||0).toLocaleString()+'</td>'
-      +'<td class="tm tmut">'+(p.compare?'PKR '+parseInt(p.compare).toLocaleString():'—')+'</td>'
-      +'<td style="font-size:11px;color:'+(p.desc?'var(--green)':'var(--muted2)')+'">'+( p.desc?'✓ Has description':'empty')+'</td>'
-      +'<td class="tm tmut">'+p.status+'</td></tr>';
-  }).join('');
-  document.getElementById('cgPreviewNote').textContent=_cgProducts.length+' products · '+totalRows+' rows · Design Code & Images empty';
-  document.getElementById('cgPreview').style.display='block';
-  // Generate button
-  document.getElementById('cgGenWrap').style.display='block';
-  document.getElementById('cgGenInfo').textContent=_cgProducts.length+' products → '+totalRows+' CSV rows · all 74 Shopify columns included';
-  cgSetStep(2);
-}
-
-function cgMakeHandle(t){return t.toLowerCase().replace(/[^a-z0-9 -]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-');}
-function cgMakeSKU(p,si){return p.skuPrefix+String(p.skuBase+si).padStart(p.skuPad,'0');}
-
-function cgGenerate(){
-  if(!_cgProducts.length) return;
-  const btn=document.getElementById('cgGenBtn');
-  btn.textContent='⏳ Generating...'; btn.disabled=true;
-  setTimeout(()=>{
-    const HDRS=SHOPIFY_HDRS; // reuse from uploader
-    const rows=[HDRS];
-    _cgProducts.forEach(p=>{
-      const handle=cgMakeHandle(p.name);
-      const seo='Buy '+p.name+' Online in Pakistan from Mendeez';
-      p.sizes.forEach((sz,si)=>{
-        const isFirst=si===0;
-        const sku=cgMakeSKU(p,si);
-        const row=new Array(HDRS.length).fill('');
-        const set=(col,val)=>{const i=HDRS.indexOf(col);if(i>=0)row[i]=String(val==null?'':val);};
-        set('Handle',handle); set('Title',isFirst?p.name:'');
-        set('Body (HTML)',isFirst?p.desc:''); set('Vendor',isFirst?p.vendor:'');
-        set('Type',isFirst?p.type:''); set('Tags',isFirst?p.tags:'');
-        set('Published','TRUE'); set('Option1 Name','Size'); set('Option1 Value',sz);
-        set('Variant SKU',sku); set('Variant Grams','0');
-        set('Variant Inventory Tracker','shopify'); set('Variant Inventory Policy','deny');
-        set('Variant Fulfillment Service','manual'); set('Variant Price',p.price);
-        set('Variant Compare At Price',p.compare); set('Variant Requires Shipping','TRUE');
-        set('Variant Taxable','FALSE'); set('Variant Barcode',sku);
-        set('Image Src',''); set('Image Position',String(si+1));
-        set('Image Alt Text',isFirst?p.name+'-MENDEEZ':''); set('Gift Card','FALSE');
-        set('SEO Title',isFirst?seo:''); set('SEO Description',isFirst?seo:'');
-        set('Design Code (product.metafields.my_fields.design_code)','');
-        set('Variant Weight Unit','kg'); set('Included / Pakistan',isFirst?'TRUE':'');
-        set('Price / Pakistan',p.price); set('Compare At Price / Pakistan',p.compare);
-        set('Status',p.status); rows.push(row);
-      });
-    });
-    const csv=rows.map(row=>row.map(cell=>{
-      const s=String(cell==null?'':cell);
-      return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;
-    }).join(',')).join('\r\n');
-    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url;
-    a.download='mendeez_shopify_'+_cgProducts.length+'products_'+new Date().toISOString().slice(0,10)+'.csv';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    document.getElementById('cgGenResult').style.display='block';
-    document.getElementById('cgGenResult').innerHTML='<div class="alert al-green"><div>✅</div><div>'
-      +'<strong>CSV downloaded!</strong> '+_cgProducts.length+' products · '+(rows.length-1)+' rows<br>'
-      +'<span style="color:var(--muted)">Now go to Shopify Admin → Products → Import → upload this CSV file</span>'
-      +'</div></div>';
-    btn.textContent='⬇ Generate & Download CSV'; btn.disabled=false;
-    cgSetStep(3);
-  },50);
-}
-
-function cgReset(){
-  _cgProducts=[];
-  ['cgFileStatus','cgStats','cgErrors','cgPreview','cgGenWrap'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.style.display='none';
-  });
-  document.getElementById('cgFileInput').value='';
-  cgSetStep(1);
-}
-
-</script>
-</body>
-</html>
