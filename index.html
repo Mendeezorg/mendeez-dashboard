@@ -315,7 +315,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:20px">
-    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Total Dispatched MTD</div><div class="sv blue shimmer" id="s-disp">—</div><div class="ssub">Perf Report 26</div></div>
+    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Total Dispatched MTD</div><div class="sv blue shimmer" id="s-disp">—</div><div class="ssub" id="s-disp-sub">Perf Report 26</div></div>
     <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub" id="s-delivered-sub">Perf Report 26</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub" id="s-cancel-mtd-sub">Perf Report 26</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub" id="s-cancel-cf-sub">Perf Report 26</div></div>
@@ -1804,6 +1804,7 @@ function extractCSDataForMonth(rows,sectionStart,sectionEnd,monthName,year,clean
       if(col3>0)result.orderStatus.pending=col3;
     } else if(label.includes('total dispach')||label.includes('total dispatch')){
       if(col3>0)result.orderStatus.dispatched=col3;
+      if(col4>0){result.orderStatus.dispatchedVal=col4;result.orderStatus.dispatchedPct=pct;}
     }
     // Cancellation reasons — col0=reason label, col1=count, col2=value
     const cancelKeywords=['call not answered','customer cancelled','duplicate order','fake order',
@@ -1984,7 +1985,24 @@ function renderDailyStats(){
   setV('s-rev',rev>0?'PKR '+fmt(rev):'—','amber');
   setV('s-ord',ords>0?ords:'—','');
   setV('s-spend',adSpend>0?'PKR '+fmt(adSpend):'—','');
-  setV('s-disp',cntCrr.dispatched>0?cntCrr.dispatched:'—','blue');
+  // Total Dispatched — from Perf Report 26 sheet (value + percentage)
+  const dispVal = os.dispatchedVal||0;
+  const dispOrders = os.dispatched||0;
+  const dispPct = os.dispatchedPct||0;
+  if(dispVal>0){
+    setV('s-disp', fPKR(dispVal), 'blue');
+    const dispSubEl = document.getElementById('s-disp-sub');
+    if(dispSubEl){
+      const parts=[];
+      if(dispOrders>0) parts.push(fmt(dispOrders)+' orders');
+      if(dispPct>0) parts.push(dispPct+'%');
+      dispSubEl.textContent = parts.length>0 ? parts.join(' · ') : 'Perf Report 26';
+    }
+  } else if(dispOrders>0){
+    setV('s-disp', fmt(dispOrders)+' orders', 'blue');
+  } else {
+    setV('s-disp','—','blue');
+  }
 
   // Helper to set sub-line text for sheet cards
   const setSub=(id,orders,pct)=>{
