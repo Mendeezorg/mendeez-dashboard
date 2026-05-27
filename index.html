@@ -184,12 +184,47 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .cs-kpi{text-align:center}
 .cs-kpi-val{font-size:18px;font-weight:700;font-family:var(--mono)}
 .cs-kpi-lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.03em}
+
+/* ── LOGIN ── */
+#loginOverlay{position:fixed;inset:0;background:#0d0d0d;z-index:99999;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;}
+.login-card{background:#161616;border:1px solid #2a2a2a;border-radius:14px;padding:36px 32px;width:100%;max-width:380px;}
+.login-logo{font-size:20px;font-weight:800;color:#e8c547;letter-spacing:0.05em;margin-bottom:4px;}
+.login-sub{font-size:11px;color:#555;margin-bottom:28px;}
+.login-label{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;}
+.login-input{width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px;color:#f0ede8;font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:14px;outline:none;transition:border-color 0.15s;}
+.login-input:focus{border-color:#e8c547;}
+.login-btn{width:100%;background:#e8c547;border:none;border-radius:8px;padding:11px;color:#0d0d0d;font-size:14px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:background 0.15s;}
+.login-btn:hover{background:#f0d479;}
+.login-err{color:#e05252;font-size:12px;margin-top:8px;text-align:center;min-height:16px;}
+.login-role{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;}
+.login-role.agent{background:rgba(232,197,71,0.12);color:#e8c547;}
+.login-role.manager{background:rgba(76,175,125,0.12);color:#4caf7d;}
+
 </style>
 </head>
 <body>
 
 <!-- SETUP OVERLAY -->
-<div class="overlay" id="setupOverlay">
+
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">MENDEEZ</div>
+    <div class="login-sub">Ecommerce Dashboard — Sign In</div>
+    <div class="login-label">Username</div>
+    <input class="login-input" id="li-user" type="text" placeholder="Enter username" onkeydown="if(event.key==='Enter')document.getElementById('li-pwd').focus()"/>
+    <div class="login-label">Password</div>
+    <div style="position:relative;margin-bottom:14px">
+      <input class="login-input" id="li-pwd" type="password" placeholder="Enter password" style="margin-bottom:0;padding-right:40px" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button onclick="toggleLoginPwd()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#555;font-size:16px;padding:0">👁</button>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign In →</button>
+    <div class="login-err" id="li-err"></div>
+    <a href="/" style="display:block;text-align:center;margin-top:16px;color:#555;font-size:12px;text-decoration:none;font-family:'Syne',sans-serif;transition:color 0.15s" onmouseover="this.style.color='#e8c547'" onmouseout="this.style.color='#555'">🏠 Back to Main Dashboard</a>
+  </div>
+</div>
+
+<div class="overlay" id="setupOverlay" style="display:none">
   <div class="setup-box">
     <div class="setup-title">MENDEEZ OPS</div>
     <div class="setup-sub">Connect your four data sources. Open the file from anywhere — Chrome, Firefox, or Edge.</div>
@@ -228,6 +263,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="badge badge-grey" id="bCrr"><div class="sdot" style="background:var(--muted2)"></div>Courier</div>
     <div class="badge badge-grey" id="bCS"><div class="sdot" style="background:var(--muted2)"></div>CS</div>
     <div class="upd">Updated: <span id="lastUpd">—</span></div>
+    <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #e8c547;border-radius:6px;color:#e8c547;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;font-family:'Syne',sans-serif">🏠 Portal</a>
+    <a href="/tasks/" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#e8c547;border:none;border-radius:6px;color:#0d0d0d;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">✅ Task Manager</a>
+    <button onclick="doEcomLogout()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #444;border-radius:6px;color:#999;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⇄ Logout</button>
+    
     <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
 </div>
@@ -736,7 +775,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 <script>
 // ═══════════ STATE ═══════════
-let STORE='',TOKEN='',SHEET_ID='',ADS_TAB='',CRR_TAB='',CS_TAB='';
+let STORE='mendeez.myshopify.com',
+       TOKEN='shpat_hardcoded_placeholder',
+       SHEET_ID='1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs',
+       ADS_TAB='Ads',CRR_TAB='Courier',CS_TAB='Perf Report 26';
 let ordersData=[],allProducts=[],manualData={};
 let allCrr=[],filtCrr=[],crrPage=1;
 const PAGE=50;
@@ -4233,6 +4275,360 @@ function renderComplaintsTable(){
     return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${cells.join('')}</tr>`;
   }).join('');
 }
+
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════
+// SUPABASE CONFIG — Mendeez Dashboard
+// ═══════════════════════════════════════════════════
+const SUPA_URL  = 'https://afewclisvjjwvpxvyazm.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZXdjbGlzdmpqd3ZweHZ5YXptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODQ3OTcsImV4cCI6MjA5NTI2MDc5N30.bixfpmZU1MDdUKj85rtE1xgoa5F3oX9N2UFdquvWJTQ';
+const DB = {
+  h:{'apikey':SUPA_ANON,'Authorization':`Bearer ${SUPA_ANON}`,'Content-Type':'application/json','Prefer':'return=representation'},
+  async get(table,q=''){try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}?${q}`,{headers:this.h});return r.ok?r.json():[];}catch(e){return[];}},
+  async insert(table,data){try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:this.h,body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}},
+  async update(table,id,data,col='id'){try{await fetch(`${SUPA_URL}/rest/v1/${table}?${col}=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:this.h,body:JSON.stringify(data)});}catch(e){}},
+  async delete(table,id,col='id'){try{await fetch(`${SUPA_URL}/rest/v1/${table}?${col}=eq.${encodeURIComponent(id)}`,{method:'DELETE',headers:this.h});}catch(e){}},
+  async upsert(table,data){try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:{...this.h,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}}
+};
+
+// ═══════════════════════════════════════════════════
+// USER ACCOUNTS — managed via Admin Panel later
+// ═══════════════════════════════════════════════════
+const ECOM_USERS = [
+  {username:'manager',  password:'Mndz@Ecom26!', role:'manager', name:'Ecom Manager'},
+  {username:'agent1',   password:'Agent1@2026!',  role:'agent',   name:'Agent 1A'},
+  {username:'agent2',   password:'Agent2@2026!',  role:'agent',   name:'Agent 2N'},
+];
+
+let currentUser = null;
+
+function hashPwd(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h)+s.charCodeAt(i);return(h>>>0).toString(16);}
+
+function toggleLoginPwd(){
+  const inp=document.getElementById('li-pwd');
+  inp.type=inp.type==='password'?'text':'password';
+}
+
+function doEcomLogout(){
+  currentUser=null;
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('li-user').value='';
+  document.getElementById('li-pwd').value='';
+  document.getElementById('li-err').textContent='';
+  // Reset tab visibility
+  document.querySelectorAll('.tab').forEach(t=>t.style.display='');
+}
+
+function doLogin(){
+  const u=document.getElementById('li-user').value.trim();
+  const p=document.getElementById('li-pwd').value;
+  const user=ECOM_USERS.find(x=>x.username===u&&x.password===p);
+  if(!user){
+    document.getElementById('li-err').textContent='Invalid username or password';
+    document.getElementById('li-pwd').value='';
+    return;
+  }
+  currentUser=user;
+  document.getElementById('loginOverlay').style.display='none';
+  // Apply role restrictions
+  applyRoleView(user.role);
+  // Init dashboard
+  loadAll().catch(e=>console.warn('Load warning:',e));
+  renderCSFromSupabase();
+}
+
+function applyRoleView(role){
+  if(role==='agent'){
+    // Hide all tabs except Overview and CS & Confirmations
+    document.querySelectorAll('.tab').forEach(t=>{
+      const txt=t.textContent.trim();
+      if(txt!=='Overview'&&txt!=='CS & Confirmations'){
+        t.style.display='none';
+      }
+    });
+    // Add New Entry button to CS tab
+    setTimeout(()=>{
+      const csPanel=document.getElementById('panel-cs');
+      if(csPanel&&!document.getElementById('newEntryBtn')){
+        const btn=document.createElement('button');
+        btn.id='newEntryBtn';
+        btn.className='btn btn-s';
+        btn.style.cssText='background:#e8c547;color:#0d0d0d;font-weight:700;margin-bottom:16px;';
+        btn.textContent='+ New Entry';
+        btn.onclick=openNewEntryModal;
+        csPanel.insertBefore(btn,csPanel.firstChild);
+      }
+    },100);
+  } else {
+    // Manager sees everything + New Entry button
+    setTimeout(()=>{
+      const csPanel=document.getElementById('panel-cs');
+      if(csPanel&&!document.getElementById('newEntryBtn')){
+        const btn=document.createElement('button');
+        btn.id='newEntryBtn';
+        btn.className='btn btn-s';
+        btn.style.cssText='background:#e8c547;color:#0d0d0d;font-weight:700;margin-bottom:16px;';
+        btn.textContent='+ New Entry';
+        btn.onclick=openNewEntryModal;
+        csPanel.insertBefore(btn,csPanel.firstChild);
+      }
+    },100);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// CS ENTRIES — Supabase powered
+// ═══════════════════════════════════════════════════
+const AGENT_FIELDS = {
+  agent1: ['Chats','Inbound Calls','OutBound Calls','R/ Returns','Exchange'],
+  agent2: ['Chats','Inbound Calls','OutBound Calls','R/ Returns','Complaints'],
+};
+
+function openNewEntryModal(){
+  const existing=document.getElementById('cs-entry-modal');
+  if(existing)existing.remove();
+
+  const isAgent1=currentUser&&currentUser.username==='agent1';
+  const isAgent2=currentUser&&currentUser.username==='agent2';
+  const isManager=currentUser&&currentUser.role==='manager';
+
+  // Determine which agent fields to show
+  let agentSections='';
+  const today=new Date().toISOString().slice(0,10);
+
+  if(isAgent1||isManager){
+    agentSections+=`
+    <div style="margin-bottom:20px">
+      <div style="background:rgba(232,197,71,0.08);border:1px solid rgba(232,197,71,0.2);border-radius:8px;padding:12px 14px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:#e8c547;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">👤 Agent 1A</div>
+        ${AGENT_FIELDS.agent1.map(f=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <label style="font-size:12px;color:#999;width:140px">${f}</label>
+            <input type="number" min="0" id="a1_${f.replace(/[ /]/g,'_')}" placeholder="0"
+              style="width:100px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;color:#f0ede8;font-size:13px;text-align:center;outline:none"/>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if(isAgent2||isManager){
+    agentSections+=`
+    <div style="margin-bottom:20px">
+      <div style="background:rgba(91,156,246,0.08);border:1px solid rgba(91,156,246,0.2);border-radius:8px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:700;color:#5b9cf6;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">👤 Agent 2N</div>
+        ${AGENT_FIELDS.agent2.map(f=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <label style="font-size:12px;color:#999;width:140px">${f}</label>
+            <input type="number" min="0" id="a2_${f.replace(/[ /]/g,'_')}" placeholder="0"
+              style="width:100px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;color:#f0ede8;font-size:13px;text-align:center;outline:none"/>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  const modal=document.createElement('div');
+  modal.id='cs-entry-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;font-family:"DM Sans",sans-serif;';
+  modal.innerHTML=`
+    <div style="background:#161616;border:1px solid #2a2a2a;border-radius:14px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:700;color:#f0ede8;font-family:'Syne',sans-serif">📋 New CS Entry</div>
+        <button onclick="document.getElementById('cs-entry-modal').remove()" style="background:none;border:none;color:#555;cursor:pointer;font-size:18px">✕</button>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Date</div>
+        <input type="date" id="cs-entry-date" value="${today}"
+          style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#f0ede8;font-size:13px;outline:none"/>
+      </div>
+      ${agentSections}
+      <div id="cs-entry-err" style="color:#e05252;font-size:12px;margin-bottom:10px;display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('cs-entry-modal').remove()"
+          style="flex:1;padding:10px;border-radius:8px;border:1px solid #2a2a2a;background:transparent;color:#999;font-size:13px;cursor:pointer">Cancel</button>
+        <button onclick="submitCSEntry()"
+          style="flex:2;padding:10px;border-radius:8px;border:none;background:#e8c547;color:#0d0d0d;font-size:13px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif">✅ Submit Entry</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+
+async function submitCSEntry(){
+  const date=document.getElementById('cs-entry-date').value;
+  if(!date){showCSErr('Please select a date');return;}
+
+  const isAgent1=currentUser&&currentUser.username==='agent1';
+  const isAgent2=currentUser&&currentUser.username==='agent2';
+  const isManager=currentUser&&currentUser.role==='manager';
+
+  const entries=[];
+
+  // Collect Agent 1 data
+  if(isAgent1||isManager){
+    const data={agent:'agent1',agent_name:'Agent 1A',date};
+    AGENT_FIELDS.agent1.forEach(f=>{
+      const el=document.getElementById('a1_'+f.replace(/[ /]/g,'_'));
+      data[f]=el?parseInt(el.value)||0:0;
+    });
+    data.total=Object.values(data).filter(v=>typeof v==='number').reduce((a,b)=>a+b,0);
+    entries.push(data);
+  }
+
+  // Collect Agent 2 data
+  if(isAgent2||isManager){
+    const data={agent:'agent2',agent_name:'Agent 2N',date};
+    AGENT_FIELDS.agent2.forEach(f=>{
+      const el=document.getElementById('a2_'+f.replace(/[ /]/g,'_'));
+      data[f]=el?parseInt(el.value)||0:0;
+    });
+    data.total=Object.values(data).filter(v=>typeof v==='number').reduce((a,b)=>a+b,0);
+    entries.push(data);
+  }
+
+  if(!entries.length){showCSErr('No data to submit');return;}
+
+  // Save to Supabase
+  try{
+    // Upsert each agent entry for this date
+    for(const entry of entries){
+      await DB.upsert('cs_entries', entry);
+    }
+    document.getElementById('cs-entry-modal').remove();
+    renderCSFromSupabase();
+    // Show success
+    showCSSuccess('✅ Entry submitted successfully!');
+  }catch(e){
+    showCSErr('Failed to save. Please try again.');
+    console.error(e);
+  }
+}
+
+function showCSErr(msg){
+  const el=document.getElementById('cs-entry-err');
+  if(el){el.textContent=msg;el.style.display='block';}
+}
+
+function showCSSuccess(msg){
+  const existing=document.getElementById('cs-success-toast');
+  if(existing)existing.remove();
+  const toast=document.createElement('div');
+  toast.id='cs-success-toast';
+  toast.style.cssText='position:fixed;bottom:24px;right:24px;background:#4caf7d;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;font-family:"Syne",sans-serif;';
+  toast.textContent=msg;
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(),3000);
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER CS DATA FROM SUPABASE
+// ═══════════════════════════════════════════════════
+async function renderCSFromSupabase(){
+  const now=new Date();
+  const year=now.getFullYear();
+  const month=String(now.getMonth()+1).padStart(2,'0');
+  const monthStart=`${year}-${month}-01`;
+  const monthEnd=`${year}-${month}-31`;
+
+  // Get all entries for this month
+  const entries=await DB.get('cs_entries',`date=gte.${monthStart}&date=lte.${monthEnd}&order=date.asc`)||[];
+
+  // Build monthly totals per agent
+  const daysInMonth=new Date(year,now.getMonth()+1,0).getDate();
+  const agent1Totals={};
+  const agent2Totals={};
+  AGENT_FIELDS.agent1.forEach(f=>agent1Totals[f]=0);
+  AGENT_FIELDS.agent2.forEach(f=>agent2Totals[f]=0);
+
+  // Also build day-by-day data
+  const byDay={};
+  entries.forEach(e=>{
+    const day=parseInt(e.date.split('-')[2]);
+    if(!byDay[day])byDay[day]={};
+    if(e.agent==='agent1'){
+      AGENT_FIELDS.agent1.forEach(f=>{
+        const val=e[f]||0;
+        agent1Totals[f]=(agent1Totals[f]||0)+val;
+        if(!byDay[day].a1)byDay[day].a1={};
+        byDay[day].a1[f]=val;
+      });
+    }
+    if(e.agent==='agent2'){
+      AGENT_FIELDS.agent2.forEach(f=>{
+        const val=e[f]||0;
+        agent2Totals[f]=(agent2Totals[f]||0)+val;
+        if(!byDay[day].a2)byDay[day].a2={};
+        byDay[day].a2[f]=val;
+      });
+    }
+  });
+
+  // Build the table
+  const days=Array.from({length:daysInMonth},(_,i)=>i+1);
+  const today=now.getDate();
+
+  function buildAgentRows(fields,totals,dayKey,color,agentLabel){
+    return fields.map((f,fi)=>`
+      <tr>
+        ${fi===0?`<td rowspan="${fields.length}" style="font-weight:700;color:${color};white-space:nowrap;padding:6px 10px;border-right:2px solid #222;font-size:12px;vertical-align:middle">${agentLabel}</td>`:''}
+        <td style="white-space:nowrap;padding:6px 10px;border-right:1px solid #222;font-size:12px;color:#ccc">${f}</td>
+        ${days.map(d=>{
+          const val=byDay[d]&&byDay[d][dayKey]&&byDay[d][dayKey][f]!=null?byDay[d][dayKey][f]:'';
+          const isToday=d===today;
+          return`<td style="text-align:center;padding:4px 6px;font-size:12px;font-family:'DM Mono',monospace;background:${isToday?'rgba(232,197,71,0.08)':'transparent'};color:${val?'#f0ede8':'#333'}">${val}</td>`;
+        }).join('')}
+        <td style="text-align:center;padding:4px 8px;font-weight:700;font-size:12px;font-family:'DM Mono',monospace;background:#1a1a1a;color:${color}">${totals[f]||0}</td>
+      </tr>`).join('');
+  }
+
+  const tableHTML=`
+    <div style="overflow-x:auto;margin-top:16px">
+      <table style="border-collapse:collapse;width:100%;min-width:900px;font-family:'DM Sans',sans-serif">
+        <thead>
+          <tr style="background:#1a1a1a">
+            <th style="padding:8px 10px;text-align:left;font-size:10px;color:#666;letter-spacing:0.06em;text-transform:uppercase;border-right:2px solid #222;white-space:nowrap">Agent</th>
+            <th style="padding:8px 10px;text-align:left;font-size:10px;color:#666;letter-spacing:0.06em;text-transform:uppercase;border-right:1px solid #222">Activity</th>
+            ${days.map(d=>`<th style="padding:6px 4px;text-align:center;font-size:10px;color:${d===today?'#e8c547':'#555'};min-width:28px;font-family:'DM Mono',monospace">${d}</th>`).join('')}
+            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#e8c547;letter-spacing:0.06em;text-transform:uppercase;background:#1a1a1a">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${buildAgentRows(AGENT_FIELDS.agent1,agent1Totals,'a1','#e8c547','Agent 1A')}
+          <tr><td colspan="${daysInMonth+3}" style="height:8px;background:transparent"></td></tr>
+          ${buildAgentRows(AGENT_FIELDS.agent2,agent2Totals,'a2','#5b9cf6','Agent 2N')}
+        </tbody>
+      </table>
+    </div>`;
+
+  // Update the CS agent table area
+  const csTable=document.getElementById('csAgentTable');
+  if(csTable){
+    csTable.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:600;color:#f0ede8;font-family:'Syne',sans-serif">MTD Agent Performance — ${now.toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
+        <div style="font-size:11px;color:#555">${entries.length} entries recorded</div>
+      </div>
+      ${tableHTML}`;
+  }
+}
+
+// Auto-refresh CS table when on CS tab
+document.addEventListener('DOMContentLoaded',()=>{
+  const csTab=document.querySelector('.tab[onclick*="cs"]');
+  if(csTab){
+    const orig=csTab.onclick;
+    csTab.onclick=function(e){
+      if(orig)orig.call(this,e);
+      setTimeout(renderCSFromSupabase,200);
+    };
+  }
+});
+
+</script>
+
+<script>
+// Add themed buttons to topbar after page loads
 
 </script>
 </body>
