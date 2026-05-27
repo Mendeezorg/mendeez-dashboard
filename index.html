@@ -4344,7 +4344,7 @@ function applyRoleView(role){
     // Hide all tabs except Overview and CS & Confirmations
     document.querySelectorAll('.tab').forEach(t=>{
       const txt=t.textContent.trim();
-      if(txt!=='Overview'&&txt!=='CS & Confirmations'){
+      if(txt!=='Overview'&&txt!=='CS & Confirmations'&&txt!=='Products & Stock'){
         t.style.display='none';
       }
     });
