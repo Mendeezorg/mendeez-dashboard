@@ -4423,7 +4423,7 @@ function renderComplaintsTable(){
   // Table headers
   document.getElementById('cmpTableHead').innerHTML = '<tr>'+
     headers.map(h=>`<th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap">${h||'—'}</th>`).join('')+
-    '<th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)">ACTION</th>'+
+
   '</tr>';
 
   // Inject filter bar above table
@@ -4449,34 +4449,31 @@ function renderComplaintsTable(){
       let display = val||'—';
       if(ci===statusIdx){
         const isSolved = lv.includes('solve')||lv.includes('close')||lv.includes('done');
-        const isActive = lv.includes('active')||lv.includes('open');
-        if(isSolved) display=`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;background:#00d4aa22;color:var(--green);font-weight:700;font-size:11px">✅ Solved</span>`;
-        else if(isActive) display=`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;background:#e0525222;color:var(--red);font-weight:700;font-size:11px">🔴 Active</span>`;
+        if(isSupaRow){
+          // Supabase rows — show editable dropdown
+          display=`<select onchange="toggleComplaintStatus(${rowIdx},this.value)"
+            style="background:${isSolved?'#00d4aa22':'#e0525222'};border:1px solid ${isSolved?'#00d4aa44':'#e0525244'};border-radius:20px;padding:3px 10px;color:${isSolved?'var(--green)':'var(--red)'};font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);outline:none">
+            <option value="Active" ${!isSolved?'selected':''}>🔴 Active</option>
+            <option value="Solved" ${isSolved?'selected':''}>✅ Solved</option>
+          </select>`;
+        } else {
+          // Google Sheet rows — read only pill
+          if(isSolved) display=`<span style="padding:3px 10px;border-radius:20px;background:#00d4aa22;color:var(--green);font-weight:700;font-size:11px">✅ Solved</span>`;
+          else display=`<span style="padding:3px 10px;border-radius:20px;background:#e0525222;color:var(--red);font-weight:700;font-size:11px">🔴 Active</span>`;
+        }
       }
       return `<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px">${display}</td>`;
     });
 
-    // Action column — only for Supabase rows (can toggle status)
-    const currentStatus = String(row[statusIdx]||'').toLowerCase();
-    const isSolved = currentStatus.includes('solve')||currentStatus.includes('close')||currentStatus.includes('done');
-    let actionCell = '<td style="padding:7px 12px;border-bottom:1px solid var(--border)">—</td>';
-    if(isSupaRow){
-      const newStatus = isSolved ? 'Active' : 'Solved';
-      const btnColor = isSolved ? '#e05252' : '#00d4aa';
-      const btnLabel = isSolved ? '🔴 Mark Active' : '✅ Mark Solved';
-      actionCell = `<td style="padding:7px 12px;border-bottom:1px solid var(--border)">
-        <button onclick="toggleComplaintStatus(${rowIdx},'${newStatus}')"
-          style="padding:4px 12px;border-radius:20px;border:1px solid ${btnColor}44;background:${btnColor}22;color:${btnColor};font-size:11px;font-weight:600;cursor:pointer;font-family:var(--sans)">
-          ${btnLabel}
-        </button>
-      </td>`;
-    }
-
-    return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${cells.join('')}${actionCell}</tr>`;
+    return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${cells.join('')}</tr>`;
   }).join('');
 }
 
 async function toggleComplaintStatus(rowIdx, newStatus){
+  // Update local row immediately for instant UI feedback
+  if(window._supaComplaintRows && window._supaComplaintRows[rowIdx]){
+    window._supaComplaintRows[rowIdx][4] = newStatus;
+  }
   const supaRows = window._supaComplaintRows || [];
   const row = supaRows[rowIdx];
   if(!row) return;
