@@ -704,14 +704,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px">
-      <div style="display:flex;align-items:center;gap:14px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <button onclick="closeComplaintsPage()" style="background:none;border:1px solid var(--border2);color:var(--muted);padding:7px 14px;border-radius:6px;cursor:pointer;font-family:var(--sans);font-size:12px;display:flex;align-items:center;gap:6px">
           ← Back to CS & Confirmations
         </button>
-        <div>
-          <div style="font-size:18px;font-weight:700;color:var(--text)">🔴 Complaints Review</div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px">Complaints Data 26 — independent data</div>
-        </div>
+        <div style="font-size:18px;font-weight:700;color:var(--text)">🔴 Complaints Review</div>
+        <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">Complaints Data 26 — independent data</div>
+        <button onclick="openNewComplaintModal()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#e05252;border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans)">🔴 New Complaint</button>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Month:</span>
@@ -4230,11 +4229,176 @@ function filterByNature(nature){
   document.getElementById('cmpTableBody').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
+// ═══════════════════════════════════════════════════
+// NEW COMPLAINT SYSTEM — Supabase powered
+// ═══════════════════════════════════════════════════
+const COMPLAINT_NATURES = [
+  'Courier (BlueEx) DT',
+  'Courier (PostEx) DT',
+  'QC Department',
+  'Missing Product By Team',
+  'Missing Product By Courier',
+  'Wrong Product',
+  'Other',
+];
+
+function openNewComplaintModal(){
+  const ex = document.getElementById('new-complaint-modal');
+  if(ex) ex.remove();
+  const today = new Date().toISOString().slice(0,10);
+  const agentName = currentUser ? currentUser.name : 'Agent';
+  const modal = document.createElement('div');
+  modal.id = 'new-complaint-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;font-family:"DM Sans",sans-serif;';
+  modal.innerHTML = `
+    <div style="background:#161616;border:1px solid #2a2a2a;border-radius:14px;padding:26px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="font-size:15px;font-weight:700;color:#f0ede8;font-family:'Syne',sans-serif">🔴 New Complaint</div>
+        <button onclick="document.getElementById('new-complaint-modal').remove()" style="background:none;border:none;color:#555;cursor:pointer;font-size:18px">✕</button>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Date</div>
+        <input type="date" id="nc-date" value="${today}"
+          style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#f0ede8;font-size:13px;outline:none;font-family:'DM Sans',sans-serif"/>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Order ID</div>
+        <input type="text" id="nc-order" placeholder="e.g. 1234567"
+          style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#f0ede8;font-size:13px;outline:none;font-family:'DM Sans',sans-serif"/>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Complaint Nature</div>
+        <select id="nc-nature"
+          style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#f0ede8;font-size:13px;outline:none;font-family:'DM Sans',sans-serif">
+          <option value="">Select nature...</option>
+          ${COMPLAINT_NATURES.map(n=>`<option value="${n}">${n}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Handled By</div>
+        <input type="text" id="nc-agent" value="${agentName}" readonly
+          style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#777;font-size:13px;outline:none;font-family:'DM Sans',sans-serif"/>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Status</div>
+        <select id="nc-status"
+          style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#f0ede8;font-size:13px;outline:none;font-family:'DM Sans',sans-serif">
+          <option value="Active">Active</option>
+          <option value="Solved">Solved</option>
+          <option value="Pending">Pending</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Remarks</div>
+        <textarea id="nc-remarks" placeholder="Describe the complaint..."
+          style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#f0ede8;font-size:13px;outline:none;font-family:'DM Sans',sans-serif;resize:vertical;min-height:80px"></textarea>
+      </div>
+
+      <div id="nc-err" style="color:#e05252;font-size:12px;margin-bottom:10px;display:none"></div>
+
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('new-complaint-modal').remove()"
+          style="flex:1;padding:10px;border-radius:8px;border:1px solid #2a2a2a;background:transparent;color:#999;font-size:13px;cursor:pointer">Cancel</button>
+        <button onclick="submitNewComplaint()"
+          style="flex:2;padding:10px;border-radius:8px;border:none;background:#e05252;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif">🔴 Submit Complaint</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+
+async function submitNewComplaint(){
+  const date    = document.getElementById('nc-date').value;
+  const order   = document.getElementById('nc-order').value.trim();
+  const nature  = document.getElementById('nc-nature').value;
+  const agent   = document.getElementById('nc-agent').value;
+  const status  = document.getElementById('nc-status').value;
+  const remarks = document.getElementById('nc-remarks').value.trim();
+  const errEl   = document.getElementById('nc-err');
+
+  if(!date||!order||!nature){
+    errEl.style.display='block';
+    errEl.textContent='Please fill in Date, Order ID and Complaint Nature.';
+    return;
+  }
+
+  const complaint = {
+    date, order_id:order, nature, agent, status, remarks,
+    submitted_by: currentUser?currentUser.username:'unknown',
+    created_at: new Date().toISOString()
+  };
+
+  try{
+    await DB.upsert('complaints', complaint);
+    document.getElementById('new-complaint-modal').remove();
+    // Show success toast
+    showCSSuccess('🔴 Complaint submitted successfully!');
+    // Refresh complaints table
+    await loadComplaintsFromSupabase();
+  } catch(e){
+    errEl.style.display='block';
+    errEl.textContent='Failed to save. Please try again.';
+    console.error(e);
+  }
+}
+
+// Load complaints from Supabase and inject into complaints table
+async function loadComplaintsFromSupabase(){
+  try{
+    const data = await DB.get('complaints','order=created_at.desc&limit=500');
+    if(!data||!data.length) return;
+
+    // Map Supabase rows — same format as Google Sheet rows
+    window._supaComplaintRows = data.map(c=>[
+      c.date||'', c.order_id||'', c.nature||'', c.agent||'', c.status||'', c.remarks||''
+    ]);
+
+    // Update nature filter with any new natures from Supabase
+    const natures = [...new Set(data.map(c=>c.nature).filter(Boolean))];
+    const sel = document.getElementById('cmpNatureFilter');
+    if(sel){
+      const existing = Array.from(sel.options).map(o=>o.value);
+      natures.forEach(n=>{
+        if(!existing.includes(n)){
+          const opt = document.createElement('option');
+          opt.value=n; opt.textContent=n;
+          sel.appendChild(opt);
+        }
+      });
+    }
+
+    // Re-render — will now include both Sheet + Supabase data
+    renderComplaintsTable();
+  }catch(e){
+    console.warn('Supabase complaints load failed — showing Google Sheet data only');
+  }
+}
+
+// Patch getFilteredRows to MERGE Google Sheet + Supabase rows
+const _origGetFilteredRows = typeof getFilteredRows === 'function' ? getFilteredRows : null;
+function getFilteredRows(){
+  const sheetRows = _origGetFilteredRows ? _origGetFilteredRows() : [];
+  const supaRows  = window._supaComplaintRows || [];
+  // Supabase rows first (newest entries on top), then sheet rows
+  return [...supaRows, ...sheetRows];
+}
+
+// Auto-load Supabase complaints when complaints page opens
+const _origOpenComplaintsPage = typeof openComplaintsPage === 'function' ? openComplaintsPage : null;
+function openComplaintsPage(){
+  if(_origOpenComplaintsPage) _origOpenComplaintsPage();
+  setTimeout(loadComplaintsFromSupabase, 300);
+}
+
+
 function renderComplaintsTable(){
   const filterVal = document.getElementById('cmpNatureFilter').value;
-  const allRows = getFilteredRows();
-  const headers = _complaintsHeaders.length ? _complaintsHeaders : (allRows[0]||[]);
-  const dataRows = _complaintsHeaders.length ? allRows : allRows.slice(1);
 
   const statusKeywords = ['status','state','resolution'];
   const natureKeywords = ['nature','type','complaint type','complaint nature','category'];
