@@ -4387,6 +4387,7 @@ async function loadComplaintsFromSupabase(){
 
 function renderComplaintsTable(){
   const filterVal = document.getElementById('cmpNatureFilter').value;
+  const statusFilter = window._cmpStatusFilter || 'all';
   const allRows = getFilteredRows();
   const headers = _complaintsHeaders.length ? _complaintsHeaders : (allRows[0]||['Date','Order ID','Nature','Handled By','Status','Remarks']);
   const dataRows = _complaintsHeaders.length ? allRows : allRows.slice(1);
@@ -4397,38 +4398,103 @@ function renderComplaintsTable(){
   const natureIdx = headers.findIndex(h=>natureKeywords.some(k=>h.toLowerCase().includes(k)));
 
   let rows = dataRows;
-  if(filterVal){
-    rows = rows.filter(row=>row.some(cell=>String(cell).toLowerCase().includes(filterVal.toLowerCase())));
-  }
+  if(filterVal) rows = rows.filter(row=>row.some(cell=>String(cell).toLowerCase().includes(filterVal.toLowerCase())));
+  if(statusFilter==='active') rows = rows.filter(row=>{ const v=(row[statusIdx]||'').toLowerCase(); return v.includes('active')||v.includes('open'); });
+  if(statusFilter==='solved') rows = rows.filter(row=>{ const v=(row[statusIdx]||'').toLowerCase(); return v.includes('solve')||v.includes('close')||v.includes('done'); });
 
-  document.getElementById('cmpTableCount').textContent = rows.length+' complaint'+(rows.length!==1?'s':'');
+  // Status filter buttons above table
+  const countAll = dataRows.length;
+  const countActive = dataRows.filter(r=>{ const v=(r[statusIdx]||'').toLowerCase(); return v.includes('active')||v.includes('open'); }).length;
+  const countSolved = dataRows.filter(r=>{ const v=(r[statusIdx]||'').toLowerCase(); return v.includes('solve')||v.includes('close')||v.includes('done'); }).length;
+
+  const btnStyle = (active) => active
+    ? 'padding:5px 14px;border-radius:20px;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans)'
+    : 'padding:5px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;font-size:11px;font-weight:500;cursor:pointer;font-family:var(--sans);color:var(--muted)';
+
+  const filterBar = `<div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+    <button onclick="window._cmpStatusFilter='all';renderComplaintsTable()" style="${btnStyle(statusFilter==='all')};background:${statusFilter==='all'?'var(--surface3)':'transparent'};color:${statusFilter==='all'?'var(--text)':'var(--muted)'}">All (${countAll})</button>
+    <button onclick="window._cmpStatusFilter='active';renderComplaintsTable()" style="${btnStyle(statusFilter==='active')};background:${statusFilter==='active'?'#e0525222':'transparent'};color:${statusFilter==='active'?'var(--red)':'var(--muted)'};border:1px solid ${statusFilter==='active'?'#e0525244':'var(--border2)'}">🔴 Active (${countActive})</button>
+    <button onclick="window._cmpStatusFilter='solved';renderComplaintsTable()" style="${btnStyle(statusFilter==='solved')};background:${statusFilter==='solved'?'#00d4aa22':'transparent'};color:${statusFilter==='solved'?'var(--green)':'var(--muted)'};border:1px solid ${statusFilter==='solved'?'#00d4aa44':'var(--border2)'}">✅ Solved (${countSolved})</button>
+    <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:var(--mono)">${rows.length} complaint${rows.length!==1?'s':''}</span>
+  </div>`;
+
+  document.getElementById('cmpTableCount').textContent = '';
 
   // Table headers
   document.getElementById('cmpTableHead').innerHTML = '<tr>'+
     headers.map(h=>`<th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap">${h||'—'}</th>`).join('')+
+    '<th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)">ACTION</th>'+
   '</tr>';
+
+  // Inject filter bar above table
+  const tableWrap = document.getElementById('cmpTableHead').closest('table');
+  if(tableWrap){
+    let bar = document.getElementById('cmp-filter-bar');
+    if(!bar){ bar=document.createElement('div'); bar.id='cmp-filter-bar'; tableWrap.parentNode.insertBefore(bar,tableWrap); }
+    bar.innerHTML = filterBar;
+  }
 
   if(!rows.length){
     document.getElementById('cmpTableBody').innerHTML =
-      `<tr><td colspan="${headers.length||5}" style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No complaints found${filterVal?' for "'+filterVal+'"':''}</td></tr>`;
+      `<tr><td colspan="${headers.length+1}" style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No complaints found</td></tr>`;
     return;
   }
 
-  document.getElementById('cmpTableBody').innerHTML = rows.map(row=>{
+  document.getElementById('cmpTableBody').innerHTML = rows.map((row, rowIdx)=>{
+    const isSupaRow = rowIdx < (window._supaComplaintRows||[]).length;
+    const rowId = isSupaRow ? (window._supaComplaintRows[rowIdx]?._id||rowIdx) : null;
     const cells = headers.map((_,ci)=>{
       const val = String(row[ci]||'').trim();
       const lv = val.toLowerCase();
       let display = val||'—';
       if(ci===statusIdx){
-        if(lv.includes('solve')||lv.includes('close')||lv.includes('done'))
-          display=`<span style="color:var(--green);font-weight:600">${val}</span>`;
-        else if(lv.includes('active')||lv.includes('open')||lv.includes('pending'))
-          display=`<span style="color:var(--accent);font-weight:600">${val}</span>`;
+        const isSolved = lv.includes('solve')||lv.includes('close')||lv.includes('done');
+        const isActive = lv.includes('active')||lv.includes('open');
+        if(isSolved) display=`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;background:#00d4aa22;color:var(--green);font-weight:700;font-size:11px">✅ Solved</span>`;
+        else if(isActive) display=`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;background:#e0525222;color:var(--red);font-weight:700;font-size:11px">🔴 Active</span>`;
       }
       return `<td style="padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px">${display}</td>`;
     });
-    return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${cells.join('')}</tr>`;
+
+    // Action column — only for Supabase rows (can toggle status)
+    const currentStatus = String(row[statusIdx]||'').toLowerCase();
+    const isSolved = currentStatus.includes('solve')||currentStatus.includes('close')||currentStatus.includes('done');
+    let actionCell = '<td style="padding:7px 12px;border-bottom:1px solid var(--border)">—</td>';
+    if(isSupaRow){
+      const newStatus = isSolved ? 'Active' : 'Solved';
+      const btnColor = isSolved ? '#e05252' : '#00d4aa';
+      const btnLabel = isSolved ? '🔴 Mark Active' : '✅ Mark Solved';
+      actionCell = `<td style="padding:7px 12px;border-bottom:1px solid var(--border)">
+        <button onclick="toggleComplaintStatus(${rowIdx},'${newStatus}')"
+          style="padding:4px 12px;border-radius:20px;border:1px solid ${btnColor}44;background:${btnColor}22;color:${btnColor};font-size:11px;font-weight:600;cursor:pointer;font-family:var(--sans)">
+          ${btnLabel}
+        </button>
+      </td>`;
+    }
+
+    return `<tr onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${cells.join('')}${actionCell}</tr>`;
   }).join('');
+}
+
+async function toggleComplaintStatus(rowIdx, newStatus){
+  const supaRows = window._supaComplaintRows || [];
+  const row = supaRows[rowIdx];
+  if(!row) return;
+
+  // Find the complaint in Supabase by order_id + date
+  try{
+    const existing = await DB.get('complaints', `order_id=eq.${encodeURIComponent(row[1]||'')}&date=eq.${row[0]||''}`);
+    if(existing && existing.length){
+      await DB.update('complaints', existing[0].id, {status: newStatus});
+      // Update local row
+      const statusIdx = window._supaComplaintRows[rowIdx].length >= 5 ? 4 : -1;
+      if(statusIdx >= 0) window._supaComplaintRows[rowIdx][4] = newStatus;
+      showCSSuccess(`✅ Status updated to ${newStatus}`);
+      renderComplaintsTable();
+    }
+  } catch(e){
+    console.error('Failed to update status:', e);
+  }
 }
 
 </script>
