@@ -4068,8 +4068,8 @@ let _complaintsMonths = {};    // month → rows
 function openComplaintsPage(){
   document.getElementById('complaintsOverlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  // Fetch fresh data from Complaints Data 26 sheet
   fetchComplaintsData();
+  setTimeout(loadComplaintsFromSupabase, 300);
 }
 
 function closeComplaintsPage(){
@@ -4389,12 +4389,6 @@ function getFilteredRows(){
   return [...supaRows, ...sheetRows];
 }
 
-// Auto-load Supabase complaints when complaints page opens
-const _origOpenComplaintsPage = typeof openComplaintsPage === 'function' ? openComplaintsPage : null;
-function openComplaintsPage(){
-  if(_origOpenComplaintsPage) _origOpenComplaintsPage();
-  setTimeout(loadComplaintsFromSupabase, 300);
-}
 
 
 function renderComplaintsTable(){
