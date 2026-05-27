@@ -4387,6 +4387,9 @@ async function loadComplaintsFromSupabase(){
 
 function renderComplaintsTable(){
   const filterVal = document.getElementById('cmpNatureFilter').value;
+  const allRows = getFilteredRows();
+  const headers = _complaintsHeaders.length ? _complaintsHeaders : (allRows[0]||['Date','Order ID','Nature','Handled By','Status','Remarks']);
+  const dataRows = _complaintsHeaders.length ? allRows : allRows.slice(1);
 
   const statusKeywords = ['status','state','resolution'];
   const natureKeywords = ['nature','type','complaint type','complaint nature','category'];
