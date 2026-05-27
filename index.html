@@ -4153,8 +4153,9 @@ async function fetchComplaintsData(){
 
 function getFilteredRows(){
   const month = document.getElementById('cmpMonthSel').value;
-  if(month === 'all' || !month) return _complaintsData;
-  return _complaintsMonths[month] || [];
+  const sheetRows = (month === 'all' || !month) ? _complaintsData : (_complaintsMonths[month] || []);
+  const supaRows  = window._supaComplaintRows || [];
+  return [...supaRows, ...sheetRows];
 }
 
 function renderComplaintsPage(){
@@ -4380,14 +4381,7 @@ async function loadComplaintsFromSupabase(){
   }
 }
 
-// Patch getFilteredRows to MERGE Google Sheet + Supabase rows
-const _origGetFilteredRows = typeof getFilteredRows === 'function' ? getFilteredRows : null;
-function getFilteredRows(){
-  const sheetRows = _origGetFilteredRows ? _origGetFilteredRows() : [];
-  const supaRows  = window._supaComplaintRows || [];
-  // Supabase rows first (newest entries on top), then sheet rows
-  return [...supaRows, ...sheetRows];
-}
+// Supabase rows merged inside getFilteredRows directly above
 
 
 
