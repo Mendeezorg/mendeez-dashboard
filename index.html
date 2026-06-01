@@ -5027,8 +5027,28 @@ const GT_OUTLETS = [
 
 // stockData[locCode] = [ {barcode, balanceQty}, ... ]
 let _gtechStockData = {};
-// demand list: [ {barcode, productName, size, locationName, locCode, balanceQty} ]
+// demand list
 let _demandList = [];
+// tracks qty demanded per barcode per location
+let _demandedQty = {};
+
+// Lookup product title from allProducts by barcode or SKU
+function getDemandProductName(barcode){
+  if(!barcode || !window.allProducts) return '—';
+  const bc  = String(barcode).trim();
+  const bcs = bc.replace(/^0+/,'');
+  for(const p of allProducts){
+    for(const v of (p.variants||[])){
+      const vbc  = String(v.barcode||'').trim();
+      const vsku = String(v.sku||'').trim();
+      if(vbc===bc || vbc===bcs || vsku===bc || vsku===bcs ||
+         vbc.replace(/^0+/,'')===bcs || vsku.replace(/^0+/,'')===bcs){
+        return p.title;
+      }
+    }
+  }
+  return '—';
+}
 
 // ── Load all locations in parallel ──
 async function gtechLoadAll(){
@@ -5106,7 +5126,7 @@ async function gtechLoadAll(){
 // 3. If that location is exhausted (demanded = max), spill to next highest
 // 4. If all locations exhausted → warn user
 // _demandedQty tracks how much has been demanded per barcode per locCode
-let _demandedQty = {}; // key: "barcode|locCode" → qty demanded so far
+// key: "barcode|locCode" → qty demanded so far
 
 async function gtechAddDemand(){
   const input  = document.getElementById('demandBcInput');
@@ -5162,7 +5182,7 @@ async function gtechAddDemand(){
     found.forEach(f => {
       _demandList.push({
         barcode      : f.barcode,
-        productName  : '—',
+        productName  : getDemandProductName(f.barcode),
         size         : '—',
         locationName : f.locationName,
         locationShort: f.locationShort,
@@ -5203,7 +5223,7 @@ async function gtechAddDemand(){
   // Add to demand list
   _demandList.push({
     barcode        : best.barcode,
-    productName    : '—',
+    productName    : getDemandProductName(best.barcode),
     size           : '—',
     locationName   : best.locationName,
     locationShort  : best.locationShort,
