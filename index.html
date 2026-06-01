@@ -3769,6 +3769,7 @@ function upDetectCols(headerRow){
     sizes:   find(['sizes','size']),
     sku:     find(['sku (s size)','sku']),
     price:   find(['price (pkr)','price']),
+    design:  find(['design code','design_code','design']),
     compare: find(['compare at (pkr)','compare at','compare']),
     tags:    find(['tags','tag']),
     desc:    find(['description (html)','description','body (html)','body','desc']),
@@ -3819,7 +3820,7 @@ function upParseCSV(rows, fileName){
     const skuPad    = skuRaw.replace(skuPrefix,'').length||7;
     _upCsvProducts.push({name,type,sizes,skuPrefix,skuBase,skuPad,
       price:String(parseFloat(price)||''), compare:compare?String(parseFloat(compare)||''):'',
-      tags, desc, vendor, status});
+      design, tags, desc, vendor, status});
   });
 
   const totalRows = _upCsvProducts.reduce((s,p)=>s+p.sizes.length, 0);
@@ -3950,24 +3951,25 @@ function upUpdateSubmitBtn(){
 const SHOPIFY_HDRS=['Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published','Option1 Name','Option1 Value','Option1 Linked To','Option2 Name','Option2 Value','Option2 Linked To','Option3 Name','Option3 Value','Option3 Linked To','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Unit Price Total Measure','Unit Price Total Measure Unit','Unit Price Base Measure','Unit Price Base Measure Unit','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card','SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product','Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2','Google Shopping / Custom Label 3','Google Shopping / Custom Label 4','related products (product.metafields.custom.related_products)','EComposer product countdown end at (product.metafields.ecomposer.countdown)','EComposer product countdown start at (product.metafields.ecomposer.countdown_from)','Google: Custom Product (product.metafields.mm-google-shopping.custom_product)','Design Code (product.metafields.my_fields.design_code)','Product rating count (product.metafields.reviews.rating_count)','Activewear clothing features (product.metafields.shopify.activewear-clothing-features)','Activity (product.metafields.shopify.activity)','Age group (product.metafields.shopify.age-group)','Clothing accessory material (product.metafields.shopify.clothing-accessory-material)','Color (product.metafields.shopify.color-pattern)','Pants length type (product.metafields.shopify.pants-length-type)','Size (product.metafields.shopify.size)','Target gender (product.metafields.shopify.target-gender)','Complementary products (product.metafields.shopify--discovery--product_recommendation.complementary_products)','Related products (product.metafields.shopify--discovery--product_recommendation.related_products)','Related products settings (product.metafields.shopify--discovery--product_recommendation.related_products_display)','Search product boosts (product.metafields.shopify--discovery--product_search_boost.queries)','Variant Image','Variant Weight Unit','Variant Tax Code','Cost per item','Included / Pakistan','Price / Pakistan','Compare At Price / Pakistan','Status'];
 
 // ── DYNAMIC TAG CACHE — fetched live from Shopify per category ──
-const _tagCache = {}; // type → tags string
+const _tagCache = {}; // type → tags string (cleared on each upload session)
 
 async function getAutoTags(type){
   if(!type) return '';
   const typeKey = type.toLowerCase().trim();
-  // Return cached if available
+  // Return cached if available (cache cleared on each upload session start)
   if(_tagCache[typeKey]) return _tagCache[typeKey];
-  // Fetch latest product of this type from Shopify (exclude factory outlet)
+  // Fetch most recently UPDATED product of this type from Shopify
   if(STORE && TOKEN){
     try{
-      const d = await shopFetch('/products.json?limit=10&product_type='+encodeURIComponent(type)+'&fields=tags&order=created_at+desc');
+      const d = await shopFetch('/products.json?limit=250&product_type='+encodeURIComponent(type)+'&fields=id,tags,updated_at&order=updated_at+desc');
       const products = d.products||[];
-      // Find first product that doesn't have factory outlet tags
+      // Find the most recently updated product with real tags (not factory outlet)
       for(const p of products){
         const tags = p.tags||[];
         const tagStr = Array.isArray(tags) ? tags.join(', ') : String(tags);
-        if(!tagStr.toLowerCase().includes('factory outlet') && tags.length > 0){
+        if(tagStr.trim() && !tagStr.toLowerCase().includes('factory outlet')){
           _tagCache[typeKey] = tagStr;
+          console.log('Auto-tags for "'+type+'" (from updated_at):', tagStr);
           return tagStr;
         }
       }
@@ -4018,6 +4020,9 @@ async function upSubmit(){
   document.getElementById('upLog').style.display='block';
   document.getElementById('upCsvResult').style.display='none';
   document.getElementById('upImgResult').style.display='none';
+
+  // Clear tag cache so this session always fetches the latest tags from Shopify
+  Object.keys(_tagCache).forEach(k => delete _tagCache[k]);
 
   const log=(msg,col)=>{
     const el=document.getElementById('upLog');
