@@ -281,6 +281,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="tab" onclick="switchTab('sorter',this)">Catalog Sorter</div>
   <div class="tab" onclick="switchTab('uploader',this)">📦 Product Uploader</div>
   <div class="tab" onclick="switchTab('gtech',this)">📊 G-Tech Data & Demand</div>
+  <div class="tab" onclick="switchTab('gtechinv',this)">🏪 G-Tech Inventory</div>
 </div>
 
 <!-- DATE RANGE BAR -->
@@ -848,6 +849,56 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 
 </div>
+
+<!-- ══════════════════════════════════════════
+     G-TECH INVENTORY PANEL
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-gtechinv" style="padding:22px 28px;max-width:1440px">
+
+  <div class="ds" style="margin-bottom:20px">
+    <div>
+      <div class="dt">G-Tech Inventory</div>
+      <div class="dsub">Search real-time stock across all outlets by barcode or product name</div>
+    </div>
+  </div>
+
+  <!-- Location selector + search -->
+  <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center">
+    <select id="gtechinvLoc" class="fi" style="width:220px" onchange="gtechinvLoad()">
+      <option value="">— Select Location —</option>
+    </select>
+    <input id="gtechinvSearch" class="fi" placeholder="Search barcode or product name…" style="flex:1;min-width:200px" oninput="gtechinvFilter()">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap">
+      <input type="checkbox" id="gtechinvShowZero" onchange="gtechinvFilter()" style="accent-color:var(--accent)"> Show zero stock
+    </label>
+    <span id="gtechinvStatus" style="font-family:var(--mono);font-size:11px;color:var(--muted)"></span>
+  </div>
+
+  <!-- Summary pills -->
+  <div id="gtechinvSummary" style="display:none;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+
+  <!-- Table -->
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border2)">
+          <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;width:50px">Pic</th>
+          <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Barcode</th>
+          <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Product Name</th>
+          <th style="padding:8px 12px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Balance Qty</th>
+          <th style="padding:8px 12px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Hold Qty</th>
+          <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Price</th>
+          <th style="padding:8px 12px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Status</th>
+        </tr>
+      </thead>
+      <tbody id="gtechinvBody">
+        <tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Select a location to load inventory</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
 
 </div><!-- end .content -->
 
@@ -4648,26 +4699,32 @@ function doLogin(){
 
 function applyRoleView(role){
   if(role==='dispatcher'){
-    // Dispatcher: Overview + G-Tech Data & Demand only
+    // Dispatcher: Overview + G-Tech Data & Demand + G-Tech Inventory only
     document.querySelectorAll('.tab').forEach(t=>{
       const txt=t.textContent.trim();
-      if(txt!=='Overview' && txt!=='📊 G-Tech Data & Demand'){
+      if(txt!=='Overview' && txt!=='📊 G-Tech Data & Demand' && txt!=='🏪 G-Tech Inventory'){
         t.style.display='none';
       }
     });
-    // Switch to Overview tab
     const overviewTab = Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='Overview');
     if(overviewTab) overviewTab.click();
+    // Populate location dropdown
+    gtechinvPopulateSelect();
     return;
   }
+  if(role==='manager'){
+    // Manager sees everything — populate gtechinv dropdown too
+    gtechinvPopulateSelect();
+  }
   if(role==='agent'){
-    // Hide all tabs except Overview and CS & Confirmations
+    // Hide all tabs except Overview, CS & Confirmations, Products & Stock, G-Tech Inventory
     document.querySelectorAll('.tab').forEach(t=>{
       const txt=t.textContent.trim();
-      if(txt!=='Overview'&&txt!=='CS & Confirmations'&&txt!=='Products & Stock'){
+      if(txt!=='Overview'&&txt!=='CS & Confirmations'&&txt!=='Products & Stock'&&txt!=='🏪 G-Tech Inventory'){
         t.style.display='none';
       }
     });
+    gtechinvPopulateSelect();
     // Add New Entry button to CS tab
     setTimeout(()=>{
       const csPanel=document.getElementById('panel-cs');
@@ -4969,7 +5026,7 @@ const GT_OUTLETS = [
   { id:'tariq',     name:'Tariq Road',                 short:'Tariq',   loc:'00100010008' },
   { id:'lucky',     name:'Lucky One Mall',             short:'Lucky',   loc:'00100010009' },
   { id:'squareone', name:'Square One Mall',            short:'Sq.One',  loc:'00100010017' },
-  { id:'malir',     name:'Mendeez Malir Cant',         short:'Malir',   loc:'00100010018' },
+  { id:'factory',   name:'Factory',                     short:'Factory', loc:'00100020001' },
   { id:'dolmen',    name:'Mendeez Dolmen Mall T.Road', short:'Dolmen',  loc:'00100010023' },
 ];
 
@@ -5068,18 +5125,17 @@ async function gtechAddDemand(){
   const found = [];
   GT_OUTLETS.forEach(o => {
     const rows = _gtechStockData[o.loc] || [];
-    // Match with or without leading zeros
     const match = rows.find(r =>
       String(r.barcode).trim() === bc ||
       String(r.barcode).replace(/^0+/,'') === bc.replace(/^0+/,'')
     );
     if(match){
       found.push({
-        barcode    : String(match.barcode).trim(),
-        balanceQty : parseFloat(match.balanceQty || 0),
-        locationName: o.name,
+        barcode      : String(match.barcode).trim(),
+        balanceQty   : parseFloat(match.balanceQty || 0),
+        locationName : o.name,
         locationShort: o.short,
-        locCode    : o.loc,
+        locCode      : o.loc,
       });
     }
   });
@@ -5091,11 +5147,26 @@ async function gtechAddDemand(){
     return;
   }
 
-  // Add each found location to demand list
-  found.forEach(f => {
+  // ── Smart selection logic ──
+  const maxQty = Math.max(...found.map(f => f.balanceQty));
+
+  let toAdd = [];
+  if(maxQty <= 1){
+    // All locations have qty 1 (or less) — add ALL of them
+    toAdd = found;
+    status.textContent = `✓ "${bc}" has qty ≤1 everywhere — added all ${found.length} location(s)`;
+  } else {
+    // Add only the location(s) with maximum qty
+    toAdd = found.filter(f => f.balanceQty === maxQty);
+    const loc = toAdd.map(f => f.locationShort).join(', ');
+    status.textContent = `✓ "${bc}" added from ${loc} (max qty: ${maxQty})`;
+  }
+  status.style.color = 'var(--green)';
+
+  toAdd.forEach(f => {
     _demandList.push({
       barcode      : f.barcode,
-      productName  : '—',   // will show barcode until Shopify loads
+      productName  : '—',
       size         : '—',
       locationName : f.locationName,
       locationShort: f.locationShort,
@@ -5106,11 +5177,8 @@ async function gtechAddDemand(){
 
   input.value = '';
   input.focus();
-  status.textContent = `✓ Added "${bc}" in ${found.length} location(s)`;
-  status.style.color = 'var(--green)';
-
   gtechRenderDemand();
-  setTimeout(() => { status.textContent = ''; }, 3000);
+  setTimeout(() => { status.textContent = ''; }, 4000);
 }
 
 // ── Render demand list and preview ──
@@ -5134,18 +5202,21 @@ function gtechRenderDemand(){
     byBc[item.barcode].push({ ...item, idx });
   });
 
-  listEl.innerHTML = Object.entries(byBc).map(([bc, items]) => `
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-family:var(--mono);font-size:12px;color:var(--accent)">${bc}</span>
-        <button onclick="gtechRemoveBarcode('${bc}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px" title="Remove all">✕</button>
-      </div>
-      ${items.map(item => `
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono);padding:2px 0">
-          <span>${item.locationShort}</span>
-          <span style="color:${item.balanceQty>0?'var(--green)':'var(--red)'}">Qty: ${item.balanceQty}</span>
-        </div>`).join('')}
-    </div>`).join('');
+  listEl.innerHTML = Object.entries(byBc).map(([bc, items]) => {
+    const itemRows = items.map(item =>
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono);padding:2px 0">'
+      + '<span>'+item.locationShort+'</span>'
+      + '<span style="color:'+(item.balanceQty>0?'var(--green)':'var(--red)')+'">Qty: '+item.balanceQty+'</span>'
+      + '</div>'
+    ).join('');
+    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+      + '<span style="font-family:var(--mono);font-size:12px;color:var(--accent)">'+bc+'</span>'
+      + '<button onclick="gtechRemoveBarcode(\''+bc+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px" title="Remove all">\u2715</button>'
+      + '</div>'
+      + itemRows
+      + '</div>';
+  }).join('');
 
   // Right preview — sorted by outlet order (DHA, Badar, Ocean… etc)
   const sorted = [..._demandList].sort((a, b) => {
@@ -5236,4 +5307,130 @@ function gtechGenerateDemand(){
   document.getElementById('demandStatus').textContent = `✓ Downloaded Mendeez_Demand_${date}.xlsx`;
   document.getElementById('demandStatus').style.color = 'var(--green)';
 }
+
+// ═══════════════════════════════════════════════════
+// G-TECH INVENTORY TAB
+// ═══════════════════════════════════════════════════
+
+let _gtechinvData    = [];
+let _gtechinvLocCode = '';
+let _giImageMap = {};
+let _giTitleMap = {};
+let _giPriceMap = {};
+
+function gtechinvPopulateSelect(){
+  const sel = document.getElementById('gtechinvLoc');
+  if(!sel || sel.options.length > 1) return;
+  GT_OUTLETS.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.loc;
+    opt.textContent = o.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function gtechinvLoad(){
+  const sel    = document.getElementById('gtechinvLoc');
+  const loc    = sel ? sel.value : '';
+  const status = document.getElementById('gtechinvStatus');
+  const body   = document.getElementById('gtechinvBody');
+  const summEl = document.getElementById('gtechinvSummary');
+  if(!loc) return;
+
+  _gtechinvLocCode = loc;
+  if(status){ status.textContent = '⏳ Loading…'; status.style.color = 'var(--muted)'; }
+  if(body) body.innerHTML = `<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px"><div class="spinner" style="margin:0 auto 10px"></div>Loading inventory…</td></tr>`;
+  if(summEl) summEl.style.display = 'none';
+
+  try{
+    const t0  = Date.now();
+    const res = await fetch(GTECH_BALANCE_URL + '?api=' + GTECH_API_KEY + '&Location=' + encodeURIComponent(loc));
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    let rows = await res.json();
+    if(!Array.isArray(rows)) rows = rows.data || rows.result || rows.records || [];
+
+    rows.sort((a,b) => {
+      if((a.balanceQty||0) > 0 && (b.balanceQty||0) <= 0) return -1;
+      if((a.balanceQty||0) <= 0 && (b.balanceQty||0) > 0) return 1;
+      return String(a.barcode).localeCompare(String(b.barcode));
+    });
+
+    _gtechinvData = rows;
+    const ms      = Date.now() - t0;
+    const inStock = rows.filter(r => (r.balanceQty||0) > 0).length;
+    const totalQ  = rows.reduce((s,r) => s+(r.balanceQty||0), 0);
+
+    if(status){ status.textContent = '\u2713 ' + rows.length + ' SKUs \u00b7 ' + ms + 'ms'; status.style.color = 'var(--green)'; }
+
+    if(summEl){
+      summEl.style.display = 'flex';
+      summEl.innerHTML = [
+        {l:'Total SKUs',  v:rows.length,        c:'var(--blue)'},
+        {l:'In Stock',    v:inStock,             c:'var(--green)'},
+        {l:'Zero Stock',  v:rows.length-inStock, c:'var(--red)'},
+        {l:'Balance Qty', v:totalQ.toFixed(0),   c:'var(--text)'},
+        {l:'Load Time',   v:ms+'ms',             c:'var(--muted)'},
+      ].map(s=>'<div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 14px;text-align:center;min-width:90px"><div style="font-size:17px;font-weight:700;font-family:var(--mono);color:'+s.c+'">'+s.v+'</div><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px">'+s.l+'</div></div>').join('');
+    }
+    gtechinvFilter();
+  } catch(e){
+    if(status){ status.textContent = '\u26a0 ' + e.message; status.style.color = 'var(--red)'; }
+    if(body) body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--red);font-family:var(--mono);font-size:12px">Error: '+e.message+'</td></tr>';
+  }
+}
+
+function gtechinvFilter(){
+  const q        = (document.getElementById('gtechinvSearch') ? document.getElementById('gtechinvSearch').value : '').toLowerCase().trim();
+  const showZero = document.getElementById('gtechinvShowZero') ? document.getElementById('gtechinvShowZero').checked : false;
+  const body     = document.getElementById('gtechinvBody');
+  if(!body) return;
+
+  if(_gtechinvData.length === 0){
+    body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Select a location to load inventory</td></tr>';
+    return;
+  }
+
+  const filtered = _gtechinvData.filter(r => {
+    const bc    = String(r.barcode||'').toLowerCase();
+    const title = (gtinvGetTitle(r.barcode)||'').toLowerCase();
+    const matchQ = !q || bc.includes(q) || title.includes(q);
+    const matchZ = showZero || (r.balanceQty||0) > 0;
+    return matchQ && matchZ;
+  });
+
+  if(filtered.length === 0){
+    body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No results found</td></tr>';
+    return;
+  }
+
+  body.innerHTML = filtered.map(function(r){
+    const bc      = String(r.barcode||'');
+    const qty     = parseFloat(r.balanceQty||0);
+    const holdQty = parseFloat(r.holdQty||0);
+    const inStock = qty > 0;
+    const imgUrl  = gtinvGetImage(bc);
+    const title   = gtinvGetTitle(bc) || '\u2014';
+    const price   = gtinvGetPrice(bc);
+    const priceStr= price > 0 ? 'PKR '+price.toLocaleString() : '\u2014';
+    const imgHtml = imgUrl
+      ? '<img src="'+imgUrl+'" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '<div style="width:40px;height:40px;border-radius:6px;border:1px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>';
+    return '<tr onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border)">'+imgHtml+'</td>'
+      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted)">'+bc+'</td>'
+      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</td>'
+      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:700;font-size:14px;color:'+(inStock?'var(--green)':'var(--red)')+';text-align:center">'+qty.toFixed(0)+'</td>'
+      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:13px;color:'+(holdQty>0?'var(--orange)':'var(--muted)')+';text-align:center">'+holdQty.toFixed(0)+'</td>'
+      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px">'+priceStr+'</td>'
+      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);text-align:center"><span style="font-size:11px;padding:2px 10px;border-radius:20px;font-weight:600;background:'+(inStock?'var(--green-dim)':'var(--red-dim)')+';color:'+(inStock?'var(--green)':'var(--red)')+'">'+( inStock?'In Stock':'Out')+'</span></td>'
+      +'</tr>';
+  }).join('');
+}
+
+function gtinvGetImage(bc){ const s=String(bc).replace(/^0+/,''); return (_giImageMap[bc]||_giImageMap[s]||''); }
+function gtinvGetTitle(bc){ const s=String(bc).replace(/^0+/,''); return (_giTitleMap[bc]||_giTitleMap[s]||''); }
+function gtinvGetPrice(bc){ const s=String(bc).replace(/^0+/,''); return (_giPriceMap[bc]||_giPriceMap[s]||0); }
+
 </script>
+</body>
+</html>
