@@ -3956,20 +3956,34 @@ const _tagCache = {}; // type → tags string (cleared on each upload session)
 async function getAutoTags(type){
   if(!type) return '';
   const typeKey = type.toLowerCase().trim();
-  // Return cached if available (cache cleared on each upload session start)
   if(_tagCache[typeKey]) return _tagCache[typeKey];
-  // Fetch most recently UPDATED product of this type from Shopify
+
+  // Use allProducts (already in memory) — sort by id desc = most recently created first
+  if(window.allProducts && allProducts.length > 0){
+    const ofType = allProducts
+      .filter(p => (p.product_type||'').toLowerCase().trim() === typeKey)
+      .sort((a,b) => b.id - a.id); // highest id = most recently created
+
+    for(const p of ofType){
+      const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
+      if(tagStr.trim() && !tagStr.toLowerCase().includes('factory outlet')){
+        _tagCache[typeKey] = tagStr;
+        console.log('Auto-tags for "'+type+'" (from allProducts id desc):', tagStr);
+        return tagStr;
+      }
+    }
+  }
+
+  // Fallback: fetch from Shopify API (order=id+desc = most recently created)
   if(STORE && TOKEN){
     try{
-      const d = await shopFetch('/products.json?limit=250&product_type='+encodeURIComponent(type)+'&fields=id,tags,updated_at&order=updated_at+desc');
+      const d = await shopFetch('/products.json?limit=50&product_type='+encodeURIComponent(type)+'&fields=id,tags&order=id+desc');
       const products = d.products||[];
-      // Find the most recently updated product with real tags (not factory outlet)
       for(const p of products){
-        const tags = p.tags||[];
-        const tagStr = Array.isArray(tags) ? tags.join(', ') : String(tags);
+        const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
         if(tagStr.trim() && !tagStr.toLowerCase().includes('factory outlet')){
           _tagCache[typeKey] = tagStr;
-          console.log('Auto-tags for "'+type+'" (from updated_at):', tagStr);
+          console.log('Auto-tags for "'+type+'" (from API):', tagStr);
           return tagStr;
         }
       }
