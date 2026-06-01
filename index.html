@@ -3770,8 +3770,8 @@ function upDetectCols(headerRow){
     sku:     find(['sku (s size)','sku']),
     price:   find(['price (pkr)','price']),
     design:  find(['design code','design_code','design']),
-    compare: find(['compare at (pkr)','compare at','compare']),
     tags:    find(['tags','tag']),
+    compare: find(['compare at (pkr)','compare at','compare']),
     desc:    find(['description (html)','description','body (html)','body','desc']),
     vendor:  find(['vendor']),
     status:  find(['status']),
@@ -4081,8 +4081,11 @@ async function upSubmit(){
             weight_unit:   'kg',
             grams:         0
           }));
-          // Fetch latest tags from Shopify for this category (live, not cached static)
-          const autoTags = p.tags || (await getAutoTags(p.type));
+          // Use tags from Excel if provided, otherwise auto-fetch from Shopify
+          const autoTags = p.tags && p.tags.trim()
+            ? p.tags.trim()
+            : (await getAutoTags(p.type));
+          log('Tags for "'+p.name+'": '+(autoTags||'(none)'), autoTags ? 'var(--green)' : 'var(--muted)');
           const handle = upMakeHandle(p.name, upMakeSKU(p,0));
           const payload = {
             product:{
