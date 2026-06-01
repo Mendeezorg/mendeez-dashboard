@@ -858,26 +858,18 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="ds" style="margin-bottom:20px">
     <div>
       <div class="dt">G-Tech Inventory</div>
-      <div class="dsub">Search real-time stock across all outlets by barcode or product name</div>
+      <div class="dsub">Search real-time stock across all outlets — type barcode or product name</div>
     </div>
-  </div>
-
-  <!-- Location selector + search -->
-  <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center">
-    <select id="gtechinvLoc" class="fi" style="width:220px" onchange="gtechinvLoad()">
-      <option value="">— Select Location —</option>
-    </select>
-    <input id="gtechinvSearch" class="fi" placeholder="Search barcode or product name…" style="flex:1;min-width:200px" oninput="gtechinvFilter()">
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap">
-      <input type="checkbox" id="gtechinvShowZero" onchange="gtechinvFilter()" style="accent-color:var(--accent)"> Show zero stock
-    </label>
     <span id="gtechinvStatus" style="font-family:var(--mono);font-size:11px;color:var(--muted)"></span>
   </div>
 
-  <!-- Summary pills -->
-  <div id="gtechinvSummary" style="display:none;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+  <!-- Search bar only -->
+  <div style="position:relative;margin-bottom:18px">
+    <input id="gtechinvSearch" class="fi" placeholder="🔍  Search barcode or product name…"
+      style="width:100%;padding-left:16px;font-size:14px" oninput="gtechinvSearch()">
+  </div>
 
-  <!-- Table -->
+  <!-- Results table -->
   <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
@@ -885,14 +877,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;width:50px">Pic</th>
           <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Barcode</th>
           <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Product Name</th>
+          <th style="padding:8px 12px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Location</th>
           <th style="padding:8px 12px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Balance Qty</th>
-          <th style="padding:8px 12px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Hold Qty</th>
           <th style="padding:8px 12px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Price</th>
           <th style="padding:8px 12px;text-align:center;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Status</th>
         </tr>
       </thead>
       <tbody id="gtechinvBody">
-        <tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Select a location to load inventory</td></tr>
+        <tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Type a barcode or product name to search across all locations</td></tr>
       </tbody>
     </table>
   </div>
@@ -3022,6 +3014,8 @@ function switchTab(name,el){
   const datebar=document.querySelector('.datebar');
   if(datebar) datebar.style.display='flex';
   if(name==='report')buildReport();
+  if(name==='gtechinv') gtechinvInit();
+  if(name==='gtech') gtechinvPopulateSelect();
   if(name==='sorter'){
     const sel=document.getElementById('sortCat');
     if(sel&&allCollections.length>0&&sel.options.length<=1)
@@ -5027,6 +5021,7 @@ const GT_OUTLETS = [
   { id:'lucky',     name:'Lucky One Mall',             short:'Lucky',   loc:'00100010009' },
   { id:'squareone', name:'Square One Mall',            short:'Sq.One',  loc:'00100010017' },
   { id:'factory',   name:'Factory',                     short:'Factory', loc:'00100020001' },
+  { id:'ecommerce',  name:'E-Commerce',                  short:'E-Com',   loc:'00100010019' },
   { id:'dolmen',    name:'Mendeez Dolmen Mall T.Road', short:'Dolmen',  loc:'00100010023' },
 ];
 
@@ -5105,23 +5100,27 @@ async function gtechLoadAll(){
 }
 
 // ── Add barcode to demand list ──
+// Rules:
+// 1. Max demandable from any location = balanceQty - 1 (always keep 1 piece)
+// 2. Each press of Add fills from the highest available location first
+// 3. If that location is exhausted (demanded = max), spill to next highest
+// 4. If all locations exhausted → warn user
+// _demandedQty tracks how much has been demanded per barcode per locCode
+let _demandedQty = {}; // key: "barcode|locCode" → qty demanded so far
+
 async function gtechAddDemand(){
   const input  = document.getElementById('demandBcInput');
   const status = document.getElementById('demandStatus');
   const bc     = input.value.trim();
   if(!bc){ input.focus(); return; }
 
-  // Check if stock data is loaded
   if(Object.keys(_gtechStockData).length === 0){
     status.textContent = '⚠ Load stock data first (Refresh All Locations)';
     status.style.color = 'var(--red)';
     return;
   }
 
-  status.textContent = '🔍 Looking up barcode…';
-  status.style.color = 'var(--muted)';
-
-  // Find this barcode across all locations
+  // Find this barcode across all locations with available (demandable) qty
   const found = [];
   GT_OUTLETS.forEach(o => {
     const rows = _gtechStockData[o.loc] || [];
@@ -5130,55 +5129,107 @@ async function gtechAddDemand(){
       String(r.barcode).replace(/^0+/,'') === bc.replace(/^0+/,'')
     );
     if(match){
+      const actualQty  = parseFloat(match.balanceQty || 0);
+      const maxDemand  = Math.max(0, actualQty - 1); // keep 1 piece
+      const alreadyDemanded = _demandedQty[bc+'|'+o.loc] || 0;
+      const remaining  = maxDemand - alreadyDemanded;
       found.push({
-        barcode      : String(match.barcode).trim(),
-        balanceQty   : parseFloat(match.balanceQty || 0),
-        locationName : o.name,
-        locationShort: o.short,
-        locCode      : o.loc,
+        barcode        : String(match.barcode).trim(),
+        balanceQty     : actualQty,
+        maxDemand,
+        alreadyDemanded,
+        remaining,
+        locationName   : o.name,
+        locationShort  : o.short,
+        locCode        : o.loc,
       });
     }
   });
 
   if(found.length === 0){
-    status.textContent = `⚠ Barcode "${bc}" not found in any location`;
+    status.textContent = '⚠ Barcode "'+bc+'" not found in any location';
     status.style.color = 'var(--red)';
     input.select();
     return;
   }
 
-  // ── Smart selection logic ──
-  const maxQty = Math.max(...found.map(f => f.balanceQty));
+  // Filter to locations that still have remaining demandable qty
+  const available = found.filter(f => f.remaining > 0);
 
-  let toAdd = [];
-  if(maxQty <= 1){
-    // All locations have qty 1 (or less) — add ALL of them
-    toAdd = found;
-    status.textContent = `✓ "${bc}" has qty ≤1 everywhere — added all ${found.length} location(s)`;
-  } else {
-    // Add only the location(s) with maximum qty
-    toAdd = found.filter(f => f.balanceQty === maxQty);
-    const loc = toAdd.map(f => f.locationShort).join(', ');
-    status.textContent = `✓ "${bc}" added from ${loc} (max qty: ${maxQty})`;
-  }
-  status.style.color = 'var(--green)';
-
-  toAdd.forEach(f => {
-    _demandList.push({
-      barcode      : f.barcode,
-      productName  : '—',
-      size         : '—',
-      locationName : f.locationName,
-      locationShort: f.locationShort,
-      locCode      : f.locCode,
-      balanceQty   : f.balanceQty,
+  // Special case: ALL locations have exactly 1 piece — add all of them
+  const allHaveOne = found.every(f => f.balanceQty === 1);
+  if(allHaveOne){
+    found.forEach(f => {
+      _demandList.push({
+        barcode      : f.barcode,
+        productName  : '—',
+        size         : '—',
+        locationName : f.locationName,
+        locationShort: f.locationShort,
+        locCode      : f.locCode,
+        balanceQty   : f.balanceQty,
+        demandQty    : 1,
+      });
+      _demandedQty[bc+'|'+f.locCode] = 1;
     });
+    status.textContent = '✓ "'+bc+'" has 1 pc everywhere — added all '+found.length+' location(s)';
+    status.style.color = 'var(--green)';
+    input.value = '';
+    input.focus();
+    gtechRenderDemand();
+    setTimeout(() => { status.textContent = ''; }, 5000);
+    return;
+  }
+
+  if(available.length === 0){
+    // Check why — all qty=1 already kept, or all demanded
+    const allOne = found.every(f => f.balanceQty <= 1);
+    if(allOne){
+      status.textContent = '⚠ "'+bc+'" has only 1 piece everywhere — cannot demand (must keep 1)';
+    } else {
+      status.textContent = '⚠ "'+bc+'" fully demanded from all locations — nothing left';
+    }
+    status.style.color = 'var(--red)';
+    input.select();
+    return;
+  }
+
+  // Sort available by remaining desc (highest first)
+  available.sort((a,b) => b.remaining - a.remaining);
+
+  // Pick the best location — highest remaining
+  const best = available[0];
+
+  // Add to demand list
+  _demandList.push({
+    barcode        : best.barcode,
+    productName    : '—',
+    size           : '—',
+    locationName   : best.locationName,
+    locationShort  : best.locationShort,
+    locCode        : best.locCode,
+    balanceQty     : best.balanceQty,
+    demandQty      : best.remaining, // demand ALL remaining from this location
   });
+
+  // Track what's been demanded
+  _demandedQty[bc+'|'+best.locCode] = (best.alreadyDemanded + best.remaining);
+
+  // Status message
+  const stillAvail = available.slice(1);
+  let msg = '✓ "'+bc+'" — '+best.remaining+' pcs from '+best.locationShort;
+  if(stillAvail.length > 0){
+    msg += ' · '+stillAvail.map(f=>f.locationShort+': '+f.remaining+' left').join(', ');
+  } else {
+    msg += ' · No more locations available';
+  }
+  status.textContent = msg;
+  status.style.color = 'var(--green)';
 
   input.value = '';
   input.focus();
   gtechRenderDemand();
-  setTimeout(() => { status.textContent = ''; }, 4000);
+  setTimeout(() => { status.textContent = ''; }, 5000);
 }
 
 // ── Render demand list and preview ──
@@ -5206,7 +5257,7 @@ function gtechRenderDemand(){
     const itemRows = items.map(item =>
       '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono);padding:2px 0">'
       + '<span>'+item.locationShort+'</span>'
-      + '<span style="color:'+(item.balanceQty>0?'var(--green)':'var(--red)')+'">Qty: '+item.balanceQty+'</span>'
+      + '<span style="color:var(--green)">Demand: <b>'+item.demandQty+'</b> / Stock: '+item.balanceQty+'</span>'
       + '</div>'
     ).join('');
     return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px">'
@@ -5218,7 +5269,7 @@ function gtechRenderDemand(){
       + '</div>';
   }).join('');
 
-  // Right preview — sorted by outlet order (DHA, Badar, Ocean… etc)
+  // Right preview — sorted by outlet order
   const sorted = [..._demandList].sort((a, b) => {
     const ai = GT_OUTLETS.findIndex(o => o.loc === a.locCode);
     const bi = GT_OUTLETS.findIndex(o => o.loc === b.locCode);
@@ -5232,13 +5283,17 @@ function gtechRenderDemand(){
       <td style="padding:5px 10px;border-bottom:1px solid var(--border);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.productName}</td>
       <td style="padding:5px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px">${item.size}</td>
       <td style="padding:5px 10px;border-bottom:1px solid var(--border);font-size:11px;color:var(--accent)">${item.locationName}</td>
-      <td style="padding:5px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:${item.balanceQty>0?'var(--green)':'var(--red)'}">${item.balanceQty}</td>
-      <td style="padding:5px 4px;border-bottom:1px solid var(--border)"></td>
+      <td style="padding:5px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">${item.demandQty}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted)">(stock:${item.balanceQty})</td>
     </tr>`).join('');
 }
 
 // ── Remove all entries for a barcode ──
 function gtechRemoveBarcode(bc){
+  // Find which locations were demanded for this barcode and reset their tracking
+  _demandList.filter(item => item.barcode === bc).forEach(item => {
+    delete _demandedQty[bc+'|'+item.locCode];
+  });
   _demandList = _demandList.filter(item => item.barcode !== bc);
   gtechRenderDemand();
 }
@@ -5246,6 +5301,7 @@ function gtechRemoveBarcode(bc){
 // ── Clear all ──
 function gtechClearDemand(){
   _demandList = [];
+  _demandedQty = {};
   gtechRenderDemand();
   document.getElementById('demandStatus').textContent = '';
 }
@@ -5268,20 +5324,20 @@ function gtechGenerateDemand(){
 
   // Build Excel rows
   const wsData = [
-    ['Barcode', 'Product Name', 'Size', 'Location', 'Balance Qty']
+    ['Barcode', 'Product Name', 'Size', 'Location', 'Demand Qty', 'Stock Qty']
   ];
 
   let lastLocation = null;
   sorted.forEach(item => {
-    // Add blank row between locations for readability
     if(lastLocation && lastLocation !== item.locationName){
-      wsData.push(['', '', '', '', '']);
+      wsData.push(['', '', '', '', '', '']);
     }
     wsData.push([
       item.barcode,
       item.productName,
       item.size,
       item.locationName,
+      item.demandQty,
       item.balanceQty,
     ]);
     lastLocation = item.locationName;
@@ -5309,127 +5365,140 @@ function gtechGenerateDemand(){
 }
 
 // ═══════════════════════════════════════════════════
-// G-TECH INVENTORY TAB
+// G-TECH INVENTORY TAB — Search across all locations
 // ═══════════════════════════════════════════════════
 
-let _gtechinvData    = [];
-let _gtechinvLocCode = '';
-let _giImageMap = {};
-let _giTitleMap = {};
-let _giPriceMap = {};
+// _gtechAllStock = { locCode: [{barcode, balanceQty, holdQty}, ...] }
+let _gtechAllStock   = {};
+let _gtechStockReady = false;
+let _giSearchTimer   = null;
 
-function gtechinvPopulateSelect(){
-  const sel = document.getElementById('gtechinvLoc');
-  if(!sel || sel.options.length > 1) return;
-  GT_OUTLETS.forEach(o => {
-    const opt = document.createElement('option');
-    opt.value = o.loc;
-    opt.textContent = o.name;
-    sel.appendChild(opt);
+// Build barcode→{title,image,price} from allProducts (already loaded by Shopify)
+function giGetShopifyMaps(){
+  const imgMap={}, titleMap={}, priceMap={};
+  const stripped = s => String(s||'').replace(/^0+/,'');
+  (window.allProducts||[]).forEach(p => {
+    const img = (p.images||[])[0]?.src || '';
+    (p.variants||[]).forEach(v => {
+      const bc  = String(v.barcode||'').trim();
+      const sku = String(v.sku||'').trim();
+      const pr  = parseFloat(v.price||0);
+      [bc, stripped(bc)].filter(Boolean).forEach(k => {
+        imgMap[k]   = img;
+        titleMap[k] = p.title;
+        priceMap[k] = pr;
+      });
+      [sku, stripped(sku)].filter(Boolean).forEach(k => {
+        if(!imgMap[k])   imgMap[k]   = img;
+        if(!titleMap[k]) titleMap[k] = p.title;
+        if(!priceMap[k]) priceMap[k] = pr;
+      });
+    });
   });
+  return { imgMap, titleMap, priceMap };
 }
 
-async function gtechinvLoad(){
-  const sel    = document.getElementById('gtechinvLoc');
-  const loc    = sel ? sel.value : '';
+// Load all locations in background when tab is first opened
+async function gtechinvEnsureLoaded(){
+  if(_gtechStockReady) return;
   const status = document.getElementById('gtechinvStatus');
   const body   = document.getElementById('gtechinvBody');
-  const summEl = document.getElementById('gtechinvSummary');
-  if(!loc) return;
+  if(status) { status.textContent = '⏳ Loading all locations…'; status.style.color='var(--muted)'; }
+  if(body) body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px"><div class="spinner" style="margin:0 auto 10px"></div>Loading stock from all locations…</td></tr>';
 
-  _gtechinvLocCode = loc;
-  if(status){ status.textContent = '⏳ Loading…'; status.style.color = 'var(--muted)'; }
-  if(body) body.innerHTML = `<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px"><div class="spinner" style="margin:0 auto 10px"></div>Loading inventory…</td></tr>`;
-  if(summEl) summEl.style.display = 'none';
+  const results = await Promise.allSettled(
+    GT_OUTLETS.map(o =>
+      fetch(GTECH_BALANCE_URL + '?api=' + GTECH_API_KEY + '&Location=' + encodeURIComponent(o.loc))
+        .then(r => r.json())
+        .then(rows => {
+          if(!Array.isArray(rows)) rows = rows.data||rows.result||rows.records||[];
+          _gtechAllStock[o.loc] = { outlet: o, rows };
+        })
+    )
+  );
 
-  try{
-    const t0  = Date.now();
-    const res = await fetch(GTECH_BALANCE_URL + '?api=' + GTECH_API_KEY + '&Location=' + encodeURIComponent(loc));
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    let rows = await res.json();
-    if(!Array.isArray(rows)) rows = rows.data || rows.result || rows.records || [];
-
-    rows.sort((a,b) => {
-      if((a.balanceQty||0) > 0 && (b.balanceQty||0) <= 0) return -1;
-      if((a.balanceQty||0) <= 0 && (b.balanceQty||0) > 0) return 1;
-      return String(a.barcode).localeCompare(String(b.barcode));
-    });
-
-    _gtechinvData = rows;
-    const ms      = Date.now() - t0;
-    const inStock = rows.filter(r => (r.balanceQty||0) > 0).length;
-    const totalQ  = rows.reduce((s,r) => s+(r.balanceQty||0), 0);
-
-    if(status){ status.textContent = '\u2713 ' + rows.length + ' SKUs \u00b7 ' + ms + 'ms'; status.style.color = 'var(--green)'; }
-
-    if(summEl){
-      summEl.style.display = 'flex';
-      summEl.innerHTML = [
-        {l:'Total SKUs',  v:rows.length,        c:'var(--blue)'},
-        {l:'In Stock',    v:inStock,             c:'var(--green)'},
-        {l:'Zero Stock',  v:rows.length-inStock, c:'var(--red)'},
-        {l:'Balance Qty', v:totalQ.toFixed(0),   c:'var(--text)'},
-        {l:'Load Time',   v:ms+'ms',             c:'var(--muted)'},
-      ].map(s=>'<div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 14px;text-align:center;min-width:90px"><div style="font-size:17px;font-weight:700;font-family:var(--mono);color:'+s.c+'">'+s.v+'</div><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px">'+s.l+'</div></div>').join('');
-    }
-    gtechinvFilter();
-  } catch(e){
-    if(status){ status.textContent = '\u26a0 ' + e.message; status.style.color = 'var(--red)'; }
-    if(body) body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--red);font-family:var(--mono);font-size:12px">Error: '+e.message+'</td></tr>';
-  }
+  _gtechStockReady = true;
+  const loaded = Object.keys(_gtechAllStock).length;
+  if(status) { status.textContent = '✓ ' + loaded + ' locations loaded'; status.style.color='var(--green)'; }
+  if(body) body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Type a barcode or product name to search</td></tr>';
 }
 
-function gtechinvFilter(){
-  const q        = (document.getElementById('gtechinvSearch') ? document.getElementById('gtechinvSearch').value : '').toLowerCase().trim();
-  const showZero = document.getElementById('gtechinvShowZero') ? document.getElementById('gtechinvShowZero').checked : false;
-  const body     = document.getElementById('gtechinvBody');
+// Called on tab switch
+function gtechinvInit(){
+  gtechinvEnsureLoaded();
+  setTimeout(() => { document.getElementById('gtechinvSearch')?.focus(); }, 200);
+}
+
+// Instant search — debounced 200ms
+function gtechinvSearch(){
+  clearTimeout(_giSearchTimer);
+  _giSearchTimer = setTimeout(_gtechinvDoSearch, 200);
+}
+
+function _gtechinvDoSearch(){
+  const q    = (document.getElementById('gtechinvSearch')?.value || '').toLowerCase().trim();
+  const body = document.getElementById('gtechinvBody');
   if(!body) return;
 
-  if(_gtechinvData.length === 0){
-    body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Select a location to load inventory</td></tr>';
+  if(!q){
+    body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Type a barcode or product name to search</td></tr>';
+    return;
+  }
+  if(!_gtechStockReady){
+    body.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">⏳ Still loading stock data, please wait…</td></tr>';
     return;
   }
 
-  const filtered = _gtechinvData.filter(r => {
-    const bc    = String(r.barcode||'').toLowerCase();
-    const title = (gtinvGetTitle(r.barcode)||'').toLowerCase();
-    const matchQ = !q || bc.includes(q) || title.includes(q);
-    const matchZ = showZero || (r.balanceQty||0) > 0;
-    return matchQ && matchZ;
+  const { imgMap, titleMap, priceMap } = giGetShopifyMaps();
+  const stripped = s => String(s||'').replace(/^0+/,'');
+
+  // Search across all locations
+  const results = [];
+  Object.values(_gtechAllStock).forEach(({ outlet, rows }) => {
+    rows.forEach(r => {
+      const bc    = String(r.barcode||'').trim();
+      const title = titleMap[bc] || titleMap[stripped(bc)] || '';
+      const bcLow = bc.toLowerCase();
+      const titLow= title.toLowerCase();
+      if(bcLow.includes(q) || titLow.includes(q)){
+        results.push({
+          barcode   : bc,
+          title     : title,
+          img       : imgMap[bc] || imgMap[stripped(bc)] || '',
+          price     : priceMap[bc] || priceMap[stripped(bc)] || 0,
+          balanceQty: parseFloat(r.balanceQty||0),
+          holdQty   : parseFloat(r.holdQty||0),
+          outlet    : outlet,
+        });
+      }
+    });
   });
 
-  if(filtered.length === 0){
-    body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No results found</td></tr>';
+  if(results.length === 0){
+    body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No results for "'+q+'"</td></tr>';
     return;
   }
 
-  body.innerHTML = filtered.map(function(r){
-    const bc      = String(r.barcode||'');
-    const qty     = parseFloat(r.balanceQty||0);
-    const holdQty = parseFloat(r.holdQty||0);
-    const inStock = qty > 0;
-    const imgUrl  = gtinvGetImage(bc);
-    const title   = gtinvGetTitle(bc) || '\u2014';
-    const price   = gtinvGetPrice(bc);
-    const priceStr= price > 0 ? 'PKR '+price.toLocaleString() : '\u2014';
-    const imgHtml = imgUrl
-      ? '<img src="'+imgUrl+'" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy" onerror="this.style.display=\'none\'">'
+  // Sort: in-stock first, then by outlet order
+  results.sort((a,b) => {
+    if(a.balanceQty>0 && b.balanceQty<=0) return -1;
+    if(a.balanceQty<=0 && b.balanceQty>0) return 1;
+    const ai = GT_OUTLETS.findIndex(o=>o.loc===a.outlet.loc);
+    const bi = GT_OUTLETS.findIndex(o=>o.loc===b.outlet.loc);
+    return ai-bi;
+  });
+
+  body.innerHTML = results.map(r => {
+    const inStock  = r.balanceQty > 0;
+    const priceStr = r.price > 0 ? 'PKR '+r.price.toLocaleString() : '\u2014';
+    const imgHtml  = r.img
+      ? '<img src="'+r.img+'" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy" onerror="this.style.display=\'none\'">'
       : '<div style="width:40px;height:40px;border-radius:6px;border:1px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>';
-    return '<tr onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
-      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border)">'+imgHtml+'</td>'
-      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted)">'+bc+'</td>'
-      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</td>'
-      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:700;font-size:14px;color:'+(inStock?'var(--green)':'var(--red)')+';text-align:center">'+qty.toFixed(0)+'</td>'
-      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:13px;color:'+(holdQty>0?'var(--orange)':'var(--muted)')+';text-align:center">'+holdQty.toFixed(0)+'</td>'
-      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px">'+priceStr+'</td>'
-      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);text-align:center"><span style="font-size:11px;padding:2px 10px;border-radius:20px;font-weight:600;background:'+(inStock?'var(--green-dim)':'var(--red-dim)')+';color:'+(inStock?'var(--green)':'var(--red)')+'">'+( inStock?'In Stock':'Out')+'</span></td>'
-      +'</tr>';
+    return '<tr onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border)">'+imgHtml+'</td>'      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted)">'+r.barcode+'</td>'      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.title||'\u2014')+'</td>'      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--accent);text-align:center">'+r.outlet.short+'</td>'      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:700;font-size:14px;color:'+(inStock?'var(--green)':'var(--red)')+';text-align:center">'+r.balanceQty.toFixed(0)+'</td>'      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px">'+priceStr+'</td>'      +'<td style="padding:6px 12px;border-bottom:1px solid var(--border);text-align:center"><span style="font-size:11px;padding:2px 10px;border-radius:20px;font-weight:600;background:'+(inStock?'var(--green-dim)':'var(--red-dim)')+';color:'+(inStock?'var(--green)':'var(--red)')+'">'+( inStock?'In Stock':'Out')+'</span></td>'      +'</tr>';
   }).join('');
 }
 
-function gtinvGetImage(bc){ const s=String(bc).replace(/^0+/,''); return (_giImageMap[bc]||_giImageMap[s]||''); }
-function gtinvGetTitle(bc){ const s=String(bc).replace(/^0+/,''); return (_giTitleMap[bc]||_giTitleMap[s]||''); }
-function gtinvGetPrice(bc){ const s=String(bc).replace(/^0+/,''); return (_giPriceMap[bc]||_giPriceMap[s]||0); }
+function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
 
 </script>
 </body>
