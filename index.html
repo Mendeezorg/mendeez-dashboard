@@ -1290,6 +1290,27 @@ async function loadProducts(){
     }
     allProducts=allProds;
     _productById=Object.fromEntries(allProds.map(p=>[p.id,p]));
+    // Build barcode→title/image/price maps for demand generator and inventory search
+    window._bcTitleMap = {};
+    window._bcImageMap = {};
+    window._bcPriceMap = {};
+    allProds.forEach(p => {
+      const img = (p.images||[])[0]?.src || '';
+      (p.variants||[]).forEach(v => {
+        const bc  = String(v.barcode||'').trim();
+        const sku = String(v.sku||'').trim();
+        const pr  = parseFloat(v.price||0);
+        const stripped = s => s.replace(/^0+/,'');
+        [bc, stripped(bc)].filter(Boolean).forEach(k => {
+          window._bcTitleMap[k] = p.title;
+          window._bcImageMap[k] = img;
+          window._bcPriceMap[k] = pr;
+        });
+        [sku, stripped(sku)].filter(Boolean).forEach(k => {
+          if(!window._bcTitleMap[k]){ window._bcTitleMap[k]=p.title; window._bcImageMap[k]=img; window._bcPriceMap[k]=pr; }
+        });
+      });
+    });
     _productsFullyLoaded=true;
     updateProductCounts();
     // Final render — show full results or search gate
@@ -5032,22 +5053,12 @@ let _demandList = [];
 // tracks qty demanded per barcode per location
 let _demandedQty = {};
 
-// Lookup product title from allProducts by barcode or SKU
 function getDemandProductName(barcode){
-  if(!barcode || !window.allProducts) return '—';
+  if(!barcode) return '—';
   const bc  = String(barcode).trim();
   const bcs = bc.replace(/^0+/,'');
-  for(const p of allProducts){
-    for(const v of (p.variants||[])){
-      const vbc  = String(v.barcode||'').trim();
-      const vsku = String(v.sku||'').trim();
-      if(vbc===bc || vbc===bcs || vsku===bc || vsku===bcs ||
-         vbc.replace(/^0+/,'')===bcs || vsku.replace(/^0+/,'')===bcs){
-        return p.title;
-      }
-    }
-  }
-  return '—';
+  const map = window._bcTitleMap || {};
+  return map[bc] || map[bcs] || '—';
 }
 
 // ── Load all locations in parallel ──
@@ -5258,6 +5269,14 @@ function gtechRenderDemand(){
   const previewEl = document.getElementById('demandPreviewBody');
   const countEl   = document.getElementById('demandCount');
 
+  // Re-resolve product names in case Shopify finished loading after items were added
+  _demandList.forEach(item => {
+    if(!item.productName || item.productName === '—'){
+      const name = getDemandProductName(item.barcode);
+      if(name && name !== '—') item.productName = name;
+    }
+  });
+
   countEl.textContent = _demandList.length;
 
   if(_demandList.length === 0){
@@ -5393,29 +5412,12 @@ let _gtechAllStock   = {};
 let _gtechStockReady = false;
 let _giSearchTimer   = null;
 
-// Build barcode→{title,image,price} from allProducts (already loaded by Shopify)
 function giGetShopifyMaps(){
-  const imgMap={}, titleMap={}, priceMap={};
-  const stripped = s => String(s||'').replace(/^0+/,'');
-  (window.allProducts||[]).forEach(p => {
-    const img = (p.images||[])[0]?.src || '';
-    (p.variants||[]).forEach(v => {
-      const bc  = String(v.barcode||'').trim();
-      const sku = String(v.sku||'').trim();
-      const pr  = parseFloat(v.price||0);
-      [bc, stripped(bc)].filter(Boolean).forEach(k => {
-        imgMap[k]   = img;
-        titleMap[k] = p.title;
-        priceMap[k] = pr;
-      });
-      [sku, stripped(sku)].filter(Boolean).forEach(k => {
-        if(!imgMap[k])   imgMap[k]   = img;
-        if(!titleMap[k]) titleMap[k] = p.title;
-        if(!priceMap[k]) priceMap[k] = pr;
-      });
-    });
-  });
-  return { imgMap, titleMap, priceMap };
+  return {
+    imgMap  : window._bcImageMap || {},
+    titleMap: window._bcTitleMap || {},
+    priceMap: window._bcPriceMap || {},
+  };
 }
 
 // Load all locations in background when tab is first opened
