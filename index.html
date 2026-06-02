@@ -560,6 +560,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <option value="variants_desc">Most variants in stock first</option>
         <option value="price_desc">Highest price first</option>
         <option value="price_asc">Lowest price first</option>
+        <option value="date_desc">New to Old (latest uploaded first)</option>
+        <option value="date_asc">Old to New (oldest uploaded first)</option>
       </select>
       <button class="btn btn-p btn-sm" style="margin-top:8px;width:100%" onclick="runSort()">▶ Auto-Sort</button>
     </div>
@@ -1260,7 +1262,7 @@ async function loadProducts(){
     // No hard page cap — load ALL products regardless of catalog size
     // 250 per page × unlimited pages = full catalog always loaded
     while(hasMore){
-      const base=`/products.json?limit=250&order=id+asc&fields=id,title,product_type,status,variants,images,tags`;
+      const base=`/products.json?limit=250&order=id+asc&fields=id,title,product_type,status,variants,images,tags,created_at,published_at`;
       const url=sinceId?`${base}&since_id=${sinceId}`:base;
       try{
         const d=await shopFetch(url);
@@ -3325,6 +3327,8 @@ async function loadSorterCollection(){
                 id
                 title
                 status
+                createdAt
+                publishedAt
                 productType
                 images(first: 1) { edges { node { url } } }
                 variants(first: 50) {
@@ -3356,6 +3360,8 @@ async function loadSorterCollection(){
           title: p.title,
           status: (p.status||'active').toLowerCase(),
           product_type: p.productType||'',
+          created_at: p.createdAt||p.publishedAt||null,
+          published_at: p.publishedAt||null,
           images: (p.images?.edges||[]).map(e=>({src:e.node.url})),
           variants: (p.variants?.edges||[]).map(e=>({
             id: parseInt(e.node.id.replace('gid://shopify/ProductVariant/','')),
@@ -3568,11 +3574,14 @@ function runSort(){
 
   // Sort only the unlocked products
   const gP=p=>parseFloat((p.variants||[{}])[0]?.price||0);
+  const gD=p=>new Date(p.created_at||p.published_at||0).getTime();
   unlocked.sort((a,b)=>{
     if(rule==='stock_asc')return gT(a)-gT(b);
     if(rule==='variants_desc')return gA(b)-gA(a);
     if(rule==='price_desc')return gP(b)-gP(a);
     if(rule==='price_asc')return gP(a)-gP(b);
+    if(rule==='date_desc')return gD(b)-gD(a); // newest first
+    if(rule==='date_asc')return gD(a)-gD(b);  // oldest first
     if(rule==='avail_desc'){const tA=(a.variants||[]).length,tB=(b.variants||[]).length,aA=gA(a),aB=gA(b),diff=aB-aA;if(diff!==0)return diff;return(aB===tB?1:0)-(aA===tA?1:0)||gT(b)-gT(a);}
     return gT(b)-gT(a);
   });
