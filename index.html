@@ -604,7 +604,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           style="border:2px dashed var(--border2);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px">
           <div style="font-size:28px;margin-bottom:6px">📊</div>
           <div style="font-size:12px;font-weight:600;margin-bottom:3px">Drop Excel file here or click to browse</div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">.xlsx or .xls · Product Name, Category, Sizes, SKU, Price, Description</div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">.xlsx or .xls · Product Name, Category, Sizes <span style="color:var(--muted2)">or</span> Quantity, SKU, Price, Description</div>
           <input type="file" id="upCsvInput" accept=".xlsx,.xls" style="display:none" onchange="upHandleCSV(this.files[0])">
         </div>
 
@@ -3823,11 +3823,14 @@ function upParseCSV(rows, fileName){
     const status  = cols.status>=0 && row[cols.status] ? String(row[cols.status]).trim() : 'draft';
     if(!name && !type && !skuRaw && !price) return;
     if(!name||!type||!sizesRaw||!skuRaw||!price){ errors.push('Row '+(ri+headerIdx+2)+': incomplete'); return; }
-    const sizes     = sizesRaw.split(/[,،\s]+/).map(s=>s.trim()).filter(Boolean);
+    // If Sizes column is a plain number → quantity mode (bags, perfumes, keychains etc.)
+    const isQty     = /^\d+$/.test(sizesRaw.trim());
+    const qty       = isQty ? parseInt(sizesRaw.trim()) : null;
+    const sizes     = isQty ? ['Default Title'] : sizesRaw.split(/[,،\\s]+/).map(s=>s.trim()).filter(Boolean);
     const skuPrefix = skuRaw.replace(/\d+$/,'');
     const skuBase   = parseInt(skuRaw.replace(skuPrefix,''))||0;
     const skuPad    = skuRaw.replace(skuPrefix,'').length||7;
-    _upCsvProducts.push({name,type,sizes,skuPrefix,skuBase,skuPad,
+    _upCsvProducts.push({name,type,sizes,qty,isQty,skuPrefix,skuBase,skuPad,
       price:String(parseFloat(price)||''), compare:compare?String(parseFloat(compare)||''):'',
       design, tags, desc, vendor, status});
   });
@@ -3845,13 +3848,15 @@ function upParseCSV(rows, fileName){
   } else { document.getElementById('upCsvErrors').style.display='none'; }
 
   // Preview
-  document.getElementById('upCsvHead').innerHTML='<th>#</th><th>Product</th><th>Type</th><th>Sizes</th><th>SKU(S)</th><th>Price</th><th>Description</th><th>Status</th>';
+  document.getElementById('upCsvHead').innerHTML='<th>#</th><th>Product</th><th>Type</th><th>Sizes / Qty</th><th>SKU(S)</th><th>Price</th><th>Description</th><th>Status</th>';
   document.getElementById('upCsvBody').innerHTML = _upCsvProducts.slice(0,30).map((p,i)=>{
     const skuS = p.skuPrefix+String(p.skuBase).padStart(p.skuPad,'0');
     return '<tr><td class="tm tmut">'+(i+1)+'</td>'
       +'<td style="font-weight:500;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</td>'
       +'<td class="tm tmut">'+p.type+'</td>'
-      +'<td style="color:var(--accent);font-family:var(--mono)">'+p.sizes.join(',')+'</td>'
+      +(p.isQty
+        ? '<td><span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px">QTY: '+p.qty+'</span></td>'
+        : '<td style="color:var(--accent);font-family:var(--mono)">'+p.sizes.join(',')+'</td>')
       +'<td class="tm">'+skuS+'</td>'
       +'<td class="tm">PKR '+parseInt(p.price||0).toLocaleString()+'</td>'
       +'<td style="font-size:11px;color:'+(p.desc?'var(--green)':'var(--muted2)')+'">'+( p.desc?'✓ Yes':'empty')+'</td>'
@@ -4076,20 +4081,36 @@ async function upSubmit(){
       for(const p of _upCsvProducts){
         setProg(done,total,'Creating "'+p.name+'"...');
         try{
-          const variants = p.sizes.map((sz,si)=>({
-            option1:       sz,
-            price:         p.price||'0',
-            compare_at_price: p.compare||null,
-            sku:           upMakeSKU(p,si),
-            barcode:       upMakeSKU(p,si),
-            taxable:       false,
-            requires_shipping: true,
-            fulfillment_service: 'manual',
-            inventory_management: 'shopify',
-            inventory_policy: 'deny',
-            weight_unit:   'kg',
-            grams:         0
-          }));
+          const variants = p.isQty
+            ? [{ // Quantity mode — single Default variant with inventory set
+                option1:              'Default Title',
+                price:                p.price||'0',
+                compare_at_price:     p.compare||null,
+                sku:                  upMakeSKU(p,0),
+                barcode:              upMakeSKU(p,0),
+                taxable:              false,
+                requires_shipping:    true,
+                fulfillment_service:  'manual',
+                inventory_management: 'shopify',
+                inventory_policy:     'deny',
+                inventory_quantity:   p.qty||0,
+                weight_unit:          'kg',
+                grams:                0
+              }]
+            : p.sizes.map((sz,si)=>({
+                option1:              sz,
+                price:                p.price||'0',
+                compare_at_price:     p.compare||null,
+                sku:                  upMakeSKU(p,si),
+                barcode:              upMakeSKU(p,si),
+                taxable:              false,
+                requires_shipping:    true,
+                fulfillment_service:  'manual',
+                inventory_management: 'shopify',
+                inventory_policy:     'deny',
+                weight_unit:          'kg',
+                grams:                0
+              }));
           // Use tags from Excel if provided, otherwise auto-fetch from Shopify
           const autoTags = p.tags && p.tags.trim()
             ? p.tags.trim()
@@ -4104,7 +4125,7 @@ async function upSubmit(){
               product_type: p.type||'',
               tags:         autoTags,
               status:       p.status||'draft',
-              options:      [{name:'Size'}],
+              options:      p.isQty ? [{name:'Title'}] : [{name:'Size'}],
               variants:     variants
             }
           };
@@ -4112,10 +4133,10 @@ async function upSubmit(){
           if(result && result.product && result.product.id){
             const prodId = result.product.id;
             // Map all SKUs of this product to its ID for image upload
-            p.sizes.forEach((sz,si)=>{
-              const sku = upMakeSKU(p,si);
+            // Map SKUs to product ID for image upload
+            const skuList = p.isQty ? [upMakeSKU(p,0)] : p.sizes.map((_,si)=>upMakeSKU(p,si));
+            skuList.forEach(sku=>{
               window._upNewProductSkuMap[sku] = {id:prodId, title:p.name};
-              // Also map without leading zeros
               window._upNewProductSkuMap[sku.replace(/^0+/,'')] = {id:prodId, title:p.name};
             });
             // Save design code to metafield if provided
@@ -4128,7 +4149,7 @@ async function upSubmit(){
               }catch(me){log('    ↳ Design Code failed: '+me.message.slice(0,50),'var(--red)');}
             }
             csvOk++;
-            log('  ✓ Created: '+p.name+' ('+p.sizes.length+' sizes, '+(p.design?'DC:'+p.design+', ':'')+p.status+')','var(--green)');
+            log('  ✓ Created: '+p.name+' ('+(p.isQty?'qty:'+p.qty:p.sizes.length+' sizes')+', '+(p.design?'DC:'+p.design+', ':'')+p.status+')','var(--green)');
           } else {
             csvFail++;
             log('  ✗ Failed: '+p.name+' — '+(JSON.stringify(result&&result.errors||result)).slice(0,80),'var(--red)');
