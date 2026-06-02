@@ -3976,7 +3976,7 @@ async function getAutoTags(type){
   if(window.allProducts && allProducts.length > 0){
     const ofType = allProducts
       .filter(p => (p.product_type||'').toLowerCase().trim() === typeKey)
-      .sort((a,b) => b.id - a.id); // highest id = most recently created
+      .sort((a,b) => new Date(b.created_at||0) - new Date(a.created_at||0)); // most recently created first
 
     for(const p of ofType){
       const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
@@ -3991,7 +3991,7 @@ async function getAutoTags(type){
   // Fallback: fetch from Shopify API (order=id+desc = most recently created)
   if(STORE && TOKEN){
     try{
-      const d = await shopFetch('/products.json?limit=50&product_type='+encodeURIComponent(type)+'&fields=id,tags&order=id+desc');
+      const d = await shopFetch('/products.json?limit=50&product_type='+encodeURIComponent(type)+'&fields=id,tags,created_at&order=created_at+desc');
       const products = d.products||[];
       for(const p of products){
         const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
@@ -4120,6 +4120,7 @@ async function upSubmit(){
           const payload = {
             product:{
               title:        p.name,
+              handle:       handle,
               body_html:    p.desc||'',
               vendor:       p.vendor||'MENDEEZ',
               product_type: p.type||'',
