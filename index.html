@@ -230,8 +230,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="setup-sub">Connect your four data sources. Open the file from anywhere — Chrome, Firefox, or Edge.</div>
 
     <div class="setup-sec">① Shopify — Live Sales & Stock</div>
-    <div class="fg"><div class="fl">Store URL</div><input class="fi" id="cfgStore" placeholder="yourstore.myshopify.com"></div>
-    <div class="fg"><div class="fl">Admin API Token</div><input class="fi" id="cfgToken" type="password" placeholder="shpat_xxxxxxxxxxxxxxxx"></div>
+    <div class="fg"><div class="fl">Store URL</div><input class="fi" id="cfgStore" value="mendeez.myshopify.com" placeholder="yourstore.myshopify.com"></div>
+    <div class="fg"><div class="fl">Admin API Token</div><input class="fi" id="cfgToken" type="password" value="" placeholder="shpat_xxxxxxxxxxxxxxxx"></div>
 
     <div class="setup-sec">② Google Sheet — Ads + Courier + CS</div>
     <div class="fg"><div class="fl">Sheet ID</div><input class="fi" id="cfgSheet" value="1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs" placeholder="Google Sheet ID"></div>
@@ -263,9 +263,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="badge badge-grey" id="bCrr"><div class="sdot" style="background:var(--muted2)"></div>Courier</div>
     <div class="badge badge-grey" id="bCS"><div class="sdot" style="background:var(--muted2)"></div>CS</div>
     <div class="upd">Updated: <span id="lastUpd">—</span></div>
-    <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #e8c547;border-radius:6px;color:#e8c547;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;font-family:'Syne',sans-serif">🏠 Portal</a>
     <a href="/tasks/" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#e8c547;border:none;border-radius:6px;color:#0d0d0d;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">✅ Task Manager</a>
     <button onclick="doEcomLogout()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #444;border-radius:6px;color:#999;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⇄ Logout</button>
+    <button onclick="openSetup()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #555;border-radius:6px;color:#aaa;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⚙ Settings</button>
     
     <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
@@ -1014,7 +1014,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <script>
 // ═══════════ STATE ═══════════
 let STORE='mendeez.myshopify.com',
-       TOKEN='shpat_hardcoded_placeholder',
+       TOKEN='',
        SHEET_ID='1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs',
        ADS_TAB='Ads',CRR_TAB='Courier',CS_TAB='Perf Report 26';
 let ordersData=[],allProducts=[],manualData={};
@@ -1081,10 +1081,23 @@ function fmtDate(r){
 
 // ═══════════ SAVE/LOAD ═══════════
 function saveConfig(){try{localStorage.setItem('mndz3_cfg',JSON.stringify({STORE,TOKEN,SHEET_ID,ADS_TAB,CRR_TAB,CS_TAB}));}catch(e){}}
+function openSetup(){
+  const ov=document.getElementById('setupOverlay');
+  // Reset overlay content in case it was replaced by a spinner/error
+  if(!document.getElementById('cfgStore')){location.reload();return;}
+  ov.style.display='flex';
+  document.getElementById('cfgStore').value=STORE||'mendeez.myshopify.com';
+  document.getElementById('cfgToken').value=TOKEN||'';
+  document.getElementById('cfgSheet').value=SHEET_ID||'1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs';
+  document.getElementById('cfgAds').value=ADS_TAB||'Think Spendin PW 26';
+  document.getElementById('cfgCrr').value=CRR_TAB||'Courier Data 26';
+  document.getElementById('cfgCS').value=CS_TAB||'Perf Report 26';
+}
+
 function loadConfig(){
   try{
     const c=JSON.parse(localStorage.getItem('mndz3_cfg')||'{}');
-    STORE=c.STORE||'';TOKEN=c.TOKEN||'';
+    STORE=c.STORE||'mendeez.myshopify.com';TOKEN=c.TOKEN||'';
     SHEET_ID=c.SHEET_ID||'1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs';
     ADS_TAB=c.ADS_TAB||'Think Spendin PW 26';
     CRR_TAB=c.CRR_TAB||'Courier Data 26';
@@ -1104,14 +1117,19 @@ async function connectAll(){
   ADS_TAB=document.getElementById('cfgAds').value.trim();
   CRR_TAB=document.getElementById('cfgCrr').value.trim();
   CS_TAB=document.getElementById('cfgCS').value.trim();
-  COMPLAINTS_TAB=document.getElementById('cfgComplaints').value.trim()||'Complaints Data 26';
+  COMPLAINTS_TAB=(document.getElementById('cfgComplaints')||{}).value||'Complaints Data 26';
   if(!STORE||!TOKEN){alert('Please enter Shopify store URL and API token');return;}
   saveConfig();
-  document.getElementById('setupOverlay').innerHTML='<div class="setup-box" style="text-align:center"><div class="spinner"></div><div style="color:var(--accent);font-size:15px;font-weight:600">Connecting...</div><div style="color:var(--muted);font-size:12px;margin-top:6px">'+STORE+'</div></div>';
-  try{await loadAll();document.getElementById('setupOverlay').style.display='none';}
-  catch(e){
-    console.error('Connection error:', e);
-    document.getElementById('setupOverlay').innerHTML='<div class="setup-box"><div style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:10px">Connection failed</div><div style="color:var(--muted);font-size:12px;margin-bottom:20px">'+e.message+'</div><div style="color:var(--muted);font-size:11px;font-family:var(--mono);margin-bottom:20px">Store: '+STORE+'</div><button class="btn btn-s btn-full" onclick="location.reload()">Try Again</button></div>';
+  // Close overlay and connect silently in background
+  document.getElementById('setupOverlay').style.display='none';
+  const btn=document.querySelector('#setupOverlay + * button') || document.getElementById('lastUpd');
+  document.getElementById('lastUpd').textContent='Connecting...';
+  try{
+    await loadAll();
+    document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+  }catch(e){
+    console.error('Connection error:',e);
+    document.getElementById('lastUpd').textContent='Connection failed';
   }
 }
 
@@ -3341,19 +3359,16 @@ window.addEventListener('load',()=>{
   document.getElementById('dateFrom').value=_tdStr;
   document.getElementById('dateTo').value=_tdStr;
   document.getElementById('dActiveLbl').textContent='📅 Today';
+  // Always pre-fill setup form with current values
+  document.getElementById('cfgStore').value=STORE;
+  document.getElementById('cfgToken').value=TOKEN;
+  document.getElementById('cfgSheet').value=SHEET_ID;
+  document.getElementById('cfgAds').value=ADS_TAB;
+  document.getElementById('cfgCrr').value=CRR_TAB;
+  document.getElementById('cfgCS').value=CS_TAB;
+  // Auto-connect silently — no overlay, just load in background
   if(STORE&&TOKEN){
-    document.getElementById('cfgStore').value=STORE;
-    document.getElementById('cfgToken').value=TOKEN;
-    document.getElementById('cfgSheet').value=SHEET_ID;
-    document.getElementById('cfgAds').value=ADS_TAB;
-    document.getElementById('cfgCrr').value=CRR_TAB;
-    document.getElementById('cfgCS').value=CS_TAB;
-    // Auto-connect: credentials already saved — load dashboard immediately
-    const ov=document.getElementById('setupOverlay');
-    ov.innerHTML='<div class="setup-box" style="text-align:center"><div class="spinner"></div><div style="color:var(--accent);font-size:15px;font-weight:600">Connecting...</div><div style="color:var(--muted);font-size:12px;margin-top:6px">'+STORE+'</div></div>';
-    loadAll().then(()=>{ov.style.display='none';}).catch(e=>{
-      ov.innerHTML='<div class="setup-box"><div style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:10px">Connection failed</div><div style="color:var(--muted);font-size:12px;margin-bottom:20px">'+e.message+'</div><div style="color:var(--muted);font-size:11px;font-family:var(--mono);margin-bottom:20px">Store: '+STORE+'</div><button class="btn btn-s btn-full" onclick="location.reload()">Try Again</button></div>';
-    });
+    loadAll().catch(e=>console.warn('Auto-connect failed:',e));
   }
   // Restore manual field values
   if(manualData.stock)document.getElementById('i-stock').value=manualData.stock;
