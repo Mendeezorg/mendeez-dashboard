@@ -5479,7 +5479,9 @@ async function renderCSFromSupabase(){
   const year=now.getFullYear();
   const month=String(now.getMonth()+1).padStart(2,'0');
   const monthStart=`${year}-${month}-01`;
-  const monthEnd=`${year}-${month}-31`;
+  // Get actual last day of month (avoids invalid dates like June 31)
+  const lastDay=new Date(year,now.getMonth()+1,0).getDate();
+  const monthEnd=`${year}-${month}-${String(lastDay).padStart(2,'0')}`;
 
   // Get all entries for this month
   const entries=await DB.get('cs_entries',`date=gte.${monthStart}&date=lte.${monthEnd}&order=date.asc`)||[];
