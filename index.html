@@ -1410,9 +1410,15 @@ async function loadProducts(){
         if(hasMore)await new Promise(r=>setTimeout(r,50));
       }catch(pageErr){
         console.warn('loadProducts page',pageNum,'error:',pageErr.message);
-        retries++;
-        if(retries>=3){console.error('loadProducts gave up at',allProds.length,'products');hasMore=false;}
-        else await new Promise(r=>setTimeout(r,2500));
+        // If 404 on a paginated request, the since_id product was deleted — stop pagination gracefully
+        if(pageErr.message&&pageErr.message.includes('404')&&sinceId){
+          console.log('loadProducts: 404 on since_id='+sinceId+' — likely deleted product, stopping pagination with',allProds.length,'products loaded');
+          hasMore=false;
+        } else {
+          retries++;
+          if(retries>=3){console.error('loadProducts gave up at',allProds.length,'products');hasMore=false;}
+          else await new Promise(r=>setTimeout(r,2500));
+        }
       }
     }
     allProducts=allProds;
