@@ -5613,7 +5613,8 @@ function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
 </div>
 
 <script>
-const CARD_CSV_URL = 'https://docs.google.com/spreadsheets/d/1uIYjcBXTAKd5jE9w6SSR-egdaf-439AcL_PSxFJGt3I/pub?gid=0&single=true&output=csv';
+const CARD_CSV_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSBOoqwin9kv03I2ew5AMrBo1xLtcqD5fR2S6Y5VkdGijQqekCJVccX9lf1EOE1ByK8MyNURkKnydRB/pub?output=csv';
+const CARD_CSV_URL  = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(CARD_CSV_BASE);
 let _cardAllRows = [];
 
 async function loadCardData(force=false){
@@ -5626,7 +5627,7 @@ async function loadCardData(force=false){
   icon.style.animation='spin .8s linear infinite';
 
   try {
-    const res = await fetch(CARD_CSV_URL + '&t=' + Date.now());
+    const res = await fetch(CARD_CSV_URL + '&cachebust=' + Date.now());
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     _cardAllRows = parseCardCSV(text);
