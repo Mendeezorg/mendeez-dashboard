@@ -487,9 +487,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div class="alert al-blue"><div>ℹ</div><div>Pulled automatically from your Perf Report sheet. Shows MTD agent performance and today's date column data.</div></div>
-  <!-- MTD SUMMARY -->
+  <!-- MTD SUMMARY — from Google Sheet -->
   <div class="sh"><div class="st" id="csMTDHeader">MTD Agent Performance</div></div>
   <div class="tc" id="csAgentTable"><div class="ldrow"><span class="si"></span>Loading...</div></div>
+  <!-- MANUAL ENTRIES — from Supabase -->
+  <div class="sh" style="margin-top:20px"><div class="st" style="color:var(--accent)">📋 Daily Agent Entries</div><div class="ss" id="csEntriesSubtitle"></div></div>
+  <div class="tc" id="csEntriesTable"><div class="ldrow"><span class="si"></span>Loading entries...</div></div>
   <!-- ORDER STATUS -->
   <div class="sh"><div class="st">Order Status MTD</div></div>
   <div class="sg" id="csOrderStats">
@@ -590,82 +593,182 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:12px;line-height:1.9;color:var(--muted)">
     <div style="font-weight:600;color:var(--text);margin-bottom:4px">How it works:</div>
-    <div>① Upload Excel file (CSV converter) — <strong style="color:var(--accent)">optional</strong></div>
-    <div>② Upload product images — <strong style="color:var(--accent)">optional</strong></div>
-    <div>③ Click <strong style="color:var(--accent)">Submit to Shopify</strong> — works with just CSV, just images, or both together</div>
+    <div>① Fill product details → click <strong style="color:var(--accent)">+ Add to Queue</strong> → repeat for multiple products</div>
+    <div>② Search products → drop images named <strong style="color:var(--accent)">1.jpg 2.jpg 3.jpg</strong> into their slots</div>
+    <div>③ Click <strong style="color:var(--accent)">Submit to Shopify</strong> — uploads products + images in one go</div>
   </div>
 
   <div class="two-col" style="gap:18px;align-items:start">
 
-    <!-- LEFT: CSV UPLOAD -->
+    <!-- LEFT: PRODUCT FORM -->
     <div>
-      <div class="sh" style="margin-top:0"><div class="st" style="color:var(--accent)">① Excel → CSV Upload</div></div>
-      <div class="ic">
-        <div id="upCsvDrop" onclick="document.getElementById('upCsvInput').click()"
-          style="border:2px dashed var(--border2);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px">
-          <div style="font-size:28px;margin-bottom:6px">📊</div>
-          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Drop Excel file here or click to browse</div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">.xlsx or .xls · Product Name, Category, Sizes <span style="color:var(--muted2)">or</span> Quantity, SKU, Price, Description</div>
-          <input type="file" id="upCsvInput" accept=".xlsx,.xls" style="display:none" onchange="upHandleCSV(this.files[0])">
-        </div>
-
-        <div id="upCsvStatus" style="display:none;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
-            <span style="font-size:18px" id="upCsvIcon">📄</span>
-            <div style="flex:1">
-              <div style="font-size:12px;font-weight:600" id="upCsvName">—</div>
-              <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="upCsvMeta">—</div>
-            </div>
-            <button onclick="upClearCSV()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
-          </div>
-        </div>
-
-        <div id="upCsvErrors" style="display:none;margin-bottom:10px"></div>
-
-        <div id="upCsvPreview" style="display:none;margin-bottom:10px">
-          <div style="overflow-x:auto;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
-            <table style="width:100%;border-collapse:collapse;font-size:11px">
-              <thead><tr id="upCsvHead" style="position:sticky;top:0;background:var(--surface2)"></tr></thead>
-              <tbody id="upCsvBody"></tbody>
-            </table>
-          </div>
-          <div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--muted)" id="upCsvNote"></div>
-        </div>
+      <div class="sh" style="margin-top:0">
+        <div class="st" style="color:var(--accent)">① Product Details</div>
+        <button class="btn btn-s btn-sm" onclick="upFormAddToQueue()" id="upFormAddBtn">+ Add to Queue</button>
       </div>
+      <div class="ic" style="display:flex;flex-direction:column;gap:10px">
+
+        <!-- Title -->
+        <div class="fg">
+          <div class="fl">Product Title <span style="color:var(--red)">*</span></div>
+          <input class="fi" id="pf-title" placeholder="e.g. Oversized Texture Crew T-Shirt - Khaki Beige">
+        </div>
+
+        <!-- Category + Mode row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg" style="margin:0">
+            <div class="fl">Category / Type <span style="color:var(--red)">*</span></div>
+            <select class="fi" id="pf-type">
+              <option value="">Select category...</option>
+              <option value="T-shirts">T-shirts</option>
+              <option value="Polo">Polo</option>
+              <option value="Hoodies">Hoodies</option>
+              <option value="Sweatshirts">Sweatshirts</option>
+              <option value="Shirts">Shirts</option>
+              <option value="Jackets">Jackets</option>
+              <option value="Cargo Pants">Cargo Pants</option>
+              <option value="Jogger Pants">Jogger Pants</option>
+              <option value="Shorts">Shorts</option>
+              <option value="Trunks">Trunks</option>
+              <option value="Boxer Trunks">Boxer Trunks</option>
+              <option value="Boxer Shorts">Boxer Shorts</option>
+              <option value="Boxer Briefs">Boxer Briefs</option>
+              <option value="Boxers">Boxers</option>
+              <option value="Brief">Brief</option>
+              <option value="Vest">Vest</option>
+              <option value="Undershirt">Undershirt</option>
+              <option value="Pajama">Pajama</option>
+              <option value="Pajama Sets">Pajama Sets</option>
+              <option value="Socks">Socks</option>
+              <option value="Caps">Caps</option>
+              <option value="Beanies">Beanies</option>
+              <option value="Sunglasses">Sunglasses</option>
+              <option value="Belts">Belts</option>
+              <option value="Bags">Bags</option>
+              <option value="Jewelry">Jewelry</option>
+              <option value="Shoes">Shoes</option>
+              <option value="Slides">Slides</option>
+              <option value="Tanktops">Tanktops</option>
+              <option value="Sweaters">Sweaters</option>
+              <option value="Tie & Dye">Tie & Dye</option>
+              <option value="Blazers">Blazers</option>
+            </select>
+          </div>
+          <div class="fg" style="margin:0">
+            <div class="fl">Product Mode <span style="color:var(--red)">*</span></div>
+            <select class="fi" id="pf-mode" onchange="upFormToggleMode()">
+              <option value="sizes">Sizes (with variants)</option>
+              <option value="qty">Quantity (single variant)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Sizes mode -->
+        <div id="pf-sizes-row" class="fg" style="margin:0">
+          <div class="fl">Sizes</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XS" class="pf-size-cb"> XS</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="S" class="pf-size-cb" checked> S</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="M" class="pf-size-cb" checked> M</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="L" class="pf-size-cb" checked> L</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XL" class="pf-size-cb" checked> XL</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XXL" class="pf-size-cb" checked> XXL</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="3XL" class="pf-size-cb"> 3XL</label>
+          </div>
+        </div>
+
+        <!-- Qty mode -->
+        <div id="pf-qty-row" class="fg" style="margin:0;display:none">
+          <div class="fl">Quantity</div>
+          <input class="fi" id="pf-qty" type="number" min="0" placeholder="e.g. 50">
+        </div>
+
+        <!-- SKU + Price row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg" style="margin:0">
+            <div class="fl">SKU (S size) <span style="color:var(--red)">*</span></div>
+            <input class="fi" id="pf-sku" placeholder="e.g. 0025842" oninput="upFormPreviewSKUs()">
+          </div>
+          <div class="fg" style="margin:0">
+            <div class="fl">Price (PKR) <span style="color:var(--red)">*</span></div>
+            <input class="fi" id="pf-price" type="number" placeholder="e.g. 3490">
+          </div>
+        </div>
+
+        <!-- SKU preview -->
+        <div id="pf-sku-preview" style="display:none;font-size:10px;font-family:var(--mono);color:var(--muted);background:var(--surface2);padding:6px 10px;border-radius:5px;line-height:1.8"></div>
+
+        <!-- Compare + Design row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg" style="margin:0">
+            <div class="fl">Compare At (PKR)</div>
+            <input class="fi" id="pf-compare" type="number" placeholder="Optional">
+          </div>
+          <div class="fg" style="margin:0">
+            <div class="fl">Design Code</div>
+            <input class="fi" id="pf-design" placeholder="e.g. TS-0010-009">
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="fg" style="margin:0">
+          <div class="fl">Tags <span style="color:var(--muted2);font-size:9px">— leave blank to auto-copy from same category</span></div>
+          <input class="fi" id="pf-tags" placeholder="e.g. b1g1, T-shirts Sale, Tops Sale">
+        </div>
+
+        <!-- Description -->
+        <div class="fg" style="margin:0">
+          <div class="fl">Description <span style="color:var(--muted2);font-size:9px">— paste plain text, formatting auto-applied</span></div>
+          <textarea class="fi" id="pf-desc" rows="5" placeholder="Paste your product description here. Use CAPS for words that should be bold. Separate paragraphs with blank lines." style="resize:vertical;line-height:1.6"></textarea>
+        </div>
+
+        <!-- Errors -->
+        <div id="upCsvErrors" style="display:none"></div>
+
+      </div>
+
+      <!-- Queue -->
+      <div class="sh" style="margin-top:16px">
+        <div class="st">Product Queue</div>
+        <div class="ss" id="upCsvMeta">0 products ready</div>
+      </div>
+      <div id="upCsvPreview" style="display:none">
+        <div style="overflow-x:auto;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr id="upCsvHead" style="position:sticky;top:0;background:var(--surface2)"></tr></thead>
+            <tbody id="upCsvBody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--muted)" id="upCsvNote"></div>
+      </div>
+
+      <!-- hidden compat elements -->
+      <div id="upCsvStatus" style="display:none"><span id="upCsvIcon"></span><span id="upCsvName"></span></div>
     </div>
 
     <!-- RIGHT: IMAGE UPLOAD -->
     <div>
-      <div class="sh" style="margin-top:0"><div class="st" style="color:var(--accent)">② Image Bulk Upload</div></div>
+      <div class="sh" style="margin-top:0"><div class="st" style="color:var(--accent)">② Image Upload — Search & Drop</div></div>
       <div class="ic">
         <div class="alert al-blue" style="margin-bottom:10px;font-size:11px">
           <div>ℹ</div>
-          <div>Name images as <strong>SKU-1.jpg</strong> to <strong>SKU-5.jpg</strong><br>e.g. <span style="color:var(--accent)">0024200-1.jpg</span>, <span style="color:var(--accent)">0024200-2.jpg</span><br>SKU = S size SKU of the product</div>
+          <div>Search a product → drop images named <strong>1.jpg 2.jpg 3.jpg</strong> into its slot. No renaming needed.</div>
         </div>
-
-        <div id="upImgDrop" onclick="document.getElementById('upImgInput').click()"
-          style="border:2px dashed var(--border2);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px">
-          <div style="font-size:28px;margin-bottom:6px">🖼️</div>
-          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Drop all images here or click to browse</div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">500+ images · JPG · PNG · WEBP · all at once</div>
-          <input type="file" id="upImgInput" accept="image/*,.jfif,.jfif" multiple style="display:none" onchange="upHandleImages(this.files)">
+        <!-- Search bar -->
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="imgSearchInput" class="fi" placeholder="🔍 Search product by name or SKU..." oninput="imgSearchProducts()" style="flex:1"/>
+          <button class="btn btn-s btn-sm" onclick="imgClearSearch()">✕</button>
         </div>
-
-        <div id="upImgStatus" style="display:none;margin-bottom:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
-            <div>
-              <div style="font-size:12px;font-weight:600" id="upImgCount">—</div>
-              <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="upImgMeta">—</div>
-            </div>
-            <button onclick="upClearImages()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
-          </div>
-        </div>
-
-        <div id="upImgErrors" style="display:none;margin-bottom:10px"></div>
-
-        <div id="upImgPreview" style="display:none;margin-bottom:10px">
-          <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px" id="upImgGrid"></div>
-        </div>
+        <!-- Search results dropdown -->
+        <div id="imgSearchResults" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;max-height:200px;overflow-y:auto;margin-bottom:10px"></div>
+        <!-- Product slots -->
+        <div id="imgSlots" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto"></div>
+        <!-- Hidden state tracker -->
+        <div id="upImgStatus" style="display:none"></div>
+        <div id="upImgErrors" style="display:none"></div>
+        <div id="upImgPreview" style="display:none"><div id="upImgGrid"></div></div>
+        <div id="upImgCount" style="display:none"></div>
+        <div id="upImgMeta" style="display:none"></div>
       </div>
     </div>
   </div>
@@ -3051,6 +3154,7 @@ function switchTab(name,el){
     else if(sel&&allCollections.length===0&&STORE&&STORE!=='demo'&&TOKEN)
       loadCollections().then(()=>{if(sel&&allCollections.length>0)sel.innerHTML='<option value="">Select a collection...</option>'+allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');});
   }
+  if(name==='uploader'){ setTimeout(()=>{ if(!Object.keys(_imgSlots).length) imgRenderSlots(); },50); }
   if(name==='products'){
     const tbl=document.getElementById('prodTbl');
     if(allProducts.length>0){
@@ -3732,7 +3836,8 @@ function switchOverviewMonth(){
 // PRODUCT UPLOADER — CSV + IMAGE
 // ══════════════════════════════════════════════════
 let _upCsvProducts = [];  // parsed products from Excel
-let _upImgMatched  = {};  // sku → {productId, title, images[]}
+let _upImgMatched  = {};  // productId/sku → {productId, title, sku, images[]}
+let _imgSlots = {};       // productId → slot data (search & drop system)
 let _upImgUnmatched = [];
 
 // Drag & drop setup
@@ -3780,6 +3885,7 @@ function upDetectCols(headerRow){
     type:    find(['category / type','category','type']),
     sizes:   find(['sizes','size']),
     qty:     find(['qty','quantity']),
+    sku:     find(['sku (s size)','sku (s)','sku','handle']),
     price:   find(['price (pkr)','price']),
     design:  find(['design code','design_code','design']),
     tags:    find(['tags','tag']),
@@ -3837,6 +3943,7 @@ function upParseCSV(rows, fileName){
     _upCsvProducts.push({name,type,sizes,qty,isQty,skuPrefix,skuBase,skuPad,
       price:String(parseFloat(price)||''), compare:compare?String(parseFloat(compare)||''):'',
       design, tags, desc, vendor, status});
+  });
 
   const totalRows = _upCsvProducts.reduce((s,p)=>s+p.sizes.length, 0);
 
@@ -3882,67 +3989,380 @@ function upClearCSV(){
   document.getElementById('upCsvStatus').style.display='none';
   document.getElementById('upCsvPreview').style.display='none';
   document.getElementById('upCsvErrors').style.display='none';
-  document.getElementById('upCsvInput').value='';
+  if(typeof upFormRefreshQueue==='function') upFormRefreshQueue();
   upUpdateSubmitBtn();
 }
 
-// ── IMAGE HANDLING ──
-function upHandleImages(fileList){
-  const files = Array.from(fileList).filter(f=>f.type.startsWith('image/')||f.name.match(/\.(jpg|jpeg|png|webp)$/i));
-  if(!files.length){ alert('No image files found'); return; }
-  _upImgMatched  = {};
-  _upImgUnmatched= [];
-  files.forEach(f=>{
-    const nameNoExt = f.name.replace(/\.[^.]+$/,'');
-    const m = nameNoExt.match(/^(.+?)\s*-\s*(\d+)$/);
-    if(!m){ _upImgUnmatched.push(f.name); return; }
-    const sku = m[1].trim();
-    const pos = parseInt(m[2]);
-    if(pos<1||pos>10){ _upImgUnmatched.push(f.name); return; }
-    if(!_upImgMatched[sku]) _upImgMatched[sku]={sku,productId:null,title:'Will look up on submit...',images:[]};
-    _upImgMatched[sku].images.push({file:f,pos});
+
+// ══════════════════════════════════════════════════
+// PRODUCT FORM — Direct entry system
+// ══════════════════════════════════════════════════
+
+function upFormToggleMode(){
+  const mode = document.getElementById('pf-mode').value;
+  document.getElementById('pf-sizes-row').style.display = mode==='sizes' ? '' : 'none';
+  document.getElementById('pf-qty-row').style.display   = mode==='qty'   ? '' : 'none';
+  upFormPreviewSKUs();
+}
+
+function upFormPreviewSKUs(){
+  const skuRaw = document.getElementById('pf-sku').value.trim();
+  const mode   = document.getElementById('pf-mode').value;
+  const prev   = document.getElementById('pf-sku-preview');
+  if(!skuRaw){ prev.style.display='none'; return; }
+
+  const skuPrefix = skuRaw.replace(/\d+$/, '');
+  const skuBase   = parseInt(skuRaw.replace(skuPrefix, '')) || 0;
+  const skuPad    = skuRaw.replace(skuPrefix, '').length || 7;
+
+  let lines = [];
+  if(mode === 'sizes'){
+    const checked = Array.from(document.querySelectorAll('.pf-size-cb:checked')).map(cb=>cb.value);
+    checked.forEach((sz,i)=>{
+      const sku = skuPrefix + String(skuBase+i).padStart(skuPad,'0');
+      lines.push(sz + ' → ' + sku);
+    });
+  } else {
+    lines.push('Default → ' + skuRaw);
+  }
+  prev.style.display = 'block';
+  prev.textContent = lines.join('  ·  ');
+}
+
+function upFormDescToHtml(raw){
+  if(!raw || !raw.trim()) return '';
+
+  const rawLines = raw.trim().split('\n');
+  const blocks = [];
+  let current = null;
+
+  rawLines.forEach(line => {
+    const trimmed = line.trim();
+    const isBullet = /^[\u00b7\-\*]\s+/.test(trimmed);
+
+    if(!trimmed){
+      if(current){ blocks.push(current); current=null; }
+      return;
+    }
+    if(isBullet){
+      if(!current || current.type!=='ul'){
+        if(current) blocks.push(current);
+        current={type:'ul', lines:[]};
+      }
+      current.lines.push(trimmed.replace(/^[\u00b7\-\*]\s+/, '').trim());
+    } else {
+      if(!current || current.type!=='p'){
+        if(current) blocks.push(current);
+        current={type:'p', lines:[]};
+      }
+      current.lines.push(trimmed);
+    }
   });
-  Object.values(_upImgMatched).forEach(p=>p.images.sort((a,b)=>a.pos-b.pos));
-  const matchedCount  = Object.values(_upImgMatched).reduce((s,p)=>s+p.images.length,0);
-  const productCount  = Object.keys(_upImgMatched).length;
+  if(current) blocks.push(current);
 
-  document.getElementById('upImgStatus').style.display='block';
-  document.getElementById('upImgCount').textContent = files.length+' images · '+productCount+' products';
-  document.getElementById('upImgMeta').textContent  = matchedCount+' matched · '+_upImgUnmatched.length+' unmatched';
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function boldLabel(s){ return esc(s).replace(/^([A-Za-z][A-Za-z\s&]{0,30}):/, '<b>$1:</b>'); }
 
-  if(_upImgUnmatched.length>0){
-    document.getElementById('upImgErrors').style.display='block';
-    document.getElementById('upImgErrors').innerHTML='<div class="alert al-amber"><div>⚠</div><div>'
-      +_upImgUnmatched.length+' images with wrong name format (expected SKU-1.jpg)<br>'
-      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted)">'
-      +_upImgUnmatched.slice(0,5).map(n=>'• '+n).join('<br>')
-      +(_upImgUnmatched.length>5?'<br>...and '+(_upImgUnmatched.length-5)+' more':'')
-      +'</span></div></div>';
-  } else { document.getElementById('upImgErrors').style.display='none'; }
+  return blocks.map(block => {
+    if(block.type==='ul'){
+      return '<ul>\n' + block.lines.map(l=>'<li>'+boldLabel(l)+'</li>').join('\n') + '\n</ul>';
+    } else {
+      return '<p>' + block.lines.map(l=>esc(l)).join('<br>\n') + '</p>';
+    }
+  }).join('\n\n');
+}
 
-  // Preview grid
-  document.getElementById('upImgGrid').innerHTML=Object.values(_upImgMatched).map(p=>{
-    const thumbs=p.images.map(({file,pos})=>
-      '<div style="text-align:center">'
-      +'<img src="'+URL.createObjectURL(file)+'" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">'
-      +'<div style="font-size:9px;font-family:var(--mono);color:var(--muted);margin-top:1px">#'+pos+'</div></div>'
-    ).join('');
-    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:10px">'
-      +'<div style="flex:1;min-width:0"><div style="font-size:10px;font-family:var(--mono);color:var(--accent)">'
-      +p.sku+'</div><div style="font-size:11px;color:var(--muted)">'
-      +p.images.length+' image'+( p.images.length!==1?'s':'')+'</div></div>'
-      +'<div style="display:flex;gap:4px">'+thumbs+'</div></div>';
-  }).join('');
-  document.getElementById('upImgPreview').style.display='block';
+function upFormValidate(){
+  const title = document.getElementById('pf-title').value.trim();
+  const type  = document.getElementById('pf-type').value.trim();
+  const sku   = document.getElementById('pf-sku').value.trim();
+  const price = document.getElementById('pf-price').value.trim();
+  const mode  = document.getElementById('pf-mode').value;
+  const errEl = document.getElementById('upCsvErrors');
+
+  const errs = [];
+  if(!title) errs.push('Product Title is required');
+  if(!type)  errs.push('Category / Type is required');
+  if(!sku)   errs.push('SKU is required');
+  if(!price) errs.push('Price is required');
+  if(mode==='sizes'){
+    const checked = Array.from(document.querySelectorAll('.pf-size-cb:checked'));
+    if(!checked.length) errs.push('Select at least one size');
+  }
+
+  if(errs.length){
+    errEl.style.display='block';
+    errEl.innerHTML='<div class="alert al-red"><div>✗</div><div>'+errs.join('<br>')+'</div></div>';
+    return null;
+  }
+  errEl.style.display='none';
+  return true;
+}
+
+function upFormBuildProduct(){
+  const title   = document.getElementById('pf-title').value.trim();
+  const type    = document.getElementById('pf-type').value.trim();
+  const skuRaw  = document.getElementById('pf-sku').value.trim();
+  const price   = document.getElementById('pf-price').value.trim();
+  const compare = document.getElementById('pf-compare').value.trim();
+  const design  = document.getElementById('pf-design').value.trim();
+  const tags    = document.getElementById('pf-tags').value.trim();
+  const descRaw = document.getElementById('pf-desc').value.trim();
+  const mode    = document.getElementById('pf-mode').value;
+  const qty     = parseInt(document.getElementById('pf-qty').value)||0;
+
+  const isQty = mode === 'qty';
+  const sizes = isQty
+    ? ['Default Title']
+    : Array.from(document.querySelectorAll('.pf-size-cb:checked')).map(cb=>cb.value);
+
+  const skuPrefix = skuRaw.replace(/\d+$/, '');
+  const skuBase   = parseInt(skuRaw.replace(skuPrefix,'')) || 0;
+  const skuPad    = skuRaw.replace(skuPrefix,'').length || 7;
+
+  const desc = upFormDescToHtml(descRaw);
+
+  return {
+    name:  title,
+    type,
+    sizes,
+    qty:   isQty ? qty : null,
+    isQty,
+    skuPrefix,
+    skuBase,
+    skuPad,
+    price: String(parseFloat(price)||''),
+    compare: compare ? String(parseFloat(compare)||'') : '',
+    design,
+    tags,
+    desc,
+    vendor: 'MENDEEZ',
+    status: 'draft'
+  };
+}
+
+function upFormAddToQueue(){
+  if(!upFormValidate()) return;
+  const p = upFormBuildProduct();
+  _upCsvProducts.push(p);
+  upFormRefreshQueue();
+  upFormReset();
+  upUpdateSubmitBtn();
+  // scroll to queue
+  document.getElementById('upCsvPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function upFormRemoveFromQueue(idx){
+  _upCsvProducts.splice(idx,1);
+  upFormRefreshQueue();
   upUpdateSubmitBtn();
 }
+
+function upFormRefreshQueue(){
+  const meta = document.getElementById('upCsvMeta');
+  meta.textContent = _upCsvProducts.length + ' product' + (_upCsvProducts.length!==1?'s':'') + ' ready';
+
+  if(!_upCsvProducts.length){
+    document.getElementById('upCsvPreview').style.display='none';
+    return;
+  }
+  document.getElementById('upCsvPreview').style.display='block';
+  document.getElementById('upCsvHead').innerHTML=
+    '<th style="width:28px">#</th><th>Title</th><th>Type</th><th>Sizes / Qty</th><th>SKU (S)</th><th>Price</th><th>Desc</th><th style="width:28px"></th>';
+
+  document.getElementById('upCsvBody').innerHTML = _upCsvProducts.map((p,i)=>{
+    const skuS = p.skuPrefix+String(p.skuBase).padStart(p.skuPad,'0');
+    return '<tr>'
+      +'<td class="tm tmut">'+(i+1)+'</td>'
+      +'<td style="font-weight:500;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</td>'
+      +'<td class="tm tmut">'+p.type+'</td>'
+      +(p.isQty
+        ? '<td><span style="background:var(--blue-dim);color:var(--blue);padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:10px">QTY '+p.qty+'</span></td>'
+        : '<td style="color:var(--accent);font-family:var(--mono);font-size:11px">'+p.sizes.join(', ')+'</td>')
+      +'<td class="tm">'+skuS+'</td>'
+      +'<td class="tm">'+parseInt(p.price||0).toLocaleString()+'</td>'
+      +'<td style="font-size:11px;color:'+(p.desc?'var(--green)':'var(--muted2)')+'">'+( p.desc?'✓':'—')+'</td>'
+      +'<td><button onclick="upFormRemoveFromQueue('+i+')" title="Remove" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0">✕</button></td>'
+      +'</tr>';
+  }).join('');
+
+  document.getElementById('upCsvNote').textContent =
+    _upCsvProducts.length+' products queued · click ↑ Submit to Shopify when ready';
+}
+
+function upFormReset(){
+  document.getElementById('pf-title').value='';
+  document.getElementById('pf-sku').value='';
+  document.getElementById('pf-price').value='';
+  document.getElementById('pf-compare').value='';
+  document.getElementById('pf-design').value='';
+  document.getElementById('pf-tags').value='';
+  document.getElementById('pf-desc').value='';
+  document.getElementById('pf-qty').value='';
+  document.getElementById('pf-sku-preview').style.display='none';
+  document.getElementById('upCsvErrors').style.display='none';
+  // reset sizes to default S,M,L,XL,XXL
+  document.querySelectorAll('.pf-size-cb').forEach(cb=>{
+    cb.checked = ['S','M','L','XL','XXL'].includes(cb.value);
+  });
+  document.getElementById('pf-title').focus();
+}
+
+// ── IMAGE HANDLING — Search & Drop System ──
+// _upImgMatched: productId → {productId, title, sku, images:[{file,pos}]}
+
+function imgSearchProducts(){
+  const q = document.getElementById('imgSearchInput').value.toLowerCase().trim();
+  const res = document.getElementById('imgSearchResults');
+  if(!q || q.length < 2){ res.style.display='none'; return; }
+
+  // Search from already-loaded allProducts
+  const pool = (window.allProducts||[]);
+  const hits = pool.filter(p=>
+    p.title.toLowerCase().includes(q) ||
+    (p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(q))
+  ).slice(0,8);
+
+  if(!hits.length){
+    res.style.display='block';
+    res.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--muted)">No products found</div>';
+    return;
+  }
+  res.style.display='block';
+  res.style.display='block';
+  res.innerHTML='';
+  hits.forEach(p=>{
+    const sku=(p.variants&&p.variants[0]&&p.variants[0].sku)||'';
+    const el=document.createElement('div');
+    el.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;display:flex;align-items:center;gap:10px';
+    el.onmouseover=()=>el.style.background='var(--surface2)';
+    el.onmouseout=()=>el.style.background='';
+    const titleEl=document.createElement('div');
+    titleEl.style.flex='1';
+    titleEl.innerHTML='<div style="font-weight:600;color:var(--text)"></div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">SKU: '+sku+'</div>';
+    titleEl.querySelector('div').textContent=p.title.length>50?p.title.slice(0,50)+'...':p.title;
+    const addEl=document.createElement('div');
+    addEl.style.cssText='color:var(--accent);font-size:11px;font-weight:600';
+    addEl.textContent='+ Add';
+    el.appendChild(titleEl); el.appendChild(addEl);
+    el.onclick=()=>imgAddSlot(p.id, p.title, sku);
+    res.appendChild(el);
+  });
+}
+
+function imgClearSearch(){
+  document.getElementById('imgSearchInput').value='';
+  document.getElementById('imgSearchResults').style.display='none';
+}
+
+function imgAddSlot(productId, title, sku){
+  document.getElementById('imgSearchResults').style.display='none';
+  document.getElementById('imgSearchInput').value='';
+  if(_imgSlots[productId]){ alert('Already added: '+title); return; }
+  _imgSlots[productId]={productId,title,sku,images:[]};
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function imgRemoveSlot(productId){
+  delete _imgSlots[productId];
+  // also remove from _upImgMatched
+  delete _upImgMatched[productId];
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function imgRenderSlots(){
+  const container = document.getElementById('imgSlots');
+  const slots = Object.values(_imgSlots);
+  if(!slots.length){
+    container.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;border:2px dashed var(--border2);border-radius:8px">'
+      +'<div style="font-size:20px;margin-bottom:6px">🖼️</div>'
+      +'<div style="color:var(--text);font-weight:600;margin-bottom:4px">No image slots yet</div>'
+      +'<div>Submit products first — slots will appear automatically.<br>Or search an existing Shopify product above to add a slot manually.</div>'
+      +'</div>';
+    return;
+  }
+  container.innerHTML = slots.map(s=>{
+    const thumbs = s.images.length
+      ? s.images.map((img,i)=>`<div style="text-align:center;position:relative">
+          <img src="${URL.createObjectURL(img.file)}" style="width:44px;height:44px;object-fit:cover;border-radius:5px;border:1px solid var(--border)">
+          <div style="font-size:9px;font-family:var(--mono);color:var(--accent);margin-top:2px">#${img.pos}</div>
+        </div>`).join('')
+      : '<div style="font-size:11px;color:var(--muted2);padding:4px">Drop images here</div>';
+
+    return `<div id="slot-${s.productId}"
+      style="background:var(--surface2);border:2px dashed var(--border2);border-radius:8px;padding:12px 14px;transition:border-color .2s"
+      ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+      ondragleave="this.style.borderColor='var(--border2)'"
+      ondrop="imgOnDrop(event,'${s.productId}')">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.title}</div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--muted)">SKU: ${s.sku} &nbsp;·&nbsp; ${s.images.length} image${s.images.length!==1?'s':''}</div>
+        </div>
+        <button onclick="imgClearSlotImages('${s.productId}')" title="Clear images" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">🗑</button>
+        <button onclick="imgRemoveSlot('${s.productId}')" title="Remove slot" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:2px 4px">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;min-height:44px;align-items:center">${thumbs}</div>
+    </div>`;
+  }).join('');
+}
+
+function imgOnDrop(e, productId){
+  e.preventDefault();
+  const slot = document.getElementById('slot-'+productId);
+  if(slot) slot.style.borderColor='var(--border2)';
+  const files = Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')||f.name.match(/\.(jpg|jpeg|png|webp|jfif)$/i));
+  if(!files.length){ alert('No image files detected'); return; }
+  imgAddFilesToSlot(productId, files);
+}
+
+function imgAddFilesToSlot(productId, files){
+  if(!_imgSlots[productId]) return;
+  // Parse position from filename: "1.jpg", "2.png", "3.jpg" etc.
+  // Also accept "productname-1.jpg" — take the trailing number
+  const slot = _imgSlots[productId];
+  const unrecognised = [];
+  files.forEach(f=>{
+    const nameNoExt = f.name.replace(/\.[^.]+$/,'').trim();
+    // Try: just a number "1", "2" etc
+    let pos = null;
+    if(/^\d+$/.test(nameNoExt)){
+      pos = parseInt(nameNoExt);
+    } else {
+      // Try: anything ending in -N or _N
+      const m = nameNoExt.match(/[-_](\d+)$/);
+      if(m) pos = parseInt(m[1]);
+    }
+    if(!pos || pos < 1 || pos > 20){ unrecognised.push(f.name); return; }
+    // Remove existing image at same position
+    slot.images = slot.images.filter(img=>img.pos!==pos);
+    slot.images.push({file:f, pos});
+  });
+  slot.images.sort((a,b)=>a.pos-b.pos);
+  // Sync to _upImgMatched (used by upSubmit)
+  _upImgMatched[productId]={productId, title:slot.title, sku:slot.sku, images:slot.images};
+  if(unrecognised.length){
+    alert('Could not detect position for:\n'+unrecognised.join('\n')+'\n\nName files 1.jpg, 2.jpg, 3.jpg etc.');
+  }
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function imgClearSlotImages(productId){
+  if(_imgSlots[productId]) _imgSlots[productId].images=[];
+  delete _upImgMatched[productId];
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function upHandleImages(fileList){ /* legacy — no longer used */ }
 
 function upClearImages(){
-  _upImgMatched={};_upImgUnmatched=[];
-  document.getElementById('upImgStatus').style.display='none';
-  document.getElementById('upImgPreview').style.display='none';
-  document.getElementById('upImgErrors').style.display='none';
-  document.getElementById('upImgInput').value='';
+  _upImgMatched={};
+  _imgSlots={};
+  imgRenderSlots();
   upUpdateSubmitBtn();
 }
 
@@ -4141,7 +4561,9 @@ async function upSubmit(){
             const skuList = p.isQty ? [upMakeSKU(p,0)] : p.sizes.map((_,si)=>upMakeSKU(p,si));
             skuList.forEach(sku=>{
               window._upNewProductSkuMap[sku] = {id:prodId, title:p.name};
-              window._upNewProductSkuMap[sku.replace(/^0+/,'')] = {id:prodId, title:p.name};
+              const skuStripped=sku.replace(/^0+/,'');
+              if(skuStripped && !window._upNewProductSkuMap[skuStripped])
+                window._upNewProductSkuMap[skuStripped] = {id:prodId, title:p.name};
             });
             // Save design code to metafield if provided
             if(p.design){
@@ -4154,6 +4576,12 @@ async function upSubmit(){
             }
             csvOk++;
             log('  ✓ Created: '+p.name+' ('+(p.isQty?'qty:'+p.qty:p.sizes.length+' sizes')+', '+(p.design?'DC:'+p.design+', ':'')+p.status+')','var(--green)');
+            // Auto-add image slot so user can immediately drop images without searching
+            const s0sku = upMakeSKU(p,0);
+            if(!_imgSlots[prodId]){
+              _imgSlots[prodId]={productId:prodId,title:p.name,sku:s0sku,images:[]};
+              _upImgMatched[prodId]={productId:prodId,title:p.name,sku:s0sku,images:[]};
+            }
           } else {
             csvFail++;
             log('  ✗ Failed: '+p.name+' — '+(JSON.stringify(result&&result.errors||result)).slice(0,80),'var(--red)');
@@ -4166,10 +4594,12 @@ async function upSubmit(){
         setProg(done,total,'Products: '+csvOk+'/'+_upCsvProducts.length+' created');
         await new Promise(r=>setTimeout(r,0));
       }
+      // Render auto-created image slots
+      imgRenderSlots();
       document.getElementById('upCsvResult').style.display='block';
       document.getElementById('upCsvResult').innerHTML='<div class="alert '+(csvFail===0?'al-green':'al-amber')+'"><div>'+(csvFail===0?'✅':'⚠')+'</div><div>'
         +(csvFail===0
-          ?'<strong>'+csvOk+' products created in Shopify!</strong> Status: draft — add images & Design Code then activate'
+          ?'<strong>'+csvOk+' products created!</strong> '+(csvOk>0?'Image slots ready on the right — drop <b>1.jpg, 2.jpg, 3.jpg</b> then hit Submit again.':'')
           :'Products: '+csvOk+' created · '+csvFail+' failed — see log below')
         +'</div></div>';
     }
@@ -4201,8 +4631,12 @@ async function upSubmit(){
           }
           allProds.forEach(p=>(p.variants||[]).forEach(v=>{
             if(v.sku){
-              skuMap[v.sku.trim()]={id:p.id,title:p.title};
-              skuMap[v.sku.trim().replace(/^0+/,'')]={id:p.id,title:p.title};
+              const s=v.sku.trim();
+              skuMap[s]={id:p.id,title:p.title};
+              // Also index without leading zeros — but only if it doesn't already exist
+              // (prevents collisions where two SKUs differ only by leading zeros)
+              const sStripped=s.replace(/^0+/,'');
+              if(sStripped && !skuMap[sStripped]) skuMap[sStripped]={id:p.id,title:p.title};
             }
           }));
           log('  Found '+allProds.length+' products total in Shopify','var(--muted)');
@@ -4216,15 +4650,22 @@ async function upSubmit(){
       const totalImgs=imgEntries.reduce((s,[,p])=>s+p.images.length,0);
       let doneImgs=0;
 
-      for(const [sku,p] of imgEntries){
-        const match=skuMap[sku]||skuMap[sku.replace(/^0+/,'')];
-        if(!match){
-          log('  ✗ SKU '+sku+' not found in Shopify','var(--red)');
-          imgFail++;done++;
-          setProg(done,total,'Images: SKU '+sku+' not found');
-          continue;
+      for(const [key,p] of imgEntries){
+        // New system: productId is stored directly on the slot object
+        // Legacy fallback: try SKU lookup for old-style entries
+        let resolvedId = p.productId && !String(p.productId).startsWith('sku:') ? p.productId : null;
+        if(!resolvedId){
+          const sku = p.sku||key;
+          const match=skuMap[sku]||(sku.replace(/^0+/,'')!==sku ? skuMap[sku.replace(/^0+/,'')] : null);
+          if(!match){
+            log('  ✗ Product "'+p.title+'" (SKU '+sku+') not found in Shopify','var(--red)');
+            imgFail++;done++;
+            setProg(done,total,'Images: SKU '+sku+' not found');
+            continue;
+          }
+          resolvedId=match.id; p.title=match.title;
         }
-        p.productId=match.id; p.title=match.title;
+        p.productId=resolvedId;
         let prodOk=true;
         log('  Uploading '+p.images.length+' images for "'+p.title+'"...','var(--muted)');
         for(const {file,pos} of p.images){
@@ -4263,6 +4704,8 @@ async function upSubmit(){
 
 function upReset(){
   upClearCSV(); upClearImages();
+  _imgSlots={}; imgRenderSlots();
+  upFormReset(); upFormRefreshQueue();
   document.getElementById('upProgress').style.display='none';
   document.getElementById('upLog').style.display='none';
   document.getElementById('upCsvResult').style.display='none';
@@ -5064,15 +5507,16 @@ async function renderCSFromSupabase(){
       </table>
     </div>`;
 
-  // Update the CS agent table area
-  const csTable=document.getElementById('csAgentTable');
-  if(csTable){
-    csTable.innerHTML=`
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:600;color:#f0ede8;font-family:'Syne',sans-serif">MTD Agent Performance — ${now.toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
-        <div style="font-size:11px;color:#555">${entries.length} entries recorded</div>
-      </div>
-      ${tableHTML}`;
+  // Update the dedicated Supabase entries section (NOT the Google Sheet csAgentTable)
+  const csEntriesTable=document.getElementById('csEntriesTable');
+  const csEntriesSubtitle=document.getElementById('csEntriesSubtitle');
+  if(csEntriesSubtitle) csEntriesSubtitle.textContent=entries.length+' entries this month';
+  if(csEntriesTable){
+    if(entries.length===0){
+      csEntriesTable.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">No entries yet this month. Click "+ New Entry" to add one.</div>';
+    } else {
+      csEntriesTable.innerHTML=`<div style="padding:10px 14px 4px"><span style="font-size:11px;color:#555;font-family:'DM Mono',monospace">${entries.length} entries recorded for ${now.toLocaleString('en-GB',{month:'long',year:'numeric'})}</span></div>${tableHTML}`;
+    }
   }
 }
 
