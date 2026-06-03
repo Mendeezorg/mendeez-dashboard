@@ -3837,6 +3837,7 @@ function upParseCSV(rows, fileName){
     _upCsvProducts.push({name,type,sizes,qty,isQty,skuPrefix,skuBase,skuPad,
       price:String(parseFloat(price)||''), compare:compare?String(parseFloat(compare)||''):'',
       design, tags, desc, vendor, status});
+  });
 
   const totalRows = _upCsvProducts.reduce((s,p)=>s+p.sizes.length, 0);
 
