@@ -230,8 +230,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="setup-sub">Connect your four data sources. Open the file from anywhere — Chrome, Firefox, or Edge.</div>
 
     <div class="setup-sec">① Shopify — Live Sales & Stock</div>
-    <div class="fg"><div class="fl">Store URL</div><input class="fi" id="cfgStore" placeholder="yourstore.myshopify.com"></div>
-    <div class="fg"><div class="fl">Admin API Token</div><input class="fi" id="cfgToken" type="password" placeholder="shpat_xxxxxxxxxxxxxxxx"></div>
+    <div class="fg"><div class="fl">Store URL</div><input class="fi" id="cfgStore" value="mendeez.myshopify.com" placeholder="yourstore.myshopify.com"></div>
+    <div class="fg"><div class="fl">Admin API Token</div><input class="fi" id="cfgToken" type="password" value="" placeholder="shpat_xxxxxxxxxxxxxxxx"></div>
 
     <div class="setup-sec">② Google Sheet — Ads + Courier + CS</div>
     <div class="fg"><div class="fl">Sheet ID</div><input class="fi" id="cfgSheet" value="1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs" placeholder="Google Sheet ID"></div>
@@ -245,7 +245,6 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <button class="btn btn-p btn-full" onclick="connectAll()">Connect & Load Dashboard</button>
     <button class="btn btn-s btn-full" style="margin-top:6px;font-size:11px" onclick="testShopifyDirect()">🔧 Test Shopify Connection</button>
     <div id="shopifyTestResult" style="margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--muted);display:none;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
-    <button class="btn btn-s btn-full" style="margin-top:8px" onclick="loadDemo()">Use Demo Data</button>
     <div class="cnote">Shopify: Admin → Settings → Apps → Develop Apps → read_orders, read_products, read_inventory<br>Google Sheet: must be set to <strong style="color:var(--accent)">"Anyone with the link can view"</strong></div>
     <button class="btn btn-s btn-full" style="margin-top:10px;font-size:11px" onclick="testSheetConnection()">🔍 Test Sheet Connection</button>
     <div id="sheetTestResult" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;display:none"></div>
@@ -263,9 +262,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="badge badge-grey" id="bCrr"><div class="sdot" style="background:var(--muted2)"></div>Courier</div>
     <div class="badge badge-grey" id="bCS"><div class="sdot" style="background:var(--muted2)"></div>CS</div>
     <div class="upd">Updated: <span id="lastUpd">—</span></div>
-    <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #e8c547;border-radius:6px;color:#e8c547;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;font-family:'Syne',sans-serif">🏠 Portal</a>
     <a href="/tasks/" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#e8c547;border:none;border-radius:6px;color:#0d0d0d;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">✅ Task Manager</a>
     <button onclick="doEcomLogout()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #444;border-radius:6px;color:#999;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⇄ Logout</button>
+    <button onclick="openSetup()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #555;border-radius:6px;color:#aaa;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⚙ Settings</button>
     
     <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
@@ -282,6 +281,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="tab" onclick="switchTab('uploader',this)">📦 Product Uploader</div>
   <div class="tab" onclick="switchTab('gtech',this)">📊 G-Tech Data & Demand</div>
   <div class="tab" onclick="switchTab('gtechinv',this)">🏪 G-Tech Inventory</div>
+  <div class="tab" onclick="switchTab('cards',this)">💳 Card Balances</div>
 </div>
 
 <!-- DATE RANGE BAR -->
@@ -486,9 +486,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
   <div class="alert al-blue"><div>ℹ</div><div>Pulled automatically from your Perf Report sheet. Shows MTD agent performance and today's date column data.</div></div>
-  <!-- MTD SUMMARY -->
+  <!-- MTD SUMMARY — from Google Sheet -->
   <div class="sh"><div class="st" id="csMTDHeader">MTD Agent Performance</div></div>
   <div class="tc" id="csAgentTable"><div class="ldrow"><span class="si"></span>Loading...</div></div>
+  <!-- MANUAL ENTRIES — from Supabase -->
+  <div class="sh" style="margin-top:20px"><div class="st" style="color:var(--accent)">📋 Daily Agent Entries</div><div class="ss" id="csEntriesSubtitle"></div></div>
+  <div class="tc" id="csEntriesTable"><div class="ldrow"><span class="si"></span>Loading entries...</div></div>
   <!-- ORDER STATUS -->
   <div class="sh"><div class="st">Order Status MTD</div></div>
   <div class="sg" id="csOrderStats">
@@ -560,6 +563,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <option value="variants_desc">Most variants in stock first</option>
         <option value="price_desc">Highest price first</option>
         <option value="price_asc">Lowest price first</option>
+        <option value="date_desc">New to Old (latest uploaded first)</option>
+        <option value="date_asc">Old to New (oldest uploaded first)</option>
       </select>
       <button class="btn btn-p btn-sm" style="margin-top:8px;width:100%" onclick="runSort()">▶ Auto-Sort</button>
     </div>
@@ -587,82 +592,182 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:12px;line-height:1.9;color:var(--muted)">
     <div style="font-weight:600;color:var(--text);margin-bottom:4px">How it works:</div>
-    <div>① Upload Excel file (CSV converter) — <strong style="color:var(--accent)">optional</strong></div>
-    <div>② Upload product images — <strong style="color:var(--accent)">optional</strong></div>
-    <div>③ Click <strong style="color:var(--accent)">Submit to Shopify</strong> — works with just CSV, just images, or both together</div>
+    <div>① Fill product details → click <strong style="color:var(--accent)">+ Add to Queue</strong> → repeat for multiple products</div>
+    <div>② Search products → drop images named <strong style="color:var(--accent)">1.jpg 2.jpg 3.jpg</strong> into their slots</div>
+    <div>③ Click <strong style="color:var(--accent)">Submit to Shopify</strong> — uploads products + images in one go</div>
   </div>
 
   <div class="two-col" style="gap:18px;align-items:start">
 
-    <!-- LEFT: CSV UPLOAD -->
+    <!-- LEFT: PRODUCT FORM -->
     <div>
-      <div class="sh" style="margin-top:0"><div class="st" style="color:var(--accent)">① Excel → CSV Upload</div></div>
-      <div class="ic">
-        <div id="upCsvDrop" onclick="document.getElementById('upCsvInput').click()"
-          style="border:2px dashed var(--border2);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px">
-          <div style="font-size:28px;margin-bottom:6px">📊</div>
-          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Drop Excel file here or click to browse</div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">.xlsx or .xls · Product Name, Category, Sizes, SKU, Price, Description</div>
-          <input type="file" id="upCsvInput" accept=".xlsx,.xls" style="display:none" onchange="upHandleCSV(this.files[0])">
-        </div>
-
-        <div id="upCsvStatus" style="display:none;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
-            <span style="font-size:18px" id="upCsvIcon">📄</span>
-            <div style="flex:1">
-              <div style="font-size:12px;font-weight:600" id="upCsvName">—</div>
-              <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="upCsvMeta">—</div>
-            </div>
-            <button onclick="upClearCSV()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
-          </div>
-        </div>
-
-        <div id="upCsvErrors" style="display:none;margin-bottom:10px"></div>
-
-        <div id="upCsvPreview" style="display:none;margin-bottom:10px">
-          <div style="overflow-x:auto;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
-            <table style="width:100%;border-collapse:collapse;font-size:11px">
-              <thead><tr id="upCsvHead" style="position:sticky;top:0;background:var(--surface2)"></tr></thead>
-              <tbody id="upCsvBody"></tbody>
-            </table>
-          </div>
-          <div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--muted)" id="upCsvNote"></div>
-        </div>
+      <div class="sh" style="margin-top:0">
+        <div class="st" style="color:var(--accent)">① Product Details</div>
+        <button class="btn btn-s btn-sm" onclick="upFormAddToQueue()" id="upFormAddBtn">+ Add to Queue</button>
       </div>
+      <div class="ic" style="display:flex;flex-direction:column;gap:10px">
+
+        <!-- Title -->
+        <div class="fg">
+          <div class="fl">Product Title <span style="color:var(--red)">*</span></div>
+          <input class="fi" id="pf-title" placeholder="e.g. Oversized Texture Crew T-Shirt - Khaki Beige">
+        </div>
+
+        <!-- Category + Mode row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg" style="margin:0">
+            <div class="fl">Category / Type <span style="color:var(--red)">*</span></div>
+            <select class="fi" id="pf-type">
+              <option value="">Select category...</option>
+              <option value="T-shirts">T-shirts</option>
+              <option value="Polo">Polo</option>
+              <option value="Hoodies">Hoodies</option>
+              <option value="Sweatshirts">Sweatshirts</option>
+              <option value="Shirts">Shirts</option>
+              <option value="Jackets">Jackets</option>
+              <option value="Cargo Pants">Cargo Pants</option>
+              <option value="Jogger Pants">Jogger Pants</option>
+              <option value="Shorts">Shorts</option>
+              <option value="Trunks">Trunks</option>
+              <option value="Boxer Trunks">Boxer Trunks</option>
+              <option value="Boxer Shorts">Boxer Shorts</option>
+              <option value="Boxer Briefs">Boxer Briefs</option>
+              <option value="Boxers">Boxers</option>
+              <option value="Brief">Brief</option>
+              <option value="Vest">Vest</option>
+              <option value="Undershirt">Undershirt</option>
+              <option value="Pajama">Pajama</option>
+              <option value="Pajama Sets">Pajama Sets</option>
+              <option value="Socks">Socks</option>
+              <option value="Caps">Caps</option>
+              <option value="Beanies">Beanies</option>
+              <option value="Sunglasses">Sunglasses</option>
+              <option value="Belts">Belts</option>
+              <option value="Bags">Bags</option>
+              <option value="Jewelry">Jewelry</option>
+              <option value="Shoes">Shoes</option>
+              <option value="Slides">Slides</option>
+              <option value="Tanktops">Tanktops</option>
+              <option value="Sweaters">Sweaters</option>
+              <option value="Tie & Dye">Tie & Dye</option>
+              <option value="Blazers">Blazers</option>
+            </select>
+          </div>
+          <div class="fg" style="margin:0">
+            <div class="fl">Product Mode <span style="color:var(--red)">*</span></div>
+            <select class="fi" id="pf-mode" onchange="upFormToggleMode()">
+              <option value="sizes">Sizes (with variants)</option>
+              <option value="qty">Quantity (single variant)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Sizes mode -->
+        <div id="pf-sizes-row" class="fg" style="margin:0">
+          <div class="fl">Sizes</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XS" class="pf-size-cb"> XS</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="S" class="pf-size-cb" checked> S</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="M" class="pf-size-cb" checked> M</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="L" class="pf-size-cb" checked> L</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XL" class="pf-size-cb" checked> XL</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XXL" class="pf-size-cb" checked> XXL</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="3XL" class="pf-size-cb"> 3XL</label>
+          </div>
+        </div>
+
+        <!-- Qty mode -->
+        <div id="pf-qty-row" class="fg" style="margin:0;display:none">
+          <div class="fl">Quantity</div>
+          <input class="fi" id="pf-qty" type="number" min="0" placeholder="e.g. 50">
+        </div>
+
+        <!-- SKU + Price row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg" style="margin:0">
+            <div class="fl">SKU (S size) <span style="color:var(--red)">*</span></div>
+            <input class="fi" id="pf-sku" placeholder="e.g. 0025842" oninput="upFormPreviewSKUs()">
+          </div>
+          <div class="fg" style="margin:0">
+            <div class="fl">Price (PKR) <span style="color:var(--red)">*</span></div>
+            <input class="fi" id="pf-price" type="number" placeholder="e.g. 3490">
+          </div>
+        </div>
+
+        <!-- SKU preview -->
+        <div id="pf-sku-preview" style="display:none;font-size:10px;font-family:var(--mono);color:var(--muted);background:var(--surface2);padding:6px 10px;border-radius:5px;line-height:1.8"></div>
+
+        <!-- Compare + Design row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg" style="margin:0">
+            <div class="fl">Compare At (PKR)</div>
+            <input class="fi" id="pf-compare" type="number" placeholder="Optional">
+          </div>
+          <div class="fg" style="margin:0">
+            <div class="fl">Design Code</div>
+            <input class="fi" id="pf-design" placeholder="e.g. TS-0010-009">
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="fg" style="margin:0">
+          <div class="fl">Tags <span style="color:var(--muted2);font-size:9px">— leave blank to auto-copy from same category</span></div>
+          <input class="fi" id="pf-tags" placeholder="e.g. b1g1, T-shirts Sale, Tops Sale">
+        </div>
+
+        <!-- Description -->
+        <div class="fg" style="margin:0">
+          <div class="fl">Description <span style="color:var(--muted2);font-size:9px">— paste plain text, formatting auto-applied</span></div>
+          <textarea class="fi" id="pf-desc" rows="5" placeholder="Paste your product description here. Use CAPS for words that should be bold. Separate paragraphs with blank lines." style="resize:vertical;line-height:1.6"></textarea>
+        </div>
+
+        <!-- Errors -->
+        <div id="upCsvErrors" style="display:none"></div>
+
+      </div>
+
+      <!-- Queue -->
+      <div class="sh" style="margin-top:16px">
+        <div class="st">Product Queue</div>
+        <div class="ss" id="upCsvMeta">0 products ready</div>
+      </div>
+      <div id="upCsvPreview" style="display:none">
+        <div style="overflow-x:auto;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr id="upCsvHead" style="position:sticky;top:0;background:var(--surface2)"></tr></thead>
+            <tbody id="upCsvBody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--muted)" id="upCsvNote"></div>
+      </div>
+
+      <!-- hidden compat elements -->
+      <div id="upCsvStatus" style="display:none"><span id="upCsvIcon"></span><span id="upCsvName"></span></div>
     </div>
 
     <!-- RIGHT: IMAGE UPLOAD -->
     <div>
-      <div class="sh" style="margin-top:0"><div class="st" style="color:var(--accent)">② Image Bulk Upload</div></div>
+      <div class="sh" style="margin-top:0"><div class="st" style="color:var(--accent)">② Image Upload — Search & Drop</div></div>
       <div class="ic">
         <div class="alert al-blue" style="margin-bottom:10px;font-size:11px">
           <div>ℹ</div>
-          <div>Name images as <strong>SKU-1.jpg</strong> to <strong>SKU-5.jpg</strong><br>e.g. <span style="color:var(--accent)">0024200-1.jpg</span>, <span style="color:var(--accent)">0024200-2.jpg</span><br>SKU = S size SKU of the product</div>
+          <div>Search a product → drop images named <strong>1.jpg 2.jpg 3.jpg</strong> into its slot. No renaming needed.</div>
         </div>
-
-        <div id="upImgDrop" onclick="document.getElementById('upImgInput').click()"
-          style="border:2px dashed var(--border2);border-radius:8px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px">
-          <div style="font-size:28px;margin-bottom:6px">🖼️</div>
-          <div style="font-size:12px;font-weight:600;margin-bottom:3px">Drop all images here or click to browse</div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">500+ images · JPG · PNG · WEBP · all at once</div>
-          <input type="file" id="upImgInput" accept="image/*,.jfif,.jfif" multiple style="display:none" onchange="upHandleImages(this.files)">
+        <!-- Search bar -->
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="imgSearchInput" class="fi" placeholder="🔍 Search product by name or SKU..." oninput="imgSearchProducts()" style="flex:1"/>
+          <button class="btn btn-s btn-sm" onclick="imgClearSearch()">✕</button>
         </div>
-
-        <div id="upImgStatus" style="display:none;margin-bottom:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
-            <div>
-              <div style="font-size:12px;font-weight:600" id="upImgCount">—</div>
-              <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="upImgMeta">—</div>
-            </div>
-            <button onclick="upClearImages()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
-          </div>
-        </div>
-
-        <div id="upImgErrors" style="display:none;margin-bottom:10px"></div>
-
-        <div id="upImgPreview" style="display:none;margin-bottom:10px">
-          <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px" id="upImgGrid"></div>
-        </div>
+        <!-- Search results dropdown -->
+        <div id="imgSearchResults" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;max-height:200px;overflow-y:auto;margin-bottom:10px"></div>
+        <!-- Product slots -->
+        <div id="imgSlots" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto"></div>
+        <!-- Hidden state tracker -->
+        <div id="upImgStatus" style="display:none"></div>
+        <div id="upImgErrors" style="display:none"></div>
+        <div id="upImgPreview" style="display:none"><div id="upImgGrid"></div></div>
+        <div id="upImgCount" style="display:none"></div>
+        <div id="upImgMeta" style="display:none"></div>
       </div>
     </div>
   </div>
@@ -908,10 +1013,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <script>
 // ═══════════ STATE ═══════════
 let STORE='mendeez.myshopify.com',
-       TOKEN='shpat_hardcoded_placeholder',
+       TOKEN='',
        SHEET_ID='1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs',
        ADS_TAB='Ads',CRR_TAB='Courier',CS_TAB='Perf Report 26';
-let ordersData=[],allProducts=[],manualData={};
+let ordersData=[],manualData={};
+window.allProducts=[];var allProducts=window.allProducts;
 let allCrr=[],filtCrr=[],crrPage=1;
 const PAGE=50;
 let adsLatest=null,adsTrend=[],adsIdx=null;
@@ -975,10 +1081,25 @@ function fmtDate(r){
 
 // ═══════════ SAVE/LOAD ═══════════
 function saveConfig(){try{localStorage.setItem('mndz3_cfg',JSON.stringify({STORE,TOKEN,SHEET_ID,ADS_TAB,CRR_TAB,CS_TAB}));}catch(e){}}
+function openSetup(){
+  const ov=document.getElementById('setupOverlay');
+  // Reset overlay content in case it was replaced by a spinner/error
+  if(!document.getElementById('cfgStore')){location.reload();return;}
+  ov.style.display='flex';
+  document.getElementById('cfgStore').value=STORE||'mendeez.myshopify.com';
+  document.getElementById('cfgToken').value=TOKEN||'';
+  document.getElementById('cfgSheet').value=SHEET_ID||'1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs';
+  document.getElementById('cfgAds').value=ADS_TAB||'Think Spendin PW 26';
+  document.getElementById('cfgCrr').value=CRR_TAB||'Courier Data 26';
+  document.getElementById('cfgCS').value=CS_TAB||'Perf Report 26';
+}
+
 function loadConfig(){
   try{
     const c=JSON.parse(localStorage.getItem('mndz3_cfg')||'{}');
-    STORE=c.STORE||'';TOKEN=c.TOKEN||'';
+    STORE=c.STORE||'mendeez.myshopify.com';TOKEN=c.TOKEN||'';
+    // Safety: if demo mode was saved accidentally, reset to real store
+    if(STORE==='demo') STORE='mendeez.myshopify.com';
     SHEET_ID=c.SHEET_ID||'1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs';
     ADS_TAB=c.ADS_TAB||'Think Spendin PW 26';
     CRR_TAB=c.CRR_TAB||'Courier Data 26';
@@ -998,14 +1119,19 @@ async function connectAll(){
   ADS_TAB=document.getElementById('cfgAds').value.trim();
   CRR_TAB=document.getElementById('cfgCrr').value.trim();
   CS_TAB=document.getElementById('cfgCS').value.trim();
-  COMPLAINTS_TAB=document.getElementById('cfgComplaints').value.trim()||'Complaints Data 26';
+  COMPLAINTS_TAB=(document.getElementById('cfgComplaints')||{}).value||'Complaints Data 26';
   if(!STORE||!TOKEN){alert('Please enter Shopify store URL and API token');return;}
   saveConfig();
-  document.getElementById('setupOverlay').innerHTML='<div class="setup-box" style="text-align:center"><div class="spinner"></div><div style="color:var(--accent);font-size:15px;font-weight:600">Connecting...</div><div style="color:var(--muted);font-size:12px;margin-top:6px">'+STORE+'</div></div>';
-  try{await loadAll();document.getElementById('setupOverlay').style.display='none';}
-  catch(e){
-    console.error('Connection error:', e);
-    document.getElementById('setupOverlay').innerHTML='<div class="setup-box"><div style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:10px">Connection failed</div><div style="color:var(--muted);font-size:12px;margin-bottom:20px">'+e.message+'</div><div style="color:var(--muted);font-size:11px;font-family:var(--mono);margin-bottom:20px">Store: '+STORE+'</div><button class="btn btn-s btn-full" onclick="location.reload()">Try Again</button></div>';
+  // Close overlay and connect silently in background
+  document.getElementById('setupOverlay').style.display='none';
+  const btn=document.querySelector('#setupOverlay + * button') || document.getElementById('lastUpd');
+  document.getElementById('lastUpd').textContent='Connecting...';
+  try{
+    await loadAll();
+    document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+  }catch(e){
+    console.error('Connection error:',e);
+    document.getElementById('lastUpd').textContent='Connection failed';
   }
 }
 
@@ -1185,7 +1311,7 @@ function applyDateRange(){
   // Always update the date label
   document.getElementById('todayDate').textContent=rangeLabel();
   // Trigger the right reload based on current state
-  if(STORE==='demo'){
+  if(STORE==='demo' && !TOKEN){
     reloadDemo();
   } else if(STORE && TOKEN){
     reloadShopifyData();
@@ -1260,7 +1386,7 @@ async function loadProducts(){
     // No hard page cap — load ALL products regardless of catalog size
     // 250 per page × unlimited pages = full catalog always loaded
     while(hasMore){
-      const base=`/products.json?limit=250&order=id+asc&fields=id,title,product_type,status,variants,images,tags`;
+      const base=`/products.json?limit=250&order=id+asc&fields=id,title,product_type,status,variants,images,tags,created_at,published_at`;
       const url=sinceId?`${base}&since_id=${sinceId}`:base;
       try{
         const d=await shopFetch(url);
@@ -1271,7 +1397,7 @@ async function loadProducts(){
         sinceId=batch[batch.length-1].id; // cursor for next page
         hasMore=batch.length===250;
         pageNum++;
-        allProducts=[...allProds];
+        allProducts=[...allProds]; window.allProducts=allProducts;
         updateProductCounts();
         const _s=(document.getElementById('prodSearch')?.value||'').trim();
         const _sk=(document.getElementById('skuSearch')?.value||'').trim();
@@ -1285,12 +1411,18 @@ async function loadProducts(){
         if(hasMore)await new Promise(r=>setTimeout(r,50));
       }catch(pageErr){
         console.warn('loadProducts page',pageNum,'error:',pageErr.message);
-        retries++;
-        if(retries>=3){console.error('loadProducts gave up at',allProds.length,'products');hasMore=false;}
-        else await new Promise(r=>setTimeout(r,2500));
+        // If 404 on a paginated request, the since_id product was deleted — stop pagination gracefully
+        if(pageErr.message&&pageErr.message.includes('404')&&sinceId){
+          console.log('loadProducts: 404 on since_id='+sinceId+' — likely deleted product, stopping pagination with',allProds.length,'products loaded');
+          hasMore=false;
+        } else {
+          retries++;
+          if(retries>=3){console.error('loadProducts gave up at',allProds.length,'products');hasMore=false;}
+          else await new Promise(r=>setTimeout(r,2500));
+        }
       }
     }
-    allProducts=allProds;
+    allProducts=allProds; window.allProducts=allProducts;
     _productById=Object.fromEntries(allProds.map(p=>[p.id,p]));
     // Build barcode→title/image/price maps for demand generator and inventory search
     window._bcTitleMap = {};
@@ -3037,7 +3169,9 @@ function switchTab(name,el){
   const datebar=document.querySelector('.datebar');
   if(datebar) datebar.style.display='flex';
   if(name==='report')buildReport();
-  if(name==='gtechinv') gtechinvInit();
+  if(name==='report')buildReport();
+  if(name==='cs') setTimeout(renderCSFromSupabase,200);
+  if(name==='cards') loadCardData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
   if(name==='sorter'){
     const sel=document.getElementById('sortCat');
@@ -3045,6 +3179,18 @@ function switchTab(name,el){
       sel.innerHTML='<option value="">Select a collection...</option>'+allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');
     else if(sel&&allCollections.length===0&&STORE&&STORE!=='demo'&&TOKEN)
       loadCollections().then(()=>{if(sel&&allCollections.length>0)sel.innerHTML='<option value="">Select a collection...</option>'+allCollections.map(col=>`<option value="${col.id}">${col.title}</option>`).join('');});
+  }
+  if(name==='uploader'){
+    setTimeout(()=>{
+      if(!Object.keys(_imgSlots).length) imgRenderSlots();
+      const inp = document.getElementById('imgSearchInput');
+      if(inp){
+        const cnt = (allProducts||window.allProducts||[]).length;
+        inp.placeholder = cnt > 0
+          ? '🔍 Search '+cnt.toLocaleString()+' products by name or SKU...'
+          : '🔍 Search product by name or SKU... (loading products)';
+      }
+    },100);
   }
   if(name==='products'){
     const tbl=document.getElementById('prodTbl');
@@ -3232,19 +3378,16 @@ window.addEventListener('load',()=>{
   document.getElementById('dateFrom').value=_tdStr;
   document.getElementById('dateTo').value=_tdStr;
   document.getElementById('dActiveLbl').textContent='📅 Today';
+  // Always pre-fill setup form with current values
+  document.getElementById('cfgStore').value=STORE;
+  document.getElementById('cfgToken').value=TOKEN;
+  document.getElementById('cfgSheet').value=SHEET_ID;
+  document.getElementById('cfgAds').value=ADS_TAB;
+  document.getElementById('cfgCrr').value=CRR_TAB;
+  document.getElementById('cfgCS').value=CS_TAB;
+  // Auto-connect silently — no overlay, just load in background
   if(STORE&&TOKEN){
-    document.getElementById('cfgStore').value=STORE;
-    document.getElementById('cfgToken').value=TOKEN;
-    document.getElementById('cfgSheet').value=SHEET_ID;
-    document.getElementById('cfgAds').value=ADS_TAB;
-    document.getElementById('cfgCrr').value=CRR_TAB;
-    document.getElementById('cfgCS').value=CS_TAB;
-    // Auto-connect: credentials already saved — load dashboard immediately
-    const ov=document.getElementById('setupOverlay');
-    ov.innerHTML='<div class="setup-box" style="text-align:center"><div class="spinner"></div><div style="color:var(--accent);font-size:15px;font-weight:600">Connecting...</div><div style="color:var(--muted);font-size:12px;margin-top:6px">'+STORE+'</div></div>';
-    loadAll().then(()=>{ov.style.display='none';}).catch(e=>{
-      ov.innerHTML='<div class="setup-box"><div style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:10px">Connection failed</div><div style="color:var(--muted);font-size:12px;margin-bottom:20px">'+e.message+'</div><div style="color:var(--muted);font-size:11px;font-family:var(--mono);margin-bottom:20px">Store: '+STORE+'</div><button class="btn btn-s btn-full" onclick="location.reload()">Try Again</button></div>';
-    });
+    loadAll().catch(e=>console.warn('Auto-connect failed:',e));
   }
   // Restore manual field values
   if(manualData.stock)document.getElementById('i-stock').value=manualData.stock;
@@ -3325,6 +3468,8 @@ async function loadSorterCollection(){
                 id
                 title
                 status
+                createdAt
+                publishedAt
                 productType
                 images(first: 1) { edges { node { url } } }
                 variants(first: 50) {
@@ -3356,6 +3501,8 @@ async function loadSorterCollection(){
           title: p.title,
           status: (p.status||'active').toLowerCase(),
           product_type: p.productType||'',
+          created_at: p.createdAt||p.publishedAt||null,
+          published_at: p.publishedAt||null,
           images: (p.images?.edges||[]).map(e=>({src:e.node.url})),
           variants: (p.variants?.edges||[]).map(e=>({
             id: parseInt(e.node.id.replace('gid://shopify/ProductVariant/','')),
@@ -3568,11 +3715,14 @@ function runSort(){
 
   // Sort only the unlocked products
   const gP=p=>parseFloat((p.variants||[{}])[0]?.price||0);
+  const gD=p=>new Date(p.created_at||p.published_at||0).getTime();
   unlocked.sort((a,b)=>{
     if(rule==='stock_asc')return gT(a)-gT(b);
     if(rule==='variants_desc')return gA(b)-gA(a);
     if(rule==='price_desc')return gP(b)-gP(a);
     if(rule==='price_asc')return gP(a)-gP(b);
+    if(rule==='date_desc')return gD(b)-gD(a); // newest first
+    if(rule==='date_asc')return gD(a)-gD(b);  // oldest first
     if(rule==='avail_desc'){const tA=(a.variants||[]).length,tB=(b.variants||[]).length,aA=gA(a),aB=gA(b),diff=aB-aA;if(diff!==0)return diff;return(aB===tB?1:0)-(aA===tA?1:0)||gT(b)-gT(a);}
     return gT(b)-gT(a);
   });
@@ -3720,7 +3870,8 @@ function switchOverviewMonth(){
 // PRODUCT UPLOADER — CSV + IMAGE
 // ══════════════════════════════════════════════════
 let _upCsvProducts = [];  // parsed products from Excel
-let _upImgMatched  = {};  // sku → {productId, title, images[]}
+let _upImgMatched  = {};  // productId/sku → {productId, title, sku, images[]}
+let _imgSlots = {};       // productId → slot data (search & drop system)
 let _upImgUnmatched = [];
 
 // Drag & drop setup
@@ -3767,7 +3918,8 @@ function upDetectCols(headerRow){
     name:    find(['product name','name','title']),
     type:    find(['category / type','category','type']),
     sizes:   find(['sizes','size']),
-    sku:     find(['sku (s size)','sku']),
+    qty:     find(['qty','quantity']),
+    sku:     find(['sku (s size)','sku (s)','sku','handle']),
     price:   find(['price (pkr)','price']),
     design:  find(['design code','design_code','design']),
     tags:    find(['tags','tag']),
@@ -3802,23 +3954,27 @@ function upParseCSV(rows, fileName){
   rows.slice(headerIdx+1).forEach((row, ri) => {
     const name    = String(row[cols.name]  ||'').trim();
     const type    = String(row[cols.type]  ||'').trim();
-    const sizesRaw= String(row[cols.sizes] ||'').trim();
+    const qtyColUsed = cols.qty >= 0;
+    const sizesRaw  = qtyColUsed ? String(row[cols.qty]||'').trim() : String(row[cols.sizes]||'').trim();
     const skuRaw  = String(row[cols.sku]   ||'').trim().replace(/^'+/,'');
     const price   = String(row[cols.price] ||'').trim();
     const compare = cols.compare>=0 ? String(row[cols.compare]||'').trim() : '';
     const design  = cols.design>=0  ? String(row[cols.design] ||'').trim() : '';
     const tagsRaw = cols.tags>=0    ? String(row[cols.tags]   ||'').trim() : '';
-    const tags    = tagsRaw; // tags fetched async in upSubmit // auto-fill from category if empty
+    const tags    = tagsRaw;
     const desc    = cols.desc>=0    ? String(row[cols.desc]   ||'').trim() : '';
     const vendor  = cols.vendor>=0 && row[cols.vendor] ? String(row[cols.vendor]).trim() : 'MENDEEZ';
     const status  = cols.status>=0 && row[cols.status] ? String(row[cols.status]).trim() : 'draft';
     if(!name && !type && !skuRaw && !price) return;
-    if(!name||!type||!sizesRaw||!skuRaw||!price){ errors.push('Row '+(ri+headerIdx+2)+': incomplete'); return; }
-    const sizes     = sizesRaw.split(/[,،\s]+/).map(s=>s.trim()).filter(Boolean);
+    if(!name||!type||!skuRaw||!price){ errors.push('Row '+(ri+headerIdx+2)+': incomplete'); return; }
+    // qty column → always qty mode; sizes column → variant mode
+    const isQty = qtyColUsed || /^\d+$/.test(sizesRaw.trim());
+    const qty   = isQty ? (parseInt(sizesRaw.trim())||1) : null;
+    const sizes = isQty ? ['Default Title'] : sizesRaw.split(/[,،\\s]+/).map(s=>s.trim()).filter(Boolean);
     const skuPrefix = skuRaw.replace(/\d+$/,'');
     const skuBase   = parseInt(skuRaw.replace(skuPrefix,''))||0;
     const skuPad    = skuRaw.replace(skuPrefix,'').length||7;
-    _upCsvProducts.push({name,type,sizes,skuPrefix,skuBase,skuPad,
+    _upCsvProducts.push({name,type,sizes,qty,isQty,skuPrefix,skuBase,skuPad,
       price:String(parseFloat(price)||''), compare:compare?String(parseFloat(compare)||''):'',
       design, tags, desc, vendor, status});
   });
@@ -3836,13 +3992,15 @@ function upParseCSV(rows, fileName){
   } else { document.getElementById('upCsvErrors').style.display='none'; }
 
   // Preview
-  document.getElementById('upCsvHead').innerHTML='<th>#</th><th>Product</th><th>Type</th><th>Sizes</th><th>SKU(S)</th><th>Price</th><th>Description</th><th>Status</th>';
+  document.getElementById('upCsvHead').innerHTML='<th>#</th><th>Product</th><th>Type</th><th>Sizes / Qty</th><th>SKU(S)</th><th>Price</th><th>Description</th><th>Status</th>';
   document.getElementById('upCsvBody').innerHTML = _upCsvProducts.slice(0,30).map((p,i)=>{
     const skuS = p.skuPrefix+String(p.skuBase).padStart(p.skuPad,'0');
     return '<tr><td class="tm tmut">'+(i+1)+'</td>'
       +'<td style="font-weight:500;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</td>'
       +'<td class="tm tmut">'+p.type+'</td>'
-      +'<td style="color:var(--accent);font-family:var(--mono)">'+p.sizes.join(',')+'</td>'
+      +(p.isQty
+        ? '<td><span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px">QTY: '+p.qty+'</span></td>'
+        : '<td style="color:var(--accent);font-family:var(--mono)">'+p.sizes.join(',')+'</td>')
       +'<td class="tm">'+skuS+'</td>'
       +'<td class="tm">PKR '+parseInt(p.price||0).toLocaleString()+'</td>'
       +'<td style="font-size:11px;color:'+(p.desc?'var(--green)':'var(--muted2)')+'">'+( p.desc?'✓ Yes':'empty')+'</td>'
@@ -3865,67 +4023,390 @@ function upClearCSV(){
   document.getElementById('upCsvStatus').style.display='none';
   document.getElementById('upCsvPreview').style.display='none';
   document.getElementById('upCsvErrors').style.display='none';
-  document.getElementById('upCsvInput').value='';
+  if(typeof upFormRefreshQueue==='function') upFormRefreshQueue();
   upUpdateSubmitBtn();
 }
 
-// ── IMAGE HANDLING ──
-function upHandleImages(fileList){
-  const files = Array.from(fileList).filter(f=>f.type.startsWith('image/')||f.name.match(/\.(jpg|jpeg|png|webp)$/i));
-  if(!files.length){ alert('No image files found'); return; }
-  _upImgMatched  = {};
-  _upImgUnmatched= [];
-  files.forEach(f=>{
-    const nameNoExt = f.name.replace(/\.[^.]+$/,'');
-    const m = nameNoExt.match(/^(.+?)\s*-\s*(\d+)$/);
-    if(!m){ _upImgUnmatched.push(f.name); return; }
-    const sku = m[1].trim();
-    const pos = parseInt(m[2]);
-    if(pos<1||pos>10){ _upImgUnmatched.push(f.name); return; }
-    if(!_upImgMatched[sku]) _upImgMatched[sku]={sku,productId:null,title:'Will look up on submit...',images:[]};
-    _upImgMatched[sku].images.push({file:f,pos});
+
+// ══════════════════════════════════════════════════
+// PRODUCT FORM — Direct entry system
+// ══════════════════════════════════════════════════
+
+function upFormToggleMode(){
+  const mode = document.getElementById('pf-mode').value;
+  document.getElementById('pf-sizes-row').style.display = mode==='sizes' ? '' : 'none';
+  document.getElementById('pf-qty-row').style.display   = mode==='qty'   ? '' : 'none';
+  upFormPreviewSKUs();
+}
+
+function upFormPreviewSKUs(){
+  const skuRaw = document.getElementById('pf-sku').value.trim();
+  const mode   = document.getElementById('pf-mode').value;
+  const prev   = document.getElementById('pf-sku-preview');
+  if(!skuRaw){ prev.style.display='none'; return; }
+
+  const skuPrefix = skuRaw.replace(/\d+$/, '');
+  const skuBase   = parseInt(skuRaw.replace(skuPrefix, '')) || 0;
+  const skuPad    = skuRaw.replace(skuPrefix, '').length || 7;
+
+  let lines = [];
+  if(mode === 'sizes'){
+    const checked = Array.from(document.querySelectorAll('.pf-size-cb:checked')).map(cb=>cb.value);
+    checked.forEach((sz,i)=>{
+      const sku = skuPrefix + String(skuBase+i).padStart(skuPad,'0');
+      lines.push(sz + ' → ' + sku);
+    });
+  } else {
+    lines.push('Default → ' + skuRaw);
+  }
+  prev.style.display = 'block';
+  prev.textContent = lines.join('  ·  ');
+}
+
+function upFormDescToHtml(raw){
+  if(!raw || !raw.trim()) return '';
+
+  const rawLines = raw.trim().split('\n');
+  const blocks = [];
+  let current = null;
+
+  rawLines.forEach(line => {
+    const trimmed = line.trim();
+    const isBullet = /^[\u00b7\-\*]\s+/.test(trimmed);
+
+    if(!trimmed){
+      if(current){ blocks.push(current); current=null; }
+      return;
+    }
+    if(isBullet){
+      if(!current || current.type!=='ul'){
+        if(current) blocks.push(current);
+        current={type:'ul', lines:[]};
+      }
+      current.lines.push(trimmed.replace(/^[\u00b7\-\*]\s+/, '').trim());
+    } else {
+      if(!current || current.type!=='p'){
+        if(current) blocks.push(current);
+        current={type:'p', lines:[]};
+      }
+      current.lines.push(trimmed);
+    }
   });
-  Object.values(_upImgMatched).forEach(p=>p.images.sort((a,b)=>a.pos-b.pos));
-  const matchedCount  = Object.values(_upImgMatched).reduce((s,p)=>s+p.images.length,0);
-  const productCount  = Object.keys(_upImgMatched).length;
+  if(current) blocks.push(current);
 
-  document.getElementById('upImgStatus').style.display='block';
-  document.getElementById('upImgCount').textContent = files.length+' images · '+productCount+' products';
-  document.getElementById('upImgMeta').textContent  = matchedCount+' matched · '+_upImgUnmatched.length+' unmatched';
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function boldLabel(s){ return esc(s).replace(/^([A-Za-z][A-Za-z\s&]{0,30}):/, '<b>$1:</b>'); }
 
-  if(_upImgUnmatched.length>0){
-    document.getElementById('upImgErrors').style.display='block';
-    document.getElementById('upImgErrors').innerHTML='<div class="alert al-amber"><div>⚠</div><div>'
-      +_upImgUnmatched.length+' images with wrong name format (expected SKU-1.jpg)<br>'
-      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted)">'
-      +_upImgUnmatched.slice(0,5).map(n=>'• '+n).join('<br>')
-      +(_upImgUnmatched.length>5?'<br>...and '+(_upImgUnmatched.length-5)+' more':'')
-      +'</span></div></div>';
-  } else { document.getElementById('upImgErrors').style.display='none'; }
+  return blocks.map(block => {
+    if(block.type==='ul'){
+      return '<ul>\n' + block.lines.map(l=>'<li>'+boldLabel(l)+'</li>').join('\n') + '\n</ul>';
+    } else {
+      return '<p>' + block.lines.map(l=>esc(l)).join('<br>\n') + '</p>';
+    }
+  }).join('\n\n');
+}
 
-  // Preview grid
-  document.getElementById('upImgGrid').innerHTML=Object.values(_upImgMatched).map(p=>{
-    const thumbs=p.images.map(({file,pos})=>
-      '<div style="text-align:center">'
-      +'<img src="'+URL.createObjectURL(file)+'" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">'
-      +'<div style="font-size:9px;font-family:var(--mono);color:var(--muted);margin-top:1px">#'+pos+'</div></div>'
-    ).join('');
-    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:10px">'
-      +'<div style="flex:1;min-width:0"><div style="font-size:10px;font-family:var(--mono);color:var(--accent)">'
-      +p.sku+'</div><div style="font-size:11px;color:var(--muted)">'
-      +p.images.length+' image'+( p.images.length!==1?'s':'')+'</div></div>'
-      +'<div style="display:flex;gap:4px">'+thumbs+'</div></div>';
-  }).join('');
-  document.getElementById('upImgPreview').style.display='block';
+function upFormValidate(){
+  const title = document.getElementById('pf-title').value.trim();
+  const type  = document.getElementById('pf-type').value.trim();
+  const sku   = document.getElementById('pf-sku').value.trim();
+  const price = document.getElementById('pf-price').value.trim();
+  const mode  = document.getElementById('pf-mode').value;
+  const errEl = document.getElementById('upCsvErrors');
+
+  const errs = [];
+  if(!title) errs.push('Product Title is required');
+  if(!type)  errs.push('Category / Type is required');
+  if(!sku)   errs.push('SKU is required');
+  if(!price) errs.push('Price is required');
+  if(mode==='sizes'){
+    const checked = Array.from(document.querySelectorAll('.pf-size-cb:checked'));
+    if(!checked.length) errs.push('Select at least one size');
+  }
+
+  if(errs.length){
+    errEl.style.display='block';
+    errEl.innerHTML='<div class="alert al-red"><div>✗</div><div>'+errs.join('<br>')+'</div></div>';
+    return null;
+  }
+  errEl.style.display='none';
+  return true;
+}
+
+function upFormBuildProduct(){
+  const title   = document.getElementById('pf-title').value.trim();
+  const type    = document.getElementById('pf-type').value.trim();
+  const skuRaw  = document.getElementById('pf-sku').value.trim();
+  const price   = document.getElementById('pf-price').value.trim();
+  const compare = document.getElementById('pf-compare').value.trim();
+  const design  = document.getElementById('pf-design').value.trim();
+  const tags    = document.getElementById('pf-tags').value.trim();
+  const descRaw = document.getElementById('pf-desc').value.trim();
+  const mode    = document.getElementById('pf-mode').value;
+  const qty     = parseInt(document.getElementById('pf-qty').value)||0;
+
+  const isQty = mode === 'qty';
+  const sizes = isQty
+    ? ['Default Title']
+    : Array.from(document.querySelectorAll('.pf-size-cb:checked')).map(cb=>cb.value);
+
+  const skuPrefix = skuRaw.replace(/\d+$/, '');
+  const skuBase   = parseInt(skuRaw.replace(skuPrefix,'')) || 0;
+  const skuPad    = skuRaw.replace(skuPrefix,'').length || 7;
+
+  const desc = upFormDescToHtml(descRaw);
+
+  return {
+    name:  title,
+    type,
+    sizes,
+    qty:   isQty ? qty : null,
+    isQty,
+    skuPrefix,
+    skuBase,
+    skuPad,
+    price: String(parseFloat(price)||''),
+    compare: compare ? String(parseFloat(compare)||'') : '',
+    design,
+    tags,
+    desc,
+    vendor: 'MENDEEZ',
+    status: 'draft'
+  };
+}
+
+function upFormAddToQueue(){
+  if(!upFormValidate()) return;
+  const p = upFormBuildProduct();
+  _upCsvProducts.push(p);
+  upFormRefreshQueue();
+  upFormReset();
+  upUpdateSubmitBtn();
+  // scroll to queue
+  document.getElementById('upCsvPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function upFormRemoveFromQueue(idx){
+  _upCsvProducts.splice(idx,1);
+  upFormRefreshQueue();
   upUpdateSubmitBtn();
 }
+
+function upFormRefreshQueue(){
+  const meta = document.getElementById('upCsvMeta');
+  meta.textContent = _upCsvProducts.length + ' product' + (_upCsvProducts.length!==1?'s':'') + ' ready';
+
+  if(!_upCsvProducts.length){
+    document.getElementById('upCsvPreview').style.display='none';
+    return;
+  }
+  document.getElementById('upCsvPreview').style.display='block';
+  document.getElementById('upCsvHead').innerHTML=
+    '<th style="width:28px">#</th><th>Title</th><th>Type</th><th>Sizes / Qty</th><th>SKU (S)</th><th>Price</th><th>Desc</th><th style="width:28px"></th>';
+
+  document.getElementById('upCsvBody').innerHTML = _upCsvProducts.map((p,i)=>{
+    const skuS = p.skuPrefix+String(p.skuBase).padStart(p.skuPad,'0');
+    return '<tr>'
+      +'<td class="tm tmut">'+(i+1)+'</td>'
+      +'<td style="font-weight:500;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</td>'
+      +'<td class="tm tmut">'+p.type+'</td>'
+      +(p.isQty
+        ? '<td><span style="background:var(--blue-dim);color:var(--blue);padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:10px">QTY '+p.qty+'</span></td>'
+        : '<td style="color:var(--accent);font-family:var(--mono);font-size:11px">'+p.sizes.join(', ')+'</td>')
+      +'<td class="tm">'+skuS+'</td>'
+      +'<td class="tm">'+parseInt(p.price||0).toLocaleString()+'</td>'
+      +'<td style="font-size:11px;color:'+(p.desc?'var(--green)':'var(--muted2)')+'">'+( p.desc?'✓':'—')+'</td>'
+      +'<td><button onclick="upFormRemoveFromQueue('+i+')" title="Remove" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0">✕</button></td>'
+      +'</tr>';
+  }).join('');
+
+  document.getElementById('upCsvNote').textContent =
+    _upCsvProducts.length+' products queued · click ↑ Submit to Shopify when ready';
+}
+
+function upFormReset(){
+  document.getElementById('pf-title').value='';
+  document.getElementById('pf-sku').value='';
+  document.getElementById('pf-price').value='';
+  document.getElementById('pf-compare').value='';
+  document.getElementById('pf-design').value='';
+  document.getElementById('pf-tags').value='';
+  document.getElementById('pf-desc').value='';
+  document.getElementById('pf-qty').value='';
+  document.getElementById('pf-sku-preview').style.display='none';
+  document.getElementById('upCsvErrors').style.display='none';
+  // reset sizes to default S,M,L,XL,XXL
+  document.querySelectorAll('.pf-size-cb').forEach(cb=>{
+    cb.checked = ['S','M','L','XL','XXL'].includes(cb.value);
+  });
+  document.getElementById('pf-title').focus();
+}
+
+// ── IMAGE HANDLING — Search & Drop System ──
+// _upImgMatched: productId → {productId, title, sku, images:[{file,pos}]}
+
+function imgSearchProducts(){
+  const q = document.getElementById('imgSearchInput').value.toLowerCase().trim();
+  const res = document.getElementById('imgSearchResults');
+  if(!q || q.length < 2){ res.style.display='none'; return; }
+
+  // Search from already-loaded allProducts
+  const pool = allProducts||window.allProducts||[];
+
+  // Products not loaded yet
+  if(!pool.length){
+    res.style.display='block';
+    res.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--muted)">'
+      +'<span class="si"></span> Products still loading — try again in a moment</div>';
+    return;
+  }
+
+  const hits = pool.filter(p=>
+    p.title.toLowerCase().includes(q) ||
+    (p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(q))
+  ).slice(0,8);
+
+  if(!hits.length){
+    res.style.display='block';
+    res.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--muted)">No products found'
+      +(pool.length<100?' ('+pool.length+' loaded so far, still downloading...)':'')+'</div>';
+    return;
+  }
+  res.style.display='block';
+  res.style.display='block';
+  res.innerHTML='';
+  hits.forEach(p=>{
+    const sku=(p.variants&&p.variants[0]&&p.variants[0].sku)||'';
+    const el=document.createElement('div');
+    el.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;display:flex;align-items:center;gap:10px';
+    el.onmouseover=()=>el.style.background='var(--surface2)';
+    el.onmouseout=()=>el.style.background='';
+    const titleEl=document.createElement('div');
+    titleEl.style.flex='1';
+    titleEl.innerHTML='<div style="font-weight:600;color:var(--text)"></div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">SKU: '+sku+'</div>';
+    titleEl.querySelector('div').textContent=p.title.length>50?p.title.slice(0,50)+'...':p.title;
+    const addEl=document.createElement('div');
+    addEl.style.cssText='color:var(--accent);font-size:11px;font-weight:600';
+    addEl.textContent='+ Add';
+    el.appendChild(titleEl); el.appendChild(addEl);
+    el.onclick=()=>imgAddSlot(p.id, p.title, sku);
+    res.appendChild(el);
+  });
+}
+
+function imgClearSearch(){
+  document.getElementById('imgSearchInput').value='';
+  document.getElementById('imgSearchResults').style.display='none';
+}
+
+function imgAddSlot(productId, title, sku){
+  document.getElementById('imgSearchResults').style.display='none';
+  document.getElementById('imgSearchInput').value='';
+  if(_imgSlots[productId]){ alert('Already added: '+title); return; }
+  _imgSlots[productId]={productId,title,sku,images:[]};
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function imgRemoveSlot(productId){
+  delete _imgSlots[productId];
+  // also remove from _upImgMatched
+  delete _upImgMatched[productId];
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function imgRenderSlots(){
+  const container = document.getElementById('imgSlots');
+  const slots = Object.values(_imgSlots);
+  if(!slots.length){
+    container.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;border:2px dashed var(--border2);border-radius:8px">'
+      +'<div style="font-size:20px;margin-bottom:6px">🖼️</div>'
+      +'<div style="color:var(--text);font-weight:600;margin-bottom:4px">No image slots yet</div>'
+      +'<div>Submit products first — slots will appear automatically.<br>Or search an existing Shopify product above to add a slot manually.</div>'
+      +'</div>';
+    return;
+  }
+  container.innerHTML = slots.map(s=>{
+    const thumbs = s.images.length
+      ? s.images.map((img,i)=>`<div style="text-align:center;position:relative">
+          <img src="${URL.createObjectURL(img.file)}" style="width:44px;height:44px;object-fit:cover;border-radius:5px;border:1px solid var(--border)">
+          <div style="font-size:9px;font-family:var(--mono);color:var(--accent);margin-top:2px">#${img.pos}</div>
+        </div>`).join('')
+      : '<div style="font-size:11px;color:var(--muted2);padding:4px">Drop images here</div>';
+
+    return `<div id="slot-${s.productId}"
+      style="background:var(--surface2);border:2px dashed var(--border2);border-radius:8px;padding:12px 14px;transition:border-color .2s"
+      ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+      ondragleave="this.style.borderColor='var(--border2)'"
+      ondrop="imgOnDrop(event,'${s.productId}')">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.title}</div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--muted)">SKU: ${s.sku} &nbsp;·&nbsp; ${s.images.length} image${s.images.length!==1?'s':''}</div>
+        </div>
+        <button onclick="imgClearSlotImages('${s.productId}')" title="Clear images" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">🗑</button>
+        <button onclick="imgRemoveSlot('${s.productId}')" title="Remove slot" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:2px 4px">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;min-height:44px;align-items:center">${thumbs}</div>
+    </div>`;
+  }).join('');
+}
+
+function imgOnDrop(e, productId){
+  e.preventDefault();
+  const slot = document.getElementById('slot-'+productId);
+  if(slot) slot.style.borderColor='var(--border2)';
+  const files = Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')||f.name.match(/\.(jpg|jpeg|png|webp|jfif)$/i));
+  if(!files.length){ alert('No image files detected'); return; }
+  imgAddFilesToSlot(productId, files);
+}
+
+function imgAddFilesToSlot(productId, files){
+  if(!_imgSlots[productId]) return;
+  // Parse position from filename: "1.jpg", "2.png", "3.jpg" etc.
+  // Also accept "productname-1.jpg" — take the trailing number
+  const slot = _imgSlots[productId];
+  const unrecognised = [];
+  files.forEach(f=>{
+    const nameNoExt = f.name.replace(/\.[^.]+$/,'').trim();
+    // Try: just a number "1", "2" etc
+    let pos = null;
+    if(/^\d+$/.test(nameNoExt)){
+      pos = parseInt(nameNoExt);
+    } else {
+      // Try: anything ending in -N or _N
+      const m = nameNoExt.match(/[-_](\d+)$/);
+      if(m) pos = parseInt(m[1]);
+    }
+    if(!pos || pos < 1 || pos > 20){ unrecognised.push(f.name); return; }
+    // Remove existing image at same position
+    slot.images = slot.images.filter(img=>img.pos!==pos);
+    slot.images.push({file:f, pos});
+  });
+  slot.images.sort((a,b)=>a.pos-b.pos);
+  // Sync to _upImgMatched (used by upSubmit)
+  _upImgMatched[productId]={productId, title:slot.title, sku:slot.sku, images:slot.images};
+  if(unrecognised.length){
+    alert('Could not detect position for:\n'+unrecognised.join('\n')+'\n\nName files 1.jpg, 2.jpg, 3.jpg etc.');
+  }
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function imgClearSlotImages(productId){
+  if(_imgSlots[productId]) _imgSlots[productId].images=[];
+  delete _upImgMatched[productId];
+  imgRenderSlots();
+  upUpdateSubmitBtn();
+}
+
+function upHandleImages(fileList){ /* legacy — no longer used */ }
 
 function upClearImages(){
-  _upImgMatched={};_upImgUnmatched=[];
-  document.getElementById('upImgStatus').style.display='none';
-  document.getElementById('upImgPreview').style.display='none';
-  document.getElementById('upImgErrors').style.display='none';
-  document.getElementById('upImgInput').value='';
+  _upImgMatched={};
+  _imgSlots={};
+  imgRenderSlots();
   upUpdateSubmitBtn();
 }
 
@@ -3959,10 +4440,10 @@ async function getAutoTags(type){
   if(_tagCache[typeKey]) return _tagCache[typeKey];
 
   // Use allProducts (already in memory) — sort by id desc = most recently created first
-  if(window.allProducts && allProducts.length > 0){
+  if(allProducts && allProducts.length > 0){
     const ofType = allProducts
       .filter(p => (p.product_type||'').toLowerCase().trim() === typeKey)
-      .sort((a,b) => b.id - a.id); // highest id = most recently created
+      .sort((a,b) => new Date(b.created_at||0) - new Date(a.created_at||0)); // most recently created first
 
     for(const p of ofType){
       const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
@@ -3977,7 +4458,7 @@ async function getAutoTags(type){
   // Fallback: fetch from Shopify API (order=id+desc = most recently created)
   if(STORE && TOKEN){
     try{
-      const d = await shopFetch('/products.json?limit=50&product_type='+encodeURIComponent(type)+'&fields=id,tags&order=id+desc');
+      const d = await shopFetch('/products.json?limit=50&product_type='+encodeURIComponent(type)+'&fields=id,tags,created_at&order=created_at+desc');
       const products = d.products||[];
       for(const p of products){
         const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
@@ -4067,20 +4548,36 @@ async function upSubmit(){
       for(const p of _upCsvProducts){
         setProg(done,total,'Creating "'+p.name+'"...');
         try{
-          const variants = p.sizes.map((sz,si)=>({
-            option1:       sz,
-            price:         p.price||'0',
-            compare_at_price: p.compare||null,
-            sku:           upMakeSKU(p,si),
-            barcode:       upMakeSKU(p,si),
-            taxable:       false,
-            requires_shipping: true,
-            fulfillment_service: 'manual',
-            inventory_management: 'shopify',
-            inventory_policy: 'deny',
-            weight_unit:   'kg',
-            grams:         0
-          }));
+          const variants = p.isQty
+            ? [{ // Quantity mode — single Default variant with inventory set
+                option1:              'Default Title',
+                price:                p.price||'0',
+                compare_at_price:     p.compare||null,
+                sku:                  upMakeSKU(p,0),
+                barcode:              upMakeSKU(p,0),
+                taxable:              false,
+                requires_shipping:    true,
+                fulfillment_service:  'manual',
+                inventory_management: 'shopify',
+                inventory_policy:     'deny',
+                inventory_quantity:   p.qty||0,
+                weight_unit:          'kg',
+                grams:                0
+              }]
+            : p.sizes.map((sz,si)=>({
+                option1:              sz,
+                price:                p.price||'0',
+                compare_at_price:     p.compare||null,
+                sku:                  upMakeSKU(p,si),
+                barcode:              upMakeSKU(p,si),
+                taxable:              false,
+                requires_shipping:    true,
+                fulfillment_service:  'manual',
+                inventory_management: 'shopify',
+                inventory_policy:     'deny',
+                weight_unit:          'kg',
+                grams:                0
+              }));
           // Use tags from Excel if provided, otherwise auto-fetch from Shopify
           const autoTags = p.tags && p.tags.trim()
             ? p.tags.trim()
@@ -4090,12 +4587,13 @@ async function upSubmit(){
           const payload = {
             product:{
               title:        p.name,
+              handle:       handle,
               body_html:    p.desc||'',
               vendor:       p.vendor||'MENDEEZ',
               product_type: p.type||'',
               tags:         autoTags,
               status:       p.status||'draft',
-              options:      [{name:'Size'}],
+              options:      p.isQty ? [{name:'Title'}] : [{name:'Size'}],
               variants:     variants
             }
           };
@@ -4103,11 +4601,13 @@ async function upSubmit(){
           if(result && result.product && result.product.id){
             const prodId = result.product.id;
             // Map all SKUs of this product to its ID for image upload
-            p.sizes.forEach((sz,si)=>{
-              const sku = upMakeSKU(p,si);
+            // Map SKUs to product ID for image upload
+            const skuList = p.isQty ? [upMakeSKU(p,0)] : p.sizes.map((_,si)=>upMakeSKU(p,si));
+            skuList.forEach(sku=>{
               window._upNewProductSkuMap[sku] = {id:prodId, title:p.name};
-              // Also map without leading zeros
-              window._upNewProductSkuMap[sku.replace(/^0+/,'')] = {id:prodId, title:p.name};
+              const skuStripped=sku.replace(/^0+/,'');
+              if(skuStripped && !window._upNewProductSkuMap[skuStripped])
+                window._upNewProductSkuMap[skuStripped] = {id:prodId, title:p.name};
             });
             // Save design code to metafield if provided
             if(p.design){
@@ -4119,7 +4619,13 @@ async function upSubmit(){
               }catch(me){log('    ↳ Design Code failed: '+me.message.slice(0,50),'var(--red)');}
             }
             csvOk++;
-            log('  ✓ Created: '+p.name+' ('+p.sizes.length+' sizes, '+(p.design?'DC:'+p.design+', ':'')+p.status+')','var(--green)');
+            log('  ✓ Created: '+p.name+' ('+(p.isQty?'qty:'+p.qty:p.sizes.length+' sizes')+', '+(p.design?'DC:'+p.design+', ':'')+p.status+')','var(--green)');
+            // Auto-add image slot so user can immediately drop images without searching
+            const s0sku = upMakeSKU(p,0);
+            if(!_imgSlots[prodId]){
+              _imgSlots[prodId]={productId:prodId,title:p.name,sku:s0sku,images:[]};
+              _upImgMatched[prodId]={productId:prodId,title:p.name,sku:s0sku,images:[]};
+            }
           } else {
             csvFail++;
             log('  ✗ Failed: '+p.name+' — '+(JSON.stringify(result&&result.errors||result)).slice(0,80),'var(--red)');
@@ -4132,10 +4638,12 @@ async function upSubmit(){
         setProg(done,total,'Products: '+csvOk+'/'+_upCsvProducts.length+' created');
         await new Promise(r=>setTimeout(r,0));
       }
+      // Render auto-created image slots
+      imgRenderSlots();
       document.getElementById('upCsvResult').style.display='block';
       document.getElementById('upCsvResult').innerHTML='<div class="alert '+(csvFail===0?'al-green':'al-amber')+'"><div>'+(csvFail===0?'✅':'⚠')+'</div><div>'
         +(csvFail===0
-          ?'<strong>'+csvOk+' products created in Shopify!</strong> Status: draft — add images & Design Code then activate'
+          ?'<strong>'+csvOk+' products created!</strong> '+(csvOk>0?'Image slots ready on the right — drop <b>1.jpg, 2.jpg, 3.jpg</b> then hit Submit again.':'')
           :'Products: '+csvOk+' created · '+csvFail+' failed — see log below')
         +'</div></div>';
     }
@@ -4167,8 +4675,12 @@ async function upSubmit(){
           }
           allProds.forEach(p=>(p.variants||[]).forEach(v=>{
             if(v.sku){
-              skuMap[v.sku.trim()]={id:p.id,title:p.title};
-              skuMap[v.sku.trim().replace(/^0+/,'')]={id:p.id,title:p.title};
+              const s=v.sku.trim();
+              skuMap[s]={id:p.id,title:p.title};
+              // Also index without leading zeros — but only if it doesn't already exist
+              // (prevents collisions where two SKUs differ only by leading zeros)
+              const sStripped=s.replace(/^0+/,'');
+              if(sStripped && !skuMap[sStripped]) skuMap[sStripped]={id:p.id,title:p.title};
             }
           }));
           log('  Found '+allProds.length+' products total in Shopify','var(--muted)');
@@ -4182,15 +4694,22 @@ async function upSubmit(){
       const totalImgs=imgEntries.reduce((s,[,p])=>s+p.images.length,0);
       let doneImgs=0;
 
-      for(const [sku,p] of imgEntries){
-        const match=skuMap[sku]||skuMap[sku.replace(/^0+/,'')];
-        if(!match){
-          log('  ✗ SKU '+sku+' not found in Shopify','var(--red)');
-          imgFail++;done++;
-          setProg(done,total,'Images: SKU '+sku+' not found');
-          continue;
+      for(const [key,p] of imgEntries){
+        // New system: productId is stored directly on the slot object
+        // Legacy fallback: try SKU lookup for old-style entries
+        let resolvedId = p.productId && !String(p.productId).startsWith('sku:') ? p.productId : null;
+        if(!resolvedId){
+          const sku = p.sku||key;
+          const match=skuMap[sku]||(sku.replace(/^0+/,'')!==sku ? skuMap[sku.replace(/^0+/,'')] : null);
+          if(!match){
+            log('  ✗ Product "'+p.title+'" (SKU '+sku+') not found in Shopify','var(--red)');
+            imgFail++;done++;
+            setProg(done,total,'Images: SKU '+sku+' not found');
+            continue;
+          }
+          resolvedId=match.id; p.title=match.title;
         }
-        p.productId=match.id; p.title=match.title;
+        p.productId=resolvedId;
         let prodOk=true;
         log('  Uploading '+p.images.length+' images for "'+p.title+'"...','var(--muted)');
         for(const {file,pos} of p.images){
@@ -4229,6 +4748,8 @@ async function upSubmit(){
 
 function upReset(){
   upClearCSV(); upClearImages();
+  _imgSlots={}; imgRenderSlots();
+  upFormReset(); upFormRefreshQueue();
   document.getElementById('upProgress').style.display='none';
   document.getElementById('upLog').style.display='none';
   document.getElementById('upCsvResult').style.display='none';
@@ -4686,7 +5207,7 @@ const DB = {
   async insert(table,data){try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:this.h,body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}},
   async update(table,id,data,col='id'){try{await fetch(`${SUPA_URL}/rest/v1/${table}?${col}=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:this.h,body:JSON.stringify(data)});}catch(e){}},
   async delete(table,id,col='id'){try{await fetch(`${SUPA_URL}/rest/v1/${table}?${col}=eq.${encodeURIComponent(id)}`,{method:'DELETE',headers:this.h});}catch(e){}},
-  async upsert(table,data){try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:{...this.h,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}}
+  async upsert(table,data,onConflict=''){try{const h={...this.h,'Prefer':'resolution=merge-duplicates,return=representation'};const url=onConflict?`${SUPA_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`:`${SUPA_URL}/rest/v1/${table}`;const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}}
 };
 
 // ═══════════════════════════════════════════════════
@@ -4797,11 +5318,23 @@ function applyRoleView(role){
 // ═══════════════════════════════════════════════════
 // CS ENTRIES — Supabase powered
 // ═══════════════════════════════════════════════════
+// Field definitions: {key: Supabase column name, label: display name}
 const AGENT_FIELDS = {
-  agent1: ['Chats','Inbound Calls','OutBound Calls','R/ Returns','Exchange'],
-  agent2: ['Chats','Inbound Calls','OutBound Calls','R/ Returns','Complaints'],
+  agent1: [
+    {key:'Chats',          label:'Chats'},
+    {key:'Inbound Calls',  label:'Inbound Calls'},
+    {key:'OutBound Calls', label:'OutBound Calls'},
+    {key:'R/ Returns',     label:'R/ Returns'},
+    {key:'Exchange',       label:'Exchange'},
+  ],
+  agent2: [
+    {key:'Chats',          label:'Chats'},
+    {key:'Inbound Calls',  label:'Inbound Calls'},
+    {key:'OutBound Calls', label:'OutBound Calls'},
+    {key:'R/ Returns',     label:'R/ Returns'},
+    {key:'Complaints',     label:'Complaints'},
+  ],
 };
-
 function openNewEntryModal(){
   const existing=document.getElementById('cs-entry-modal');
   if(existing)existing.remove();
@@ -4821,8 +5354,8 @@ function openNewEntryModal(){
         <div style="font-size:11px;font-weight:700;color:#e8c547;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">👤 Agent 1A</div>
         ${AGENT_FIELDS.agent1.map(f=>`
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <label style="font-size:12px;color:#999;width:140px">${f}</label>
-            <input type="number" min="0" id="a1_${f.replace(/[ /]/g,'_')}" placeholder="0"
+            <label style="font-size:12px;color:#999;width:140px">${f.label}</label>
+            <input type="number" min="0" id="a1_${f.key}" placeholder="0"
               style="width:100px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;color:#f0ede8;font-size:13px;text-align:center;outline:none"/>
           </div>`).join('')}
       </div>
@@ -4836,8 +5369,8 @@ function openNewEntryModal(){
         <div style="font-size:11px;font-weight:700;color:#5b9cf6;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">👤 Agent 2N</div>
         ${AGENT_FIELDS.agent2.map(f=>`
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <label style="font-size:12px;color:#999;width:140px">${f}</label>
-            <input type="number" min="0" id="a2_${f.replace(/[ /]/g,'_')}" placeholder="0"
+            <label style="font-size:12px;color:#999;width:140px">${f.label}</label>
+            <input type="number" min="0" id="a2_${f.key}" placeholder="0"
               style="width:100px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;color:#f0ede8;font-size:13px;text-align:center;outline:none"/>
           </div>`).join('')}
       </div>
@@ -4885,8 +5418,8 @@ async function submitCSEntry(){
   if(isAgent1||isManager){
     const data={agent:'agent1',agent_name:'Agent 1A',date};
     AGENT_FIELDS.agent1.forEach(f=>{
-      const el=document.getElementById('a1_'+f.replace(/[ /]/g,'_'));
-      data[f]=el?parseInt(el.value)||0:0;
+      const el=document.getElementById('a1_'+f.key);
+      data[f.key]=el?parseInt(el.value)||0:0;
     });
     data.total=Object.values(data).filter(v=>typeof v==='number').reduce((a,b)=>a+b,0);
     entries.push(data);
@@ -4896,8 +5429,8 @@ async function submitCSEntry(){
   if(isAgent2||isManager){
     const data={agent:'agent2',agent_name:'Agent 2N',date};
     AGENT_FIELDS.agent2.forEach(f=>{
-      const el=document.getElementById('a2_'+f.replace(/[ /]/g,'_'));
-      data[f]=el?parseInt(el.value)||0:0;
+      const el=document.getElementById('a2_'+f.key);
+      data[f.key]=el?parseInt(el.value)||0:0;
     });
     data.total=Object.values(data).filter(v=>typeof v==='number').reduce((a,b)=>a+b,0);
     entries.push(data);
@@ -4907,17 +5440,18 @@ async function submitCSEntry(){
 
   // Save to Supabase
   try{
-    // Upsert each agent entry for this date
     for(const entry of entries){
-      await DB.upsert('cs_entries', entry);
+      console.log('Saving entry:', JSON.stringify(entry));
+      const res = await DB.upsert('cs_entries', entry, 'agent,date');
+      console.log('Supabase response:', JSON.stringify(res));
+      if(!res) throw new Error('Supabase returned null — check table columns match: agent, agent_name, date, chats, inbound_calls, outbound_calls, r_returns, exchange, complaints, total');
     }
     document.getElementById('cs-entry-modal').remove();
     renderCSFromSupabase();
-    // Show success
     showCSSuccess('✅ Entry submitted successfully!');
   }catch(e){
-    showCSErr('Failed to save. Please try again.');
-    console.error(e);
+    showCSErr('Failed: '+e.message);
+    console.error('CS Entry Error:', e);
   }
 }
 
@@ -4954,8 +5488,8 @@ async function renderCSFromSupabase(){
   const daysInMonth=new Date(year,now.getMonth()+1,0).getDate();
   const agent1Totals={};
   const agent2Totals={};
-  AGENT_FIELDS.agent1.forEach(f=>agent1Totals[f]=0);
-  AGENT_FIELDS.agent2.forEach(f=>agent2Totals[f]=0);
+  AGENT_FIELDS.agent1.forEach(f=>agent1Totals[f.key]=0);
+  AGENT_FIELDS.agent2.forEach(f=>agent2Totals[f.key]=0);
 
   // Also build day-by-day data
   const byDay={};
@@ -4964,18 +5498,18 @@ async function renderCSFromSupabase(){
     if(!byDay[day])byDay[day]={};
     if(e.agent==='agent1'){
       AGENT_FIELDS.agent1.forEach(f=>{
-        const val=e[f]||0;
-        agent1Totals[f]=(agent1Totals[f]||0)+val;
+        const val=e[f.key]||0;
+        agent1Totals[f.key]=(agent1Totals[f.key]||0)+val;
         if(!byDay[day].a1)byDay[day].a1={};
-        byDay[day].a1[f]=val;
+        byDay[day].a1[f.key]=val;
       });
     }
     if(e.agent==='agent2'){
       AGENT_FIELDS.agent2.forEach(f=>{
-        const val=e[f]||0;
-        agent2Totals[f]=(agent2Totals[f]||0)+val;
+        const val=e[f.key]||0;
+        agent2Totals[f.key]=(agent2Totals[f.key]||0)+val;
         if(!byDay[day].a2)byDay[day].a2={};
-        byDay[day].a2[f]=val;
+        byDay[day].a2[f.key]=val;
       });
     }
   });
@@ -4988,13 +5522,13 @@ async function renderCSFromSupabase(){
     return fields.map((f,fi)=>`
       <tr>
         ${fi===0?`<td rowspan="${fields.length}" style="font-weight:700;color:${color};white-space:nowrap;padding:6px 10px;border-right:2px solid #222;font-size:12px;vertical-align:middle">${agentLabel}</td>`:''}
-        <td style="white-space:nowrap;padding:6px 10px;border-right:1px solid #222;font-size:12px;color:#ccc">${f}</td>
+        <td style="white-space:nowrap;padding:6px 10px;border-right:1px solid #222;font-size:12px;color:#ccc">${f.label}</td>
         ${days.map(d=>{
-          const val=byDay[d]&&byDay[d][dayKey]&&byDay[d][dayKey][f]!=null?byDay[d][dayKey][f]:'';
+          const val=byDay[d]&&byDay[d][dayKey]&&byDay[d][dayKey][f.key]!=null?byDay[d][dayKey][f.key]:'';
           const isToday=d===today;
           return`<td style="text-align:center;padding:4px 6px;font-size:12px;font-family:'DM Mono',monospace;background:${isToday?'rgba(232,197,71,0.08)':'transparent'};color:${val?'#f0ede8':'#333'}">${val}</td>`;
         }).join('')}
-        <td style="text-align:center;padding:4px 8px;font-weight:700;font-size:12px;font-family:'DM Mono',monospace;background:#1a1a1a;color:${color}">${totals[f]||0}</td>
+        <td style="text-align:center;padding:4px 8px;font-weight:700;font-size:12px;font-family:'DM Mono',monospace;background:#1a1a1a;color:${color}">${totals[f.key]||0}</td>
       </tr>`).join('');
   }
 
@@ -5017,29 +5551,18 @@ async function renderCSFromSupabase(){
       </table>
     </div>`;
 
-  // Update the CS agent table area
-  const csTable=document.getElementById('csAgentTable');
-  if(csTable){
-    csTable.innerHTML=`
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:600;color:#f0ede8;font-family:'Syne',sans-serif">MTD Agent Performance — ${now.toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
-        <div style="font-size:11px;color:#555">${entries.length} entries recorded</div>
-      </div>
-      ${tableHTML}`;
+  // Update the dedicated Supabase entries section (NOT the Google Sheet csAgentTable)
+  const csEntriesTable=document.getElementById('csEntriesTable');
+  const csEntriesSubtitle=document.getElementById('csEntriesSubtitle');
+  if(csEntriesSubtitle) csEntriesSubtitle.textContent=entries.length+' entries this month';
+  if(csEntriesTable){
+    if(entries.length===0){
+      csEntriesTable.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">No entries yet this month. Click "+ New Entry" to add one.</div>';
+    } else {
+      csEntriesTable.innerHTML=`<div style="padding:10px 14px 4px"><span style="font-size:11px;color:#555;font-family:'DM Mono',monospace">${entries.length} entries recorded for ${now.toLocaleString('en-GB',{month:'long',year:'numeric'})}</span></div>${tableHTML}`;
+    }
   }
 }
-
-// Auto-refresh CS table when on CS tab
-document.addEventListener('DOMContentLoaded',()=>{
-  const csTab=document.querySelector('.tab[onclick*="cs"]');
-  if(csTab){
-    const orig=csTab.onclick;
-    csTab.onclick=function(e){
-      if(orig)orig.call(this,e);
-      setTimeout(renderCSFromSupabase,200);
-    };
-  }
-});
 
 </script>
 
@@ -5506,5 +6029,228 @@ function _gtechinvDoSearch(){
 function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
 
 </script>
+
+<div class="panel" id="panel-cards" style="padding:22px 28px;max-width:1440px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--accent)">💳 Card Balances</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">Live data from Google Sheets · Auto-refreshes on tab open</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <!-- Date Range -->
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="date" id="cardFrom" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none">
+        <span style="color:var(--muted);font-size:11px">to</span>
+        <input type="date" id="cardTo" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none">
+        <button onclick="renderCardTab()" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:6px 12px;font-size:11px;font-family:var(--sans);cursor:pointer;font-weight:600">Filter</button>
+        <button onclick="clearCardFilter()" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;font-family:var(--sans);cursor:pointer">Clear</button>
+      </div>
+      <button onclick="loadCardData(true)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;gap:5px">
+        <span id="cardRefreshIcon">↻</span> Refresh
+      </button>
+      <span id="cardLastUpdated" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="cardLoading" style="display:flex;align-items:center;justify-content:center;padding:60px;gap:12px">
+    <div class="spinner"></div>
+    <span style="color:var(--muted);font-size:13px">Fetching card data...</span>
+  </div>
+
+  <!-- Error -->
+  <div id="cardError" style="display:none;background:var(--red-dim);border:1px solid var(--red);border-radius:8px;padding:16px;color:var(--red);font-size:13px;margin-bottom:20px"></div>
+
+  <!-- Content -->
+  <div id="cardContent" style="display:none">
+
+    <!-- Balance Cards -->
+    <div id="cardBalanceCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:28px"></div>
+
+    <!-- Summary Row -->
+    <div id="cardSummaryRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px"></div>
+
+    <!-- Transaction Table -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:600">Transaction History</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="text" id="cardSearch" placeholder="Search description..." oninput="filterCardTable()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-family:var(--sans);font-size:11px;outline:none;width:180px">
+          <span id="cardRowCount" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Date</th>
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Description</th>
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Tracking ID</th>
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Card #</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em">Debit</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Credit</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Balance</th>
+            </tr>
+          </thead>
+          <tbody id="cardTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CARD_CSV_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSBOoqwin9kv03I2ew5AMrBo1xLtcqD5fR2S6Y5VkdGijQqekCJVccX9lf1EOE1ByK8MyNURkKnydRB/pub?output=csv';
+const CARD_CSV_URL  = 'https://corsproxy.io/?' + encodeURIComponent(CARD_CSV_BASE);
+let _cardAllRows = [];
+
+async function loadCardData(force=false){
+  const loading = document.getElementById('cardLoading');
+  const content = document.getElementById('cardContent');
+  const error   = document.getElementById('cardError');
+  const icon    = document.getElementById('cardRefreshIcon');
+
+  loading.style.display='flex'; content.style.display='none'; error.style.display='none';
+  icon.style.animation='spin .8s linear infinite';
+
+  try {
+    const res = await fetch(CARD_CSV_URL + '&cachebust=' + Date.now());
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    _cardAllRows = parseCardCSV(text);
+    document.getElementById('cardLastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    renderCardTab();
+    loading.style.display='none'; content.style.display='block';
+  } catch(e) {
+    loading.style.display='none';
+    error.style.display='block';
+    error.textContent = '⚠ Could not load data: ' + e.message + '. Make sure the sheet is published to web.';
+  }
+  icon.style.animation='';
+}
+
+function parseCardCSV(text){
+  const lines = text.trim().split('\n');
+  // First row is headers
+  const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.every(c=>!c)) continue;
+    rows.push({
+      date:   cols[0]||'',
+      desc:   cols[1]||'',
+      trackId:cols[2]||'',
+      card:   cols[3]||'',
+      dr:     parseFloat((cols[4]||'').replace(/[^0-9.-]/g,''))||0,
+      cr:     parseFloat((cols[5]||'').replace(/[^0-9.-]/g,''))||0,
+      balance:parseFloat((cols[6]||'').replace(/[^0-9.-]/g,''))||0,
+    });
+  }
+  return rows;
+}
+
+function parseCardDate(str){
+  if(!str) return null;
+  // Handle "21 Oct, 2024" or "2024-10-21" formats
+  const d = new Date(str.replace(/,/g,''));
+  return isNaN(d) ? null : d;
+}
+
+function renderCardTab(){
+  const from = document.getElementById('cardFrom').value;
+  const to   = document.getElementById('cardTo').value;
+
+  let rows = [..._cardAllRows];
+  if(from) rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d >= new Date(from); });
+  if(to)   rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d <= new Date(to+'T23:59:59'); });
+
+  // Current balance = last row balance
+  const lastRow   = rows[rows.length-1];
+  const curBalance = lastRow ? lastRow.balance : 0;
+
+  // Totals
+  const totalDr = rows.reduce((s,r)=>s+r.dr,0);
+  const totalCr = rows.reduce((s,r)=>s+r.cr,0);
+
+  // Balance Cards
+  const balCards = document.getElementById('cardBalanceCards');
+  balCards.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Current Balance</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:${curBalance>=0?'var(--green)':'var(--red)'}">${fmtPKR(curBalance)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px;font-family:var(--mono)">${lastRow?lastRow.date:'—'}</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Debits</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--red)">${fmtPKR(totalDr)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.dr>0).length} transactions</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--green)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Credits</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--green)">${fmtPKR(totalCr)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.cr>0).length} transactions</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--blue)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Transactions</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--blue)">${rows.length}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${from||'All time'}</div>
+    </div>
+  `;
+
+  renderCardTable(rows);
+}
+
+function renderCardTable(rows){
+  const tbody = document.getElementById('cardTableBody');
+  document.getElementById('cardRowCount').textContent = rows.length + ' rows';
+
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No transactions found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.slice().reverse().map((r,i)=>{
+    const isEven = i%2===0;
+    return `<tr style="border-top:1px solid var(--border);background:${isEven?'transparent':'rgba(255,255,255,.015)'}">
+      <td style="padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap">${r.date}</td>
+      <td style="padding:10px 14px;font-size:12px;max-width:220px">${r.desc||'—'}</td>
+      <td style="padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--muted)">${r.trackId||'—'}</td>
+      <td style="padding:10px 14px;font-family:var(--mono);font-size:11px">${r.card||'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.dr>0?'var(--red)':'var(--muted2)'}">${r.dr>0?fmtPKR(r.dr):'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.cr>0?'var(--green)':'var(--muted2)'}">${r.cr>0?fmtPKR(r.cr):'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:${r.balance>=0?'var(--text)':'var(--red)'}">${fmtPKR(r.balance)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterCardTable(){
+  const q = document.getElementById('cardSearch').value.toLowerCase();
+  let rows = _cardAllRows;
+  const from = document.getElementById('cardFrom').value;
+  const to   = document.getElementById('cardTo').value;
+  if(from) rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d >= new Date(from); });
+  if(to)   rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d <= new Date(to+'T23:59:59'); });
+  if(q) rows = rows.filter(r=> r.desc.toLowerCase().includes(q) || r.trackId.toLowerCase().includes(q) || r.card.toLowerCase().includes(q));
+  renderCardTable(rows);
+}
+
+function clearCardFilter(){
+  document.getElementById('cardFrom').value='';
+  document.getElementById('cardTo').value='';
+  document.getElementById('cardSearch').value='';
+  renderCardTab();
+}
+
+function fmtPKR(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+</script>
+
 </body>
 </html>
