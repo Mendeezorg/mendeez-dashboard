@@ -3816,24 +3816,27 @@ function upParseCSV(rows, fileName){
     const type    = String(row[cols.type]  ||'').trim();
     const qtyColUsed = cols.qty >= 0;
     const sizesRaw  = qtyColUsed ? String(row[cols.qty]||'').trim() : String(row[cols.sizes]||'').trim();
+    const skuRaw  = String(row[cols.sku]   ||'').trim().replace(/^'+/,'');
     const price   = String(row[cols.price] ||'').trim();
     const compare = cols.compare>=0 ? String(row[cols.compare]||'').trim() : '';
     const design  = cols.design>=0  ? String(row[cols.design] ||'').trim() : '';
     const tagsRaw = cols.tags>=0    ? String(row[cols.tags]   ||'').trim() : '';
-    const tags    = tagsRaw; // tags fetched async in upSubmit // auto-fill from category if empty
+    const tags    = tagsRaw;
     const desc    = cols.desc>=0    ? String(row[cols.desc]   ||'').trim() : '';
     const vendor  = cols.vendor>=0 && row[cols.vendor] ? String(row[cols.vendor]).trim() : 'MENDEEZ';
     const status  = cols.status>=0 && row[cols.status] ? String(row[cols.status]).trim() : 'draft';
     if(!name && !type && !skuRaw && !price) return;
     if(!name||!type||!skuRaw||!price){ errors.push('Row '+(ri+headerIdx+2)+': incomplete'); return; }
     // qty column → always qty mode; sizes column → variant mode
-    // qty column → always qty mode; sizes column → variant mode
     const isQty = qtyColUsed || /^\d+$/.test(sizesRaw.trim());
     const qty   = isQty ? (parseInt(sizesRaw.trim())||1) : null;
+    const sizes = isQty ? ['Default Title'] : sizesRaw.split(/[,،\\s]+/).map(s=>s.trim()).filter(Boolean);
+    const skuPrefix = skuRaw.replace(/\d+$/,'');
+    const skuBase   = parseInt(skuRaw.replace(skuPrefix,''))||0;
+    const skuPad    = skuRaw.replace(skuPrefix,'').length||7;
     _upCsvProducts.push({name,type,sizes,qty,isQty,skuPrefix,skuBase,skuPad,
       price:String(parseFloat(price)||''), compare:compare?String(parseFloat(compare)||''):'',
       design, tags, desc, vendor, status});
-  });
 
   const totalRows = _upCsvProducts.reduce((s,p)=>s+p.sizes.length, 0);
 
@@ -4717,7 +4720,7 @@ const DB = {
   async insert(table,data){try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:this.h,body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}},
   async update(table,id,data,col='id'){try{await fetch(`${SUPA_URL}/rest/v1/${table}?${col}=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:this.h,body:JSON.stringify(data)});}catch(e){}},
   async delete(table,id,col='id'){try{await fetch(`${SUPA_URL}/rest/v1/${table}?${col}=eq.${encodeURIComponent(id)}`,{method:'DELETE',headers:this.h});}catch(e){}},
-  async upsert(table,data){try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:{...this.h,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}}
+  async upsert(table,data,onConflict=''){try{const h={...this.h,'Prefer':'resolution=merge-duplicates,return=representation'};const url=onConflict?`${SUPA_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`:`${SUPA_URL}/rest/v1/${table}`;const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(Array.isArray(data)?data:[data])});return r.ok?r.json():null;}catch(e){return null;}}
 };
 
 // ═══════════════════════════════════════════════════
@@ -4829,10 +4832,23 @@ function applyRoleView(role){
 // CS ENTRIES — Supabase powered
 // ═══════════════════════════════════════════════════
 const AGENT_FIELDS = {
-  agent1: ['Chats','Inbound Calls','OutBound Calls','R/ Returns','Exchange'],
-  agent2: ['Chats','Inbound Calls','OutBound Calls','R/ Returns','Complaints'],
+// Field definitions: {key: Supabase column name, label: display name}
+const AGENT_FIELDS = {
+  agent1: [
+    {key:'Chats',          label:'Chats'},
+    {key:'Inbound Calls',  label:'Inbound Calls'},
+    {key:'OutBound Calls', label:'OutBound Calls'},
+    {key:'R/ Returns',     label:'R/ Returns'},
+    {key:'Exchange',       label:'Exchange'},
+  ],
+  agent2: [
+    {key:'Chats',          label:'Chats'},
+    {key:'Inbound Calls',  label:'Inbound Calls'},
+    {key:'OutBound Calls', label:'OutBound Calls'},
+    {key:'R/ Returns',     label:'R/ Returns'},
+    {key:'Complaints',     label:'Complaints'},
+  ],
 };
-
 function openNewEntryModal(){
   const existing=document.getElementById('cs-entry-modal');
   if(existing)existing.remove();
@@ -4852,8 +4868,8 @@ function openNewEntryModal(){
         <div style="font-size:11px;font-weight:700;color:#e8c547;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">👤 Agent 1A</div>
         ${AGENT_FIELDS.agent1.map(f=>`
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <label style="font-size:12px;color:#999;width:140px">${f}</label>
-            <input type="number" min="0" id="a1_${f.replace(/[ /]/g,'_')}" placeholder="0"
+            <label style="font-size:12px;color:#999;width:140px">${f.label}</label>
+            <input type="number" min="0" id="a1_${f.key}" placeholder="0"
               style="width:100px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;color:#f0ede8;font-size:13px;text-align:center;outline:none"/>
           </div>`).join('')}
       </div>
@@ -4867,8 +4883,8 @@ function openNewEntryModal(){
         <div style="font-size:11px;font-weight:700;color:#5b9cf6;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">👤 Agent 2N</div>
         ${AGENT_FIELDS.agent2.map(f=>`
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <label style="font-size:12px;color:#999;width:140px">${f}</label>
-            <input type="number" min="0" id="a2_${f.replace(/[ /]/g,'_')}" placeholder="0"
+            <label style="font-size:12px;color:#999;width:140px">${f.label}</label>
+            <input type="number" min="0" id="a2_${f.key}" placeholder="0"
               style="width:100px;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;color:#f0ede8;font-size:13px;text-align:center;outline:none"/>
           </div>`).join('')}
       </div>
@@ -4916,8 +4932,8 @@ async function submitCSEntry(){
   if(isAgent1||isManager){
     const data={agent:'agent1',agent_name:'Agent 1A',date};
     AGENT_FIELDS.agent1.forEach(f=>{
-      const el=document.getElementById('a1_'+f.replace(/[ /]/g,'_'));
-      data[f]=el?parseInt(el.value)||0:0;
+      const el=document.getElementById('a1_'+f.key);
+      data[f.key]=el?parseInt(el.value)||0:0;
     });
     data.total=Object.values(data).filter(v=>typeof v==='number').reduce((a,b)=>a+b,0);
     entries.push(data);
@@ -4927,8 +4943,8 @@ async function submitCSEntry(){
   if(isAgent2||isManager){
     const data={agent:'agent2',agent_name:'Agent 2N',date};
     AGENT_FIELDS.agent2.forEach(f=>{
-      const el=document.getElementById('a2_'+f.replace(/[ /]/g,'_'));
-      data[f]=el?parseInt(el.value)||0:0;
+      const el=document.getElementById('a2_'+f.key);
+      data[f.key]=el?parseInt(el.value)||0:0;
     });
     data.total=Object.values(data).filter(v=>typeof v==='number').reduce((a,b)=>a+b,0);
     entries.push(data);
@@ -4938,17 +4954,18 @@ async function submitCSEntry(){
 
   // Save to Supabase
   try{
-    // Upsert each agent entry for this date
     for(const entry of entries){
-      await DB.upsert('cs_entries', entry);
+      console.log('Saving entry:', JSON.stringify(entry));
+      const res = await DB.upsert('cs_entries', entry, 'agent,date');
+      console.log('Supabase response:', JSON.stringify(res));
+      if(!res) throw new Error('Supabase returned null — check table columns match: agent, agent_name, date, chats, inbound_calls, outbound_calls, r_returns, exchange, complaints, total');
     }
     document.getElementById('cs-entry-modal').remove();
     renderCSFromSupabase();
-    // Show success
     showCSSuccess('✅ Entry submitted successfully!');
   }catch(e){
-    showCSErr('Failed to save. Please try again.');
-    console.error(e);
+    showCSErr('Failed: '+e.message);
+    console.error('CS Entry Error:', e);
   }
 }
 
@@ -4985,8 +5002,8 @@ async function renderCSFromSupabase(){
   const daysInMonth=new Date(year,now.getMonth()+1,0).getDate();
   const agent1Totals={};
   const agent2Totals={};
-  AGENT_FIELDS.agent1.forEach(f=>agent1Totals[f]=0);
-  AGENT_FIELDS.agent2.forEach(f=>agent2Totals[f]=0);
+  AGENT_FIELDS.agent1.forEach(f=>agent1Totals[f.key]=0);
+  AGENT_FIELDS.agent2.forEach(f=>agent2Totals[f.key]=0);
 
   // Also build day-by-day data
   const byDay={};
@@ -4995,18 +5012,18 @@ async function renderCSFromSupabase(){
     if(!byDay[day])byDay[day]={};
     if(e.agent==='agent1'){
       AGENT_FIELDS.agent1.forEach(f=>{
-        const val=e[f]||0;
-        agent1Totals[f]=(agent1Totals[f]||0)+val;
+        const val=e[f.key]||0;
+        agent1Totals[f.key]=(agent1Totals[f.key]||0)+val;
         if(!byDay[day].a1)byDay[day].a1={};
-        byDay[day].a1[f]=val;
+        byDay[day].a1[f.key]=val;
       });
     }
     if(e.agent==='agent2'){
       AGENT_FIELDS.agent2.forEach(f=>{
-        const val=e[f]||0;
-        agent2Totals[f]=(agent2Totals[f]||0)+val;
+        const val=e[f.key]||0;
+        agent2Totals[f.key]=(agent2Totals[f.key]||0)+val;
         if(!byDay[day].a2)byDay[day].a2={};
-        byDay[day].a2[f]=val;
+        byDay[day].a2[f.key]=val;
       });
     }
   });
@@ -5019,13 +5036,13 @@ async function renderCSFromSupabase(){
     return fields.map((f,fi)=>`
       <tr>
         ${fi===0?`<td rowspan="${fields.length}" style="font-weight:700;color:${color};white-space:nowrap;padding:6px 10px;border-right:2px solid #222;font-size:12px;vertical-align:middle">${agentLabel}</td>`:''}
-        <td style="white-space:nowrap;padding:6px 10px;border-right:1px solid #222;font-size:12px;color:#ccc">${f}</td>
+        <td style="white-space:nowrap;padding:6px 10px;border-right:1px solid #222;font-size:12px;color:#ccc">${f.label}</td>
         ${days.map(d=>{
-          const val=byDay[d]&&byDay[d][dayKey]&&byDay[d][dayKey][f]!=null?byDay[d][dayKey][f]:'';
+          const val=byDay[d]&&byDay[d][dayKey]&&byDay[d][dayKey][f.key]!=null?byDay[d][dayKey][f.key]:'';
           const isToday=d===today;
           return`<td style="text-align:center;padding:4px 6px;font-size:12px;font-family:'DM Mono',monospace;background:${isToday?'rgba(232,197,71,0.08)':'transparent'};color:${val?'#f0ede8':'#333'}">${val}</td>`;
         }).join('')}
-        <td style="text-align:center;padding:4px 8px;font-weight:700;font-size:12px;font-family:'DM Mono',monospace;background:#1a1a1a;color:${color}">${totals[f]||0}</td>
+        <td style="text-align:center;padding:4px 8px;font-weight:700;font-size:12px;font-family:'DM Mono',monospace;background:#1a1a1a;color:${color}">${totals[f.key]||0}</td>
       </tr>`).join('');
   }
 
