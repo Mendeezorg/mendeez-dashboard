@@ -245,7 +245,6 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <button class="btn btn-p btn-full" onclick="connectAll()">Connect & Load Dashboard</button>
     <button class="btn btn-s btn-full" style="margin-top:6px;font-size:11px" onclick="testShopifyDirect()">🔧 Test Shopify Connection</button>
     <div id="shopifyTestResult" style="margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--muted);display:none;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
-    <button class="btn btn-s btn-full" style="margin-top:8px" onclick="loadDemo()">Use Demo Data</button>
     <div class="cnote">Shopify: Admin → Settings → Apps → Develop Apps → read_orders, read_products, read_inventory<br>Google Sheet: must be set to <strong style="color:var(--accent)">"Anyone with the link can view"</strong></div>
     <button class="btn btn-s btn-full" style="margin-top:10px;font-size:11px" onclick="testSheetConnection()">🔍 Test Sheet Connection</button>
     <div id="sheetTestResult" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;display:none"></div>
@@ -1098,6 +1097,8 @@ function loadConfig(){
   try{
     const c=JSON.parse(localStorage.getItem('mndz3_cfg')||'{}');
     STORE=c.STORE||'mendeez.myshopify.com';TOKEN=c.TOKEN||'';
+    // Safety: if demo mode was saved accidentally, reset to real store
+    if(STORE==='demo') STORE='mendeez.myshopify.com';
     SHEET_ID=c.SHEET_ID||'1OOcuvCYCX9Svl8nH3BpbJWeABoA4VWgq6e0M_UC5lZs';
     ADS_TAB=c.ADS_TAB||'Think Spendin PW 26';
     CRR_TAB=c.CRR_TAB||'Courier Data 26';
@@ -1309,7 +1310,7 @@ function applyDateRange(){
   // Always update the date label
   document.getElementById('todayDate').textContent=rangeLabel();
   // Trigger the right reload based on current state
-  if(STORE==='demo'){
+  if(STORE==='demo' && !TOKEN){
     reloadDemo();
   } else if(STORE && TOKEN){
     reloadShopifyData();
