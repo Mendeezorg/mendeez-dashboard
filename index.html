@@ -3040,7 +3040,8 @@ function switchTab(name,el){
   const datebar=document.querySelector('.datebar');
   if(datebar) datebar.style.display='flex';
   if(name==='report')buildReport();
-  if(name==='gtechinv') gtechinvInit();
+  if(name==='report')buildReport();
+  if(name==='cs') setTimeout(renderCSFromSupabase,200);
   if(name==='cards') loadCardData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
   if(name==='sorter'){
@@ -3778,7 +3779,7 @@ function upDetectCols(headerRow){
     name:    find(['product name','name','title']),
     type:    find(['category / type','category','type']),
     sizes:   find(['sizes','size']),
-    sku:     find(['sku (s size)','sku']),
+    qty:     find(['qty','quantity']),
     price:   find(['price (pkr)','price']),
     design:  find(['design code','design_code','design']),
     tags:    find(['tags','tag']),
@@ -3813,8 +3814,8 @@ function upParseCSV(rows, fileName){
   rows.slice(headerIdx+1).forEach((row, ri) => {
     const name    = String(row[cols.name]  ||'').trim();
     const type    = String(row[cols.type]  ||'').trim();
-    const sizesRaw= String(row[cols.sizes] ||'').trim();
-    const skuRaw  = String(row[cols.sku]   ||'').trim().replace(/^'+/,'');
+    const qtyColUsed = cols.qty >= 0;
+    const sizesRaw  = qtyColUsed ? String(row[cols.qty]||'').trim() : String(row[cols.sizes]||'').trim();
     const price   = String(row[cols.price] ||'').trim();
     const compare = cols.compare>=0 ? String(row[cols.compare]||'').trim() : '';
     const design  = cols.design>=0  ? String(row[cols.design] ||'').trim() : '';
@@ -3824,14 +3825,11 @@ function upParseCSV(rows, fileName){
     const vendor  = cols.vendor>=0 && row[cols.vendor] ? String(row[cols.vendor]).trim() : 'MENDEEZ';
     const status  = cols.status>=0 && row[cols.status] ? String(row[cols.status]).trim() : 'draft';
     if(!name && !type && !skuRaw && !price) return;
-    if(!name||!type||!sizesRaw||!skuRaw||!price){ errors.push('Row '+(ri+headerIdx+2)+': incomplete'); return; }
-    // If Sizes column is a plain number → quantity mode (bags, perfumes, keychains etc.)
-    const isQty     = /^\d+$/.test(sizesRaw.trim());
-    const qty       = isQty ? parseInt(sizesRaw.trim()) : null;
-    const sizes     = isQty ? ['Default Title'] : sizesRaw.split(/[,،\\s]+/).map(s=>s.trim()).filter(Boolean);
-    const skuPrefix = skuRaw.replace(/\d+$/,'');
-    const skuBase   = parseInt(skuRaw.replace(skuPrefix,''))||0;
-    const skuPad    = skuRaw.replace(skuPrefix,'').length||7;
+    if(!name||!type||!skuRaw||!price){ errors.push('Row '+(ri+headerIdx+2)+': incomplete'); return; }
+    // qty column → always qty mode; sizes column → variant mode
+    // qty column → always qty mode; sizes column → variant mode
+    const isQty = qtyColUsed || /^\d+$/.test(sizesRaw.trim());
+    const qty   = isQty ? (parseInt(sizesRaw.trim())||1) : null;
     _upCsvProducts.push({name,type,sizes,qty,isQty,skuPrefix,skuBase,skuPad,
       price:String(parseFloat(price)||''), compare:compare?String(parseFloat(compare)||''):'',
       design, tags, desc, vendor, status});
@@ -5062,18 +5060,6 @@ async function renderCSFromSupabase(){
   }
 }
 
-// Auto-refresh CS table when on CS tab
-document.addEventListener('DOMContentLoaded',()=>{
-  const csTab=document.querySelector('.tab[onclick*="cs"]');
-  if(csTab){
-    const orig=csTab.onclick;
-    csTab.onclick=function(e){
-      if(orig)orig.call(this,e);
-      setTimeout(renderCSFromSupabase,200);
-    };
-  }
-});
-
 </script>
 
 <script>
@@ -5614,7 +5600,7 @@ function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
 
 <script>
 const CARD_CSV_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSBOoqwin9kv03I2ew5AMrBo1xLtcqD5fR2S6Y5VkdGijQqekCJVccX9lf1EOE1ByK8MyNURkKnydRB/pub?output=csv';
-const CARD_CSV_URL  = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(CARD_CSV_BASE);
+const CARD_CSV_URL  = 'https://corsproxy.io/?' + encodeURIComponent(CARD_CSV_BASE);
 let _cardAllRows = [];
 
 async function loadCardData(force=false){
