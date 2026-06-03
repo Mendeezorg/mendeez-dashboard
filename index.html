@@ -282,6 +282,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="tab" onclick="switchTab('uploader',this)">📦 Product Uploader</div>
   <div class="tab" onclick="switchTab('gtech',this)">📊 G-Tech Data & Demand</div>
   <div class="tab" onclick="switchTab('gtechinv',this)">🏪 G-Tech Inventory</div>
+  <div class="tab" onclick="switchTab('cards',this)">💳 Card Balances</div>
 </div>
 
 <!-- DATE RANGE BAR -->
@@ -3040,6 +3041,7 @@ function switchTab(name,el){
   if(datebar) datebar.style.display='flex';
   if(name==='report')buildReport();
   if(name==='gtechinv') gtechinvInit();
+  if(name==='cards') loadCardData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
   if(name==='sorter'){
     const sel=document.getElementById('sortCat');
@@ -5537,5 +5539,227 @@ function _gtechinvDoSearch(){
 function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
 
 </script>
+
+<div class="panel" id="panel-cards" style="padding:22px 28px;max-width:1440px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--accent)">💳 Card Balances</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">Live data from Google Sheets · Auto-refreshes on tab open</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <!-- Date Range -->
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="date" id="cardFrom" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none">
+        <span style="color:var(--muted);font-size:11px">to</span>
+        <input type="date" id="cardTo" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none">
+        <button onclick="renderCardTab()" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:6px 12px;font-size:11px;font-family:var(--sans);cursor:pointer;font-weight:600">Filter</button>
+        <button onclick="clearCardFilter()" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;font-family:var(--sans);cursor:pointer">Clear</button>
+      </div>
+      <button onclick="loadCardData(true)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;gap:5px">
+        <span id="cardRefreshIcon">↻</span> Refresh
+      </button>
+      <span id="cardLastUpdated" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="cardLoading" style="display:flex;align-items:center;justify-content:center;padding:60px;gap:12px">
+    <div class="spinner"></div>
+    <span style="color:var(--muted);font-size:13px">Fetching card data...</span>
+  </div>
+
+  <!-- Error -->
+  <div id="cardError" style="display:none;background:var(--red-dim);border:1px solid var(--red);border-radius:8px;padding:16px;color:var(--red);font-size:13px;margin-bottom:20px"></div>
+
+  <!-- Content -->
+  <div id="cardContent" style="display:none">
+
+    <!-- Balance Cards -->
+    <div id="cardBalanceCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:28px"></div>
+
+    <!-- Summary Row -->
+    <div id="cardSummaryRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px"></div>
+
+    <!-- Transaction Table -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:600">Transaction History</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="text" id="cardSearch" placeholder="Search description..." oninput="filterCardTable()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-family:var(--sans);font-size:11px;outline:none;width:180px">
+          <span id="cardRowCount" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Date</th>
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Description</th>
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Tracking ID</th>
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Card #</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em">Debit</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Credit</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Balance</th>
+            </tr>
+          </thead>
+          <tbody id="cardTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CARD_CSV_URL = 'https://docs.google.com/spreadsheets/d/1uIYjcBXTAKd5jE9w6SSR-egdaf-439AcL_PSxFJGt3I/pub?gid=0&single=true&output=csv';
+let _cardAllRows = [];
+
+async function loadCardData(force=false){
+  const loading = document.getElementById('cardLoading');
+  const content = document.getElementById('cardContent');
+  const error   = document.getElementById('cardError');
+  const icon    = document.getElementById('cardRefreshIcon');
+
+  loading.style.display='flex'; content.style.display='none'; error.style.display='none';
+  icon.style.animation='spin .8s linear infinite';
+
+  try {
+    const res = await fetch(CARD_CSV_URL + '&t=' + Date.now());
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    _cardAllRows = parseCardCSV(text);
+    document.getElementById('cardLastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    renderCardTab();
+    loading.style.display='none'; content.style.display='block';
+  } catch(e) {
+    loading.style.display='none';
+    error.style.display='block';
+    error.textContent = '⚠ Could not load data: ' + e.message + '. Make sure the sheet is published to web.';
+  }
+  icon.style.animation='';
+}
+
+function parseCardCSV(text){
+  const lines = text.trim().split('\n');
+  // First row is headers
+  const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.every(c=>!c)) continue;
+    rows.push({
+      date:   cols[0]||'',
+      desc:   cols[1]||'',
+      trackId:cols[2]||'',
+      card:   cols[3]||'',
+      dr:     parseFloat((cols[4]||'').replace(/[^0-9.-]/g,''))||0,
+      cr:     parseFloat((cols[5]||'').replace(/[^0-9.-]/g,''))||0,
+      balance:parseFloat((cols[6]||'').replace(/[^0-9.-]/g,''))||0,
+    });
+  }
+  return rows;
+}
+
+function parseCardDate(str){
+  if(!str) return null;
+  // Handle "21 Oct, 2024" or "2024-10-21" formats
+  const d = new Date(str.replace(/,/g,''));
+  return isNaN(d) ? null : d;
+}
+
+function renderCardTab(){
+  const from = document.getElementById('cardFrom').value;
+  const to   = document.getElementById('cardTo').value;
+
+  let rows = [..._cardAllRows];
+  if(from) rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d >= new Date(from); });
+  if(to)   rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d <= new Date(to+'T23:59:59'); });
+
+  // Current balance = last row balance
+  const lastRow   = rows[rows.length-1];
+  const curBalance = lastRow ? lastRow.balance : 0;
+
+  // Totals
+  const totalDr = rows.reduce((s,r)=>s+r.dr,0);
+  const totalCr = rows.reduce((s,r)=>s+r.cr,0);
+
+  // Balance Cards
+  const balCards = document.getElementById('cardBalanceCards');
+  balCards.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Current Balance</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:${curBalance>=0?'var(--green)':'var(--red)'}">${fmtPKR(curBalance)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px;font-family:var(--mono)">${lastRow?lastRow.date:'—'}</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Debits</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--red)">${fmtPKR(totalDr)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.dr>0).length} transactions</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--green)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Credits</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--green)">${fmtPKR(totalCr)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.cr>0).length} transactions</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--blue)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Transactions</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--blue)">${rows.length}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${from||'All time'}</div>
+    </div>
+  `;
+
+  renderCardTable(rows);
+}
+
+function renderCardTable(rows){
+  const tbody = document.getElementById('cardTableBody');
+  document.getElementById('cardRowCount').textContent = rows.length + ' rows';
+
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No transactions found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.slice().reverse().map((r,i)=>{
+    const isEven = i%2===0;
+    return `<tr style="border-top:1px solid var(--border);background:${isEven?'transparent':'rgba(255,255,255,.015)'}">
+      <td style="padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap">${r.date}</td>
+      <td style="padding:10px 14px;font-size:12px;max-width:220px">${r.desc||'—'}</td>
+      <td style="padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--muted)">${r.trackId||'—'}</td>
+      <td style="padding:10px 14px;font-family:var(--mono);font-size:11px">${r.card||'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.dr>0?'var(--red)':'var(--muted2)'}">${r.dr>0?fmtPKR(r.dr):'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.cr>0?'var(--green)':'var(--muted2)'}">${r.cr>0?fmtPKR(r.cr):'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:${r.balance>=0?'var(--text)':'var(--red)'}">${fmtPKR(r.balance)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterCardTable(){
+  const q = document.getElementById('cardSearch').value.toLowerCase();
+  let rows = _cardAllRows;
+  const from = document.getElementById('cardFrom').value;
+  const to   = document.getElementById('cardTo').value;
+  if(from) rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d >= new Date(from); });
+  if(to)   rows = rows.filter(r=>{ const d=parseCardDate(r.date); return d && d <= new Date(to+'T23:59:59'); });
+  if(q) rows = rows.filter(r=> r.desc.toLowerCase().includes(q) || r.trackId.toLowerCase().includes(q) || r.card.toLowerCase().includes(q));
+  renderCardTable(rows);
+}
+
+function clearCardFilter(){
+  document.getElementById('cardFrom').value='';
+  document.getElementById('cardTo').value='';
+  document.getElementById('cardSearch').value='';
+  renderCardTab();
+}
+
+function fmtPKR(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+</script>
+
 </body>
 </html>
