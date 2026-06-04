@@ -1401,6 +1401,7 @@ async function reloadShopifyData(){
     document.getElementById('dActiveLbl').textContent='📅 '+rangeLabel();
     if(_csRows.length){try{processCS(_csRows);}catch(e){console.warn('processCS error:',e.message);}}
     renderDailyStats();
+    loadAdsTargets(); // reload targets for selected month
     // Defer heavy renders to next frame so UI stays responsive
     setTimeout(()=>{
       renderWeeklyTop20();
@@ -1832,7 +1833,7 @@ function renderAds(){
     const _netSales=_grossSales-_disc-(window._shopifyReturnValue||0);
     const _grossPct=_grossT>0?Math.min(Math.round(_grossSales/_grossT*100),999):0;
     const _netPct=_netT>0?Math.min(Math.round(_netSales/_netT*100),999):0;
-    const _spendPct=totR>0?Math.round(totS/totR*100):0;
+    const _spendPct=_grossSales>0?Math.round(totS/_grossSales*100):0;
     const _pctCol=p=>p>=80?'var(--green)':p>=50?'var(--accent)':'var(--red)';
     html+=`<div class="pc" style="border-color:var(--accent-dim)">
       <div class="pn"><div class="pi ix">Σ</div>Combined</div>
@@ -1845,13 +1846,13 @@ function renderAds(){
         <div><div class="kl">Blended ROAS</div><div class="kv ${rcol(totRoas)}">${totRoas>0?totRoas.toFixed(2)+'x':'—'}</div></div>
         <div><div class="kl">Orders</div><div class="kv">${totO||'—'}</div></div>
       </div>
-      <div style="margin-top:8px"><div class="kl">Blended CPA</div><div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px">${totO>0?'PKR '+fmt(Math.round(totS/totO)):'—'}</div></div>
+      <div style="margin-top:8px"><div class="kl">Blended CPA</div><div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px">${ordersData.length>0?'PKR '+fmt(Math.round(totS/ordersData.length)):'—'}</div><div style="font-size:9px;color:var(--muted2);margin-top:1px">${ordersData.length} Shopify orders</div></div>
       <div class="div" style="margin:10px 0"></div>
       <div class="kr">
         <div><div class="kl">Gross Achieved</div><div class="kv" style="color:${_pctCol(_grossPct)}">${_grossT>0?_grossPct+'%':'—'}</div></div>
         <div><div class="kl">Net Achieved</div><div class="kv" style="color:${_pctCol(_netPct)}">${_netT>0?_netPct+'%':'—'}</div></div>
       </div>
-      <div style="margin-top:8px"><div class="kl">Spend % of Revenue</div><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${_pctCol(100-_spendPct)};margin-top:2px">${totR>0?_spendPct+'%':'—'}</div></div>
+      <div style="margin-top:8px"><div class="kl">Spend % of Gross</div><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${_pctCol(100-_spendPct)};margin-top:2px">${_grossSales>0?_spendPct+'%':'—'}</div></div>
     </div>`;
   }
   document.getElementById('platCards').innerHTML=html;
@@ -4323,8 +4324,10 @@ window._adsTargets = {gross:0, net:0};
 let _targetEditing = 'gross';
 
 function adsTargetMonthKey(){
-  const n=new Date();
-  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');
+  // Use the selected date range's month, not today's month
+  const {from} = getRange();
+  const d = from || new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
 
 async function loadAdsTargets(){
@@ -4361,7 +4364,9 @@ function openTargetModal(type){
   const isGross = type==='gross';
   const n=new Date();
   document.getElementById('targetModalTitle').textContent = (isGross?'Set Gross Target':'Set Net Target');
-  document.getElementById('targetModalMonth').textContent = n.toLocaleString('en-GB',{month:'long',year:'numeric'});
+  const {from:_mFrom}=getRange();
+  const _mDate=_mFrom||new Date();
+  document.getElementById('targetModalMonth').textContent = _mDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
   document.getElementById('targetModalInput').value = window._adsTargets[type]||'';
   document.getElementById('targetModal').style.display='flex';
   setTimeout(()=>document.getElementById('targetModalInput').focus(),100);
