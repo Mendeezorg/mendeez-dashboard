@@ -6094,6 +6094,9 @@ function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em">Debit</th>
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Credit</th>
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Balance</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:#10b981;text-transform:uppercase;letter-spacing:.06em">PKR Received</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:#8b5cf6;text-transform:uppercase;letter-spacing:.06em">After Comm.</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:.06em">$ Rate</th>
             </tr>
           </thead>
           <tbody id="cardTableBody"></tbody>
@@ -6143,13 +6146,16 @@ function parseCardCSV(text){
     const cols = lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
     if(cols.every(c=>!c)) continue;
     rows.push({
-      date:   cols[0]||'',
-      desc:   cols[1]||'',
-      trackId:cols[2]||'',
-      card:   cols[3]||'',
-      dr:     parseFloat((cols[4]||'').replace(/[^0-9.-]/g,''))||0,
-      cr:     parseFloat((cols[5]||'').replace(/[^0-9.-]/g,''))||0,
-      balance:parseFloat((cols[6]||'').replace(/[^0-9.-]/g,''))||0,
+      date:       cols[0]||'',
+      desc:       cols[1]||'',
+      trackId:    cols[2]||'',
+      card:       cols[3]||'',
+      dr:         parseFloat((cols[4]||'').replace(/[^0-9.-]/g,''))||0,
+      cr:         parseFloat((cols[5]||'').replace(/[^0-9.-]/g,''))||0,
+      balance:    parseFloat((cols[6]||'').replace(/[^0-9.-]/g,''))||0,
+      pkrReceived:parseFloat((cols[7]||'').replace(/[^0-9.-]/g,''))||0,
+      afterComm:  parseFloat((cols[8]||'').replace(/[^0-9.-]/g,''))||0,
+      dollarRate: parseFloat((cols[9]||'').replace(/[^0-9.-]/g,''))||0,
     });
   }
   return rows;
@@ -6205,6 +6211,24 @@ function renderCardTab(){
       <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--blue)">${rows.length}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:6px">${from||'All time'}</div>
     </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#10b981"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">PKR Received</div>
+      <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#10b981">PKR ${fmt(rows.reduce((s,r)=>s+r.pkrReceived,0))}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.pkrReceived>0).length} entries</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#8b5cf6"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">After Commission</div>
+      <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#8b5cf6">PKR ${fmt(rows.reduce((s,r)=>s+r.afterComm,0))}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.afterComm>0).length} entries</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#f59e0b"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Avg $ Rate</div>
+      <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#f59e0b">${(()=>{const r=rows.filter(x=>x.dollarRate>0);return r.length?'PKR '+(r.reduce((s,x)=>s+x.dollarRate,0)/r.length).toFixed(2):'—';})()}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">Latest: PKR ${(rows.filter(r=>r.dollarRate>0).slice(-1)[0]||{dollarRate:0}).dollarRate||'—'}</div>
+    </div>
   `;
 
   renderCardTable(rows);
@@ -6215,7 +6239,7 @@ function renderCardTable(rows){
   document.getElementById('cardRowCount').textContent = rows.length + ' rows';
 
   if(!rows.length){
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No transactions found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No transactions found</td></tr>';
     return;
   }
 
@@ -6229,6 +6253,9 @@ function renderCardTable(rows){
       <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.dr>0?'var(--red)':'var(--muted2)'}">${r.dr>0?fmtPKR(r.dr):'—'}</td>
       <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.cr>0?'var(--green)':'var(--muted2)'}">${r.cr>0?fmtPKR(r.cr):'—'}</td>
       <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:${r.balance>=0?'var(--text)':'var(--red)'}">${fmtPKR(r.balance)}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.pkrReceived>0?'#10b981':'var(--muted2)'}">${r.pkrReceived>0?'PKR '+fmt(r.pkrReceived):'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.afterComm>0?'#8b5cf6':'var(--muted2)'}">${r.afterComm>0?'PKR '+fmt(r.afterComm):'—'}</td>
+      <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:${r.dollarRate>0?'#f59e0b':'var(--muted2)'}">${r.dollarRate>0?'PKR '+r.dollarRate.toFixed(2):'—'}</td>
     </tr>`;
   }).join('');
 }
