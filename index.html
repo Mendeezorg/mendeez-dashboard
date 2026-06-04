@@ -6139,11 +6139,22 @@ async function loadCardData(force=false){
 
 function parseCardCSV(text){
   const lines = text.trim().split('\n');
-  // First row is headers
-  const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+  // Proper CSV split that handles quoted fields containing commas
+  function splitCSVLine(line){
+    const result=[];let cur='';let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){inQ=!inQ;}
+      else if(ch===','&&!inQ){result.push(cur.trim().replace(/^"|"$/g,''));cur='';}
+      else{cur+=ch;}
+    }
+    result.push(cur.trim().replace(/^"|"$/g,''));
+    return result;
+  }
+  const headers = splitCSVLine(lines[0]).map(h=>h.toLowerCase());
   const rows = [];
   for(let i=1;i<lines.length;i++){
-    const cols = lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    const cols = splitCSVLine(lines[i]);
     if(cols.every(c=>!c)) continue;
     rows.push({
       date:       cols[0]||'',
@@ -6153,9 +6164,9 @@ function parseCardCSV(text){
       dr:         parseFloat((cols[4]||'').replace(/[^0-9.-]/g,''))||0,
       cr:         parseFloat((cols[5]||'').replace(/[^0-9.-]/g,''))||0,
       balance:    parseFloat((cols[6]||'').replace(/[^0-9.-]/g,''))||0,
-      pkrReceived:parseFloat((cols[7]||'').replace(/[^0-9.-]/g,''))||0,
-      afterComm:  parseFloat((cols[8]||'').replace(/[^0-9.-]/g,''))||0,
-      dollarRate: parseFloat((cols[9]||'').replace(/[^0-9.-]/g,''))||0,
+      pkrReceived:parseFloat((cols[7]||'').replace(/,/g,'').replace(/[^0-9.-]/g,''))||0,
+      afterComm:  parseFloat((cols[8]||'').replace(/,/g,'').replace(/[^0-9.-]/g,''))||0,
+      dollarRate: parseFloat((cols[9]||'').replace(/,/g,'').replace(/[^0-9.-]/g,''))||0,
     });
   }
   return rows;
@@ -6225,9 +6236,9 @@ function renderCardTab(){
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#f59e0b"></div>
-      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Avg $ Rate</div>
-      <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#f59e0b">${(()=>{const r=rows.filter(x=>x.dollarRate>0);return r.length?'PKR '+(r.reduce((s,x)=>s+x.dollarRate,0)/r.length).toFixed(2):'—';})()}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">Latest: PKR ${(rows.filter(r=>r.dollarRate>0).slice(-1)[0]||{dollarRate:0}).dollarRate||'—'}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">$ Rate (Latest)</div>
+      <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#f59e0b">${(()=>{const r=rows.filter(x=>x.dollarRate>0);return r.length?'PKR '+r[r.length-1].dollarRate.toFixed(2):'—';})()}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${(()=>{const r=rows.filter(x=>x.dollarRate>0);return r.length?r[r.length-1].date:'No rate entries';})()}</div>
     </div>
   `;
 
