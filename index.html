@@ -417,7 +417,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <button class="btn btn-s btn-sm" onclick="fetchSheets()">↻ Refresh</button>
   </div>
   <!-- Target Cards -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px" id="adsTargetCards">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px" id="adsTargetCards">
     <!-- Gross Target -->
     <div style="background:var(--surface);border:1px solid var(--accent-dim);border-radius:10px;padding:18px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)"></div>
@@ -451,6 +451,24 @@ tr:hover td{background:rgba(255,255,255,.02)}
         </div>
         <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
           <div id="netProgressBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .5s"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Spend Target -->
+    <div style="background:var(--surface);border:1px solid var(--red-dim);border-radius:10px;padding:18px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">💸 Spend Budget</div>
+        <button onclick="openTargetModal('spend')" style="background:var(--red-dim);border:1px solid var(--red);border-radius:5px;color:var(--red);font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:var(--mono)">Edit</button>
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--red)" id="spendTargetVal">—</div>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px">
+          <span id="spendUsedLbl">Spent: —</span>
+          <span id="spendUsedPct" style="font-weight:700;color:var(--red)">—%</span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+          <div id="spendProgressBar" style="height:100%;width:0%;background:var(--red);border-radius:4px;transition:width .5s"></div>
         </div>
       </div>
     </div>
@@ -4334,9 +4352,9 @@ async function loadAdsTargets(){
   const key = adsTargetMonthKey();
   const rows = await DB.get('ads_targets', `month=eq.${key}`);
   if(rows && rows.length){
-    window._adsTargets = {gross: rows[0].gross_target||0, net: rows[0].net_target||0};
+    window._adsTargets = {gross: rows[0].gross_target||0, net: rows[0].net_target||0, spend: rows[0].spend_target||0};
   } else {
-    window._adsTargets = {gross:0, net:0};
+    window._adsTargets = {gross:0, net:0, spend:0};
   }
   renderAdsTargetCards();
 }
@@ -4351,6 +4369,7 @@ async function saveTarget(){
     month: key,
     gross_target: window._adsTargets.gross,
     net_target:   window._adsTargets.net,
+    spend_target: window._adsTargets.spend||0,
     updated_at:   new Date().toISOString()
   }, 'month');
   document.getElementById('targetModal').style.display='none';
@@ -4363,11 +4382,12 @@ function openTargetModal(type){
   _targetEditing = type;
   const isGross = type==='gross';
   const n=new Date();
-  document.getElementById('targetModalTitle').textContent = (isGross?'Set Gross Target':'Set Net Target');
+  document.getElementById('targetModalTitle').textContent = isGross?'Set Gross Target':type==='net'?'Set Net Target':'Set Ad Spend Budget';
   const {from:_mFrom}=getRange();
   const _mDate=_mFrom||new Date();
   document.getElementById('targetModalMonth').textContent = _mDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
   document.getElementById('targetModalInput').value = window._adsTargets[type]||'';
+  document.getElementById('targetModalInput').placeholder = type==='spend'?'e.g. 1500000':'e.g. 5000000';
   document.getElementById('targetModal').style.display='flex';
   setTimeout(()=>document.getElementById('targetModalInput').focus(),100);
 }
@@ -4407,6 +4427,21 @@ function renderAdsTargetCards(){
   if(np){ np.textContent=netT>0?netPct+'%':'—'; np.style.color=netT>0?pctColor(netPct):'var(--muted)'; }
   const nb=document.getElementById('netProgressBar');
   if(nb){ nb.style.width=netT>0?barW(netPct):'0%'; nb.style.background=pctColor(netPct); }
+
+  // Spend card — get actual spend from ads data
+  const spendT = gt.spend||0;
+  const actualSpend = (window._adsTot||{}).spend||0;
+  const spendPct = spendT>0?Math.min(Math.round(actualSpend/spendT*100),999):0;
+  // For spend: lower % is better (green=low, red=high)
+  const spendColor = p => p>=90?'var(--red)':p>=70?'var(--accent)':'var(--green)';
+  const sv=document.getElementById('spendTargetVal');
+  if(sv) sv.textContent = spendT>0?'PKR '+fmt(spendT):'Not set';
+  const sul=document.getElementById('spendUsedLbl');
+  if(sul) sul.textContent = 'Spent: '+(actualSpend>0?'PKR '+fmt(actualSpend):'—');
+  const sp=document.getElementById('spendUsedPct');
+  if(sp){ sp.textContent=spendT>0?spendPct+'%':'—'; sp.style.color=spendT>0?spendColor(spendPct):'var(--muted)'; }
+  const spb=document.getElementById('spendProgressBar');
+  if(spb){ spb.style.width=spendT>0?barW(spendPct):'0%'; spb.style.background=spendColor(spendPct); }
 }
 
 // ── IMAGE HANDLING — Search & Drop System ──
@@ -6241,6 +6276,9 @@ function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
     <!-- Summary Row -->
     <div id="cardSummaryRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px"></div>
 
+    <!-- Client Summary -->
+    <div id="cardClientSummary" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px"></div>
+
     <!-- Transaction Table -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
       <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
@@ -6407,7 +6445,94 @@ function renderCardTab(){
       <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:#f59e0b">${(()=>{const r=rows.filter(x=>x.dollarRate>0);return r.length?'PKR '+r[r.length-1].dollarRate.toFixed(2):'—';})()}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:6px">${(()=>{const r=rows.filter(x=>x.dollarRate>0);return r.length?r[r.length-1].date:'No rate entries';})()}</div>
     </div>
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)"></div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">MTD Spend</div>
+      <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:var(--red)">$${fmt(totalDr)}</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#10b981;margin-top:6px">${(()=>{const r=rows.filter(x=>x.dollarRate>0);const rate=r.length?r[r.length-1].dollarRate:0;return rate>0?'PKR '+fmt(Math.round(totalDr*rate)):'—';})()}</div>
+    </div>
   `;
+
+  // ── Platform Summary ──
+  // Get latest dollar rate from rows
+  const latestRate = (()=>{ const r=rows.filter(x=>x.dollarRate>0); return r.length?r[r.length-1].dollarRate:0; })();
+
+  // Group debit transactions by platform name
+  const platformMap = {};
+  rows.forEach(r=>{
+    if(r.dr<=0) return;
+    const raw = r.desc.trim()||'Other';
+    // Normalise platform name from description
+    let platform = raw;
+    const u = raw.toUpperCase();
+    if(u.includes('FACEBK')||u.includes('FACEBOOK')) platform='Facebook';
+    else if(u.includes('GOOGLE')) platform='Google';
+    else if(u.includes('SNAP')) platform='Snapchat';
+    else if(u.includes('ANTHROPIC')) platform='Claude (Anthropic)';
+    else if(u.includes('WEARVIEW')) platform='Wearview';
+    else if(u.includes('SHOPIFY')) platform='Shopify';
+    else if(u.includes('FASH STUDIO')) platform='Fash Studio';
+    else if(u.includes('TIKTOK')) platform='TikTok';
+    else platform = raw.replace(/Card charge \(/i,'').replace(/\)$/,'').trim();
+
+    if(!platformMap[platform]) platformMap[platform]={debit:0, count:0};
+    platformMap[platform].debit += r.dr;
+    platformMap[platform].count++;
+  });
+
+  const platformEntries = Object.entries(platformMap)
+    .filter(([,v])=>v.debit>0)
+    .sort((a,b)=>b[1].debit-a[1].debit);
+
+  const totalPlatformDebit = platformEntries.reduce((s,[,v])=>s+v.debit,0);
+  const totalPlatformPKR   = latestRate>0 ? totalPlatformDebit*latestRate : 0;
+  const totalPkrReceived   = rows.reduce((s,r)=>s+r.pkrReceived,0);
+  const commission6pct     = totalPkrReceived*0.06;
+
+  const summaryEl = document.getElementById('cardClientSummary');
+  if(summaryEl){
+    if(!platformEntries.length){
+      summaryEl.style.display='none';
+    } else {
+      summaryEl.style.display='block';
+      summaryEl.innerHTML=`
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">Platform Spend Summary</div>
+          <div style="font-size:11px;font-family:var(--mono);color:var(--muted)">$ rate: ${latestRate>0?latestRate.toFixed(2):'—'}</div>
+        </div>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Platform</th>
+              <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Txns</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em">Debit ($)</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:#10b981;text-transform:uppercase;letter-spacing:.06em">PKR (× rate)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${platformEntries.map(([name,v],i)=>`
+            <tr style="border-bottom:1px solid var(--border);background:${i%2===0?'transparent':'var(--surface2)'}">
+              <td style="padding:10px 14px;font-weight:600;color:var(--text)">${name}</td>
+              <td style="padding:10px 14px;text-align:center;font-family:var(--mono);color:var(--muted)">${v.count}</td>
+              <td style="padding:10px 14px;text-align:right;font-family:var(--mono);color:var(--red);font-weight:600">$${fmt(v.debit)}</td>
+              <td style="padding:10px 14px;text-align:right;font-family:var(--mono);color:#10b981;font-weight:600">${latestRate>0?'PKR '+fmt(Math.round(v.debit*latestRate)):'—'}</td>
+            </tr>`).join('')}
+            <tr style="background:var(--surface2);border-top:2px solid var(--border2)">
+              <td style="padding:10px 14px;font-weight:700;color:var(--accent)">Total</td>
+              <td style="padding:10px 14px;text-align:center;font-family:var(--mono);font-weight:700;color:var(--accent)">${platformEntries.reduce((s,[,v])=>s+v.count,0)}</td>
+              <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--red)">$${fmt(totalPlatformDebit)}</td>
+              <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-weight:700;color:#10b981">${latestRate>0?'PKR '+fmt(Math.round(totalPlatformPKR)):'—'}</td>
+            </tr>
+            <tr style="background:var(--surface2)">
+              <td colspan="3" style="padding:10px 14px;font-weight:600;color:#f59e0b">Commission (6%)</td>
+              <td style="padding:10px 14px;text-align:right;font-family:var(--mono);font-weight:700;color:#f59e0b">${totalPkrReceived>0?'PKR '+fmt(Math.round(commission6pct)):'—'}</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>`;
+    }
+  }
 
   renderCardTable(rows);
 }
