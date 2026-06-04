@@ -416,6 +416,62 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div><div class="dt">Ads Performance</div><div class="dsub">From Google Sheet · <span id="adsDateLbl">—</span></div></div>
     <button class="btn btn-s btn-sm" onclick="fetchSheets()">↻ Refresh</button>
   </div>
+  <!-- Target Cards -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px" id="adsTargetCards">
+    <!-- Gross Target -->
+    <div style="background:var(--surface);border:1px solid var(--accent-dim);border-radius:10px;padding:18px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">🎯 Gross Target</div>
+        <button onclick="openTargetModal('gross')" style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:5px;color:var(--accent);font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:var(--mono)">Edit</button>
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent)" id="grossTargetVal">—</div>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px">
+          <span id="grossAchievedLbl">Achieved: —</span>
+          <span id="grossAchievedPct" style="font-weight:700;color:var(--accent)">—%</span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+          <div id="grossProgressBar" style="height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .5s"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Net Target -->
+    <div style="background:var(--surface);border:1px solid var(--green-dim);border-radius:10px;padding:18px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--green)"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">🎯 Net Target</div>
+        <button onclick="openTargetModal('net')" style="background:var(--green-dim);border:1px solid var(--green);border-radius:5px;color:var(--green);font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;font-family:var(--mono)">Edit</button>
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--green)" id="netTargetVal">—</div>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px">
+          <span id="netAchievedLbl">Achieved: —</span>
+          <span id="netAchievedPct" style="font-weight:700;color:var(--green)">—%</span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+          <div id="netProgressBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .5s"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Target Modal -->
+  <div id="targetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:28px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px" id="targetModalTitle">Set Gross Target</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:18px" id="targetModalMonth"></div>
+      <div class="fg">
+        <div class="fl">Target Amount (PKR)</div>
+        <input class="fi" type="number" id="targetModalInput" placeholder="e.g. 5000000" style="font-size:16px;font-weight:600">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button onclick="saveTarget()" style="flex:1;background:var(--accent);color:#000;border:none;border-radius:7px;padding:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--sans)">Save Target</button>
+        <button onclick="document.getElementById('targetModal').style.display='none'" style="padding:10px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--muted);cursor:pointer;font-family:var(--sans)">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Platform filter tabs -->
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
     <button class="dp active" id="ap-all"      onclick="setAdsPlatform('all',this)">All Platforms</button>
@@ -1768,6 +1824,16 @@ function renderAds(){
     </div>`;
   }).join('');
   if(_adsPlatform==='all'){
+    const _gt=window._adsTargets||{};
+    const _grossT=_gt.gross||0;
+    const _netT=_gt.net||0;
+    const _grossSales=ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
+    const _disc=ordersData.reduce((s,o)=>s+parseFloat(o.total_discounts||0),0);
+    const _netSales=_grossSales-_disc-(window._shopifyReturnValue||0);
+    const _grossPct=_grossT>0?Math.min(Math.round(_grossSales/_grossT*100),999):0;
+    const _netPct=_netT>0?Math.min(Math.round(_netSales/_netT*100),999):0;
+    const _spendPct=totR>0?Math.round(totS/totR*100):0;
+    const _pctCol=p=>p>=80?'var(--green)':p>=50?'var(--accent)':'var(--red)';
     html+=`<div class="pc" style="border-color:var(--accent-dim)">
       <div class="pn"><div class="pi ix">Σ</div>Combined</div>
       <div class="kr">
@@ -1780,6 +1846,12 @@ function renderAds(){
         <div><div class="kl">Orders</div><div class="kv">${totO||'—'}</div></div>
       </div>
       <div style="margin-top:8px"><div class="kl">Blended CPA</div><div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px">${totO>0?'PKR '+fmt(Math.round(totS/totO)):'—'}</div></div>
+      <div class="div" style="margin:10px 0"></div>
+      <div class="kr">
+        <div><div class="kl">Gross Achieved</div><div class="kv" style="color:${_pctCol(_grossPct)}">${_grossT>0?_grossPct+'%':'—'}</div></div>
+        <div><div class="kl">Net Achieved</div><div class="kv" style="color:${_pctCol(_netPct)}">${_netT>0?_netPct+'%':'—'}</div></div>
+      </div>
+      <div style="margin-top:8px"><div class="kl">Spend % of Revenue</div><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${_pctCol(100-_spendPct)};margin-top:2px">${totR>0?_spendPct+'%':'—'}</div></div>
     </div>`;
   }
   document.getElementById('platCards').innerHTML=html;
@@ -2706,6 +2778,7 @@ async function loadWeeklyOrders(){
   renderWeeklyTop20();
   renderNoSaleDiagnosis();
   renderSpark();
+  if(typeof renderAdsTargetCards==='function') renderAdsTargetCards();
 }
 
 function renderWeeklyTop20(){
@@ -3171,6 +3244,7 @@ function switchTab(name,el){
   if(name==='report')buildReport();
   if(name==='report')buildReport();
   if(name==='cs') setTimeout(renderCSFromSupabase,200);
+  if(name==='ads'){ loadAdsTargets(); }
   if(name==='cards') loadCardData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
   if(name==='sorter'){
@@ -4240,6 +4314,94 @@ function upFormReset(){
     cb.checked = ['S','M','L','XL','XXL'].includes(cb.value);
   });
   document.getElementById('pf-title').focus();
+}
+
+// ══════════════════════════════════════════════════
+// ADS TARGETS — Gross & Net monthly targets
+// ══════════════════════════════════════════════════
+window._adsTargets = {gross:0, net:0};
+let _targetEditing = 'gross';
+
+function adsTargetMonthKey(){
+  const n=new Date();
+  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');
+}
+
+async function loadAdsTargets(){
+  const key = adsTargetMonthKey();
+  const rows = await DB.get('ads_targets', `month=eq.${key}`);
+  if(rows && rows.length){
+    window._adsTargets = {gross: rows[0].gross_target||0, net: rows[0].net_target||0};
+  } else {
+    window._adsTargets = {gross:0, net:0};
+  }
+  renderAdsTargetCards();
+}
+
+async function saveTarget(){
+  const val = parseFloat(document.getElementById('targetModalInput').value)||0;
+  if(!val){ alert('Please enter a valid amount'); return; }
+  const key = adsTargetMonthKey();
+  window._adsTargets[_targetEditing] = val;
+  // Upsert to Supabase
+  await DB.upsert('ads_targets', {
+    month: key,
+    gross_target: window._adsTargets.gross,
+    net_target:   window._adsTargets.net,
+    updated_at:   new Date().toISOString()
+  }, 'month');
+  document.getElementById('targetModal').style.display='none';
+  renderAdsTargetCards();
+  // Re-render platform cards to update combined card %
+  if(typeof renderAdsCards==='function') renderAdsCards();
+}
+
+function openTargetModal(type){
+  _targetEditing = type;
+  const isGross = type==='gross';
+  const n=new Date();
+  document.getElementById('targetModalTitle').textContent = (isGross?'Set Gross Target':'Set Net Target');
+  document.getElementById('targetModalMonth').textContent = n.toLocaleString('en-GB',{month:'long',year:'numeric'});
+  document.getElementById('targetModalInput').value = window._adsTargets[type]||'';
+  document.getElementById('targetModal').style.display='flex';
+  setTimeout(()=>document.getElementById('targetModalInput').focus(),100);
+}
+
+function renderAdsTargetCards(){
+  const gt = window._adsTargets||{};
+  const grossT = gt.gross||0;
+  const netT   = gt.net||0;
+
+  // Get live Shopify values
+  const grossSales = ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
+  const disc       = ordersData.reduce((s,o)=>s+parseFloat(o.total_discounts||0),0);
+  const netSales   = grossSales - disc - (window._shopifyReturnValue||0);
+
+  const grossPct = grossT>0 ? Math.min(Math.round(grossSales/grossT*100),999) : 0;
+  const netPct   = netT>0   ? Math.min(Math.round(netSales/netT*100),999)     : 0;
+
+  const pctColor = p => p>=80?'var(--green)':p>=50?'var(--accent)':'var(--red)';
+  const barW     = p => Math.min(p,100)+'%';
+
+  // Gross card
+  const gv=document.getElementById('grossTargetVal');
+  if(gv) gv.textContent = grossT>0?'PKR '+fmt(grossT):'Not set';
+  const ga=document.getElementById('grossAchievedLbl');
+  if(ga) ga.textContent = 'Achieved: '+(grossSales>0?'PKR '+fmt(grossSales):'—');
+  const gp=document.getElementById('grossAchievedPct');
+  if(gp){ gp.textContent=grossT>0?grossPct+'%':'—'; gp.style.color=grossT>0?pctColor(grossPct):'var(--muted)'; }
+  const gb=document.getElementById('grossProgressBar');
+  if(gb){ gb.style.width=grossT>0?barW(grossPct):'0%'; gb.style.background=pctColor(grossPct); }
+
+  // Net card
+  const nv=document.getElementById('netTargetVal');
+  if(nv) nv.textContent = netT>0?'PKR '+fmt(netT):'Not set';
+  const na=document.getElementById('netAchievedLbl');
+  if(na) na.textContent = 'Achieved: '+(netSales>0?'PKR '+fmt(netSales):'—');
+  const np=document.getElementById('netAchievedPct');
+  if(np){ np.textContent=netT>0?netPct+'%':'—'; np.style.color=netT>0?pctColor(netPct):'var(--muted)'; }
+  const nb=document.getElementById('netProgressBar');
+  if(nb){ nb.style.width=netT>0?barW(netPct):'0%'; nb.style.background=pctColor(netPct); }
 }
 
 // ── IMAGE HANDLING — Search & Drop System ──
