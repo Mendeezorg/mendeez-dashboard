@@ -550,49 +550,41 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <!-- ══ CS & CONFIRMATIONS ══ -->
 <div class="panel" id="panel-cs">
   <div class="ds">
-    <div><div class="dt">CS & Confirmations</div><div class="dsub">Live from Perf Report 26 · Select month below</div></div>
+    <div><div class="dt">CS & Confirmations</div><div class="dsub">Live from Xstack · Supabase agent entries</div></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <select class="fi" id="csMonthSel" style="width:150px" onchange="switchCSMonth()">
-        <option value="">Loading...</option>
-      </select>
       <button class="btn btn-s btn-sm" onclick="openComplaintsPage()" style="border-color:var(--red);color:var(--red)">🔴 Review Complaints</button>
-      <button class="btn btn-s btn-sm" onclick="fetchSheets()">↻ Refresh</button>
     </div>
   </div>
-  <div class="alert al-blue"><div>ℹ</div><div>Pulled automatically from your Perf Report sheet. Shows MTD agent performance and today's date column data.</div></div>
-  <!-- MTD SUMMARY — from Google Sheet -->
-  <div class="sh"><div class="st" id="csMTDHeader">MTD Agent Performance</div></div>
-  <div class="tc" id="csAgentTable"><div class="ldrow"><span class="si"></span>Loading...</div></div>
+
+  <!-- XSTACK CARDS — same as overview -->
+  <div class="sh"><div class="st" style="color:var(--accent)">OMS — Xstack Live Data</div></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="cs-xs-dispatched">—</div><div class="ssub">Current month</div></div>
+    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="cs-xs-delivered">—</div><div class="ssub">Current month</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="cs-xs-cancel-mtd">—</div><div class="ssub">Current month placed</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="cs-xs-cancel-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="cs-xs-return-mtd">—</div><div class="ssub">Current month placed</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns CF</div><div class="sv red shimmer" id="cs-xs-return-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
+  </div>
+
   <!-- CANCELLATION REASONS — from Xstack -->
-  <div class="sh" style="margin-top:20px"><div class="st">Cancellation Reasons — MTD</div></div>
+  <div class="sh"><div class="st">Cancellation Reasons — MTD</div></div>
   <div class="ic" id="xs-cancel-reasons" style="padding:16px;margin-bottom:4px">
     <div style="color:var(--muted);font-size:12px">Loading...</div>
   </div>
 
-  <!-- MANUAL ENTRIES — from Supabase -->
+  <!-- DAILY AGENT ENTRIES — from Supabase -->
   <div class="sh" style="margin-top:20px"><div class="st" style="color:var(--accent)">📋 Daily Agent Entries</div><div class="ss" id="csEntriesSubtitle"></div></div>
   <div class="tc" id="csEntriesTable"><div class="ldrow"><span class="si"></span>Loading entries...</div></div>
-  <!-- ORDER STATUS -->
-  <div class="sh"><div class="st">Order Status MTD</div></div>
-  <div class="sg" id="csOrderStats">
-    <div class="sc"><div class="sl">Delivered MTD</div><div class="sv shimmer" id="cs-delivered"></div><div class="ssub" id="cs-delivered-sub">—</div></div>
-    <div class="sc"><div class="sl">Cancellations MTD</div><div class="sv shimmer" id="cs-cancel"></div><div class="ssub" id="cs-cancel-sub">—</div></div>
-    <div class="sc"><div class="sl">Cancellations CF</div><div class="sv shimmer" id="cs-cancel-cf"></div><div class="ssub" id="cs-cancel-cf-sub">—</div></div>
-    <div class="sc"><div class="sl">Returns MTD</div><div class="sv shimmer" id="cs-returns"></div><div class="ssub" id="cs-returns-sub">—</div></div>
-    <div class="sc"><div class="sl">Returns CF</div><div class="sv shimmer" id="cs-returns-cf"></div><div class="ssub" id="cs-returns-cf-sub">—</div></div>
-    <div class="sc"><div class="sl">Order Adjustment (Returns)</div><div class="sv shimmer" id="cs-order-adj"></div><div class="ssub" id="cs-order-adj-sub">—</div></div>
-  </div>
-  <!-- EWH WAREHOUSE -->
-  <div class="sh"><div class="st">Warehouse (EWH) MTD</div></div>
-  <div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
-    <div class="sc"><div class="sl">Total Dispatch Value</div><div class="sv amber" id="cs-wh-val">—</div></div>
-    <div class="sc"><div class="sl">Units Dispatched</div><div class="sv" id="cs-wh-units">—</div></div>
-    <div class="sc"><div class="sl">Return Units</div><div class="sv red" id="cs-wh-rtn">—</div></div>
-    <div class="sc"><div class="sl">Exchanges</div><div class="sv" id="cs-wh-exch">—</div></div>
-  </div>
-  <!-- CANCELLATION REASONS -->
-  <div class="sh"><div class="st">Cancellation Reasons MTD</div></div>
-  <div class="tc" id="cancelReasonsTable"><div class="ldrow"><span class="si"></span>Loading...</div></div>
+
+  <!-- hidden compat elements -->
+  <div style="display:none" id="csAgentTable"></div>
+  <div style="display:none" id="csMTDHeader"></div>
+  <div style="display:none" id="csMonthSel"></div>
+  <div style="display:none" id="csOrderStats"></div>
+  <div style="display:none" id="cancelReasonsTable"></div>
 </div>
 
 <!-- ══ PRODUCTS ══ -->
@@ -4460,8 +4452,9 @@ function renderAdsTargetCards(){
 // ══════════════════════════════════════════════════
 // XSTACK INTEGRATION
 // ══════════════════════════════════════════════════
-const XSTACK_AUTH_URL  = 'https://api-copilot-stage-local.xstak.com/v1/admin/service-account/token';
-const XSTACK_ORDERS_URL = 'https://oe-unc-stage-local.xstak.com/oe/v2/orders/sales_orders';
+const XSTACK_WORKER    = 'https://mendeez-shopify.divine-mouse-0258.workers.dev';
+const XSTACK_AUTH_URL  = XSTACK_WORKER + '/xstack-token';
+const XSTACK_ORDERS_URL = XSTACK_WORKER + '/xstack-orders';
 const XSTACK_CLIENT_ID  = 'api-user-peiUUaIuwe';
 const XSTACK_SECRET     = 'PhiVyUF0HG7bLzUeOATb';
 const XSTACK_COMPANY    = '226b5c53476dbeaf';
@@ -4484,21 +4477,29 @@ async function xGetToken(){
   });
   const data = await res.json();
   _xToken = data.access_token;
-  _xTokenExpiry = Date.now() + (data.expires_in||300)*1000;
+  _xTokenExpiry = Date.now() + ((data.expires_in||300)-30)*1000;
   return _xToken;
 }
 
 async function xFetchOrders(status, startDate, endDate){
   const token = await xGetToken();
-  const start = startDate.toISOString().replace(/\.000Z$/,'+05:00').replace('Z','+05:00');
-  const end   = endDate.toISOString().replace(/\.000Z$/,'+05:00').replace('Z','+05:00');
+  // Format dates as PKT (+05:00)
+  const fmt = d => {
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}T00:00:00%2B05:00`;
+  };
+  const fmtEnd = d => {
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}T23:59:59%2B05:00`;
+  };
   const url = XSTACK_ORDERS_URL
     + '?order_status='+encodeURIComponent(status)
     + '&location_id='+XSTACK_LOCATION
-    + '&start_date='+encodeURIComponent(start)
-    + '&end_date='+encodeURIComponent(end)
-    + '&size=500&page=1';
-  const res = await fetch(url, { headers:{ 'Token': token } });
+    + '&start_date='+fmt(startDate)
+    + '&end_date='+fmtEnd(endDate)
+    + '&size=500&page=1'
+    + '&token='+encodeURIComponent(token);
+  const res = await fetch(url);
   if(!res.ok) throw new Error('Xstack '+status+': '+res.status);
   const data = await res.json();
   return data.orders || [];
@@ -4569,6 +4570,13 @@ async function loadXstackData(){
     setCard('xs-cancel-cf',   cancelledCF);
     setCard('xs-return-mtd',  returnsMTD);
     setCard('xs-return-cf',   returnsCF);
+    // Mirror to CS tab cards
+    setCard('cs-xs-dispatched',  dispatched);
+    setCard('cs-xs-delivered',   delivered);
+    setCard('cs-xs-cancel-mtd',  cancelledMTD);
+    setCard('cs-xs-cancel-cf',   cancelledCF);
+    setCard('cs-xs-return-mtd',  returnsMTD);
+    setCard('cs-xs-return-cf',   returnsCF);
 
     // Cancellation reasons from MTD cancelled orders
     const reasonMap = {};
