@@ -4484,7 +4484,7 @@ async function xGetToken(){
 async function xFetchOrders(status, startDate, endDate){
   const token = await xGetToken();
   // Format dates as PKT (+05:00)
-  const fmt = d => {
+  const fmtD = d => {
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${dd}T00:00:00%2B05:00`;
   };
@@ -4492,17 +4492,39 @@ async function xFetchOrders(status, startDate, endDate){
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${dd}T23:59:59%2B05:00`;
   };
-  const url = XSTACK_ORDERS_URL
-    + '?order_status='+encodeURIComponent(status)
-    + '&location_id='+XSTACK_LOCATION
-    + '&start_date='+fmt(startDate)
-    + '&end_date='+fmtEnd(endDate)
-    + '&size=500&page=1'
-    + '&token='+encodeURIComponent(token);
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('Xstack '+status+': '+res.status);
-  const data = await res.json();
-  return data.orders || [];
+
+  const PAGE_SIZE = 500;
+  let page = 1;
+  let allOrders = [];
+  let guard = 0; // safety: max 20 pages = 10,000 orders
+
+  while(guard < 20){
+    guard++;
+    const url = XSTACK_ORDERS_URL
+      + '?order_status='+encodeURIComponent(status)
+      + '&location_id='+XSTACK_LOCATION
+      + '&start_date='+fmtD(startDate)
+      + '&end_date='+fmtEnd(endDate)
+      + '&size='+PAGE_SIZE+'&page='+page
+      + '&token='+encodeURIComponent(token);
+
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Xstack '+status+' p'+page+': '+res.status);
+    const data = await res.json();
+    const batch = data.orders || [];
+    allOrders = allOrders.concat(batch);
+
+    // Stop if last page: batch smaller than page size, or API gives total_pages
+    const totalPages = data.total_pages || data.totalPages || null;
+    if(totalPages !== null){
+      if(page >= totalPages) break;
+    } else {
+      if(batch.length < PAGE_SIZE) break; // no more pages
+    }
+    page++;
+  }
+
+  return allOrders;
 }
 
 function xGetCancelReason(order){
