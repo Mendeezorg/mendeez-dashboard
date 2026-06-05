@@ -186,7 +186,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .cs-kpi-lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.03em}
 
 /* ── LOGIN ── */
-#loginOverlay{position:fixed;inset:0;background:#0d0d0d;z-index:99999;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;}
+#loginOverlay{display:none!important;}
 .login-card{background:#161616;border:1px solid #2a2a2a;border-radius:14px;padding:36px 32px;width:100%;max-width:380px;}
 .login-logo{font-size:20px;font-weight:800;color:#e8c547;letter-spacing:0.05em;margin-bottom:4px;}
 .login-sub{font-size:11px;color:#555;margin-bottom:28px;}
@@ -3479,9 +3479,13 @@ window.addEventListener('load',()=>{
   document.getElementById('cfgCrr').value=CRR_TAB;
   document.getElementById('cfgCS').value=CS_TAB;
   // Auto-connect silently — no overlay, just load in background
+  // Auto-login as manager — no password required
+  currentUser = {username:'admin', role:'manager'};
+  applyRoleView('manager');
   if(STORE&&TOKEN){
     loadAll().catch(e=>console.warn('Auto-connect failed:',e));
   }
+  renderCSFromSupabase();
   // Restore manual field values
   if(manualData.stock)document.getElementById('i-stock').value=manualData.stock;
   if(manualData.web)document.getElementById('i-web').value=manualData.web;
