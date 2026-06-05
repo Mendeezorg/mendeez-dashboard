@@ -349,22 +349,22 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Net Sales</div><div class="sv green shimmer" id="s-shopify-net"></div><div class="ssub" id="s-shopify-net-sub">After discounts & returns</div></div>
   </div>
 
-  <!-- ── PERF REPORT (SHEET) CARDS ── -->
+  <!-- ── OMS XSTACK CARDS ── -->
   <div class="sh" style="margin-bottom:8px">
     <div class="st" style="display:flex;align-items:center;gap:7px">
       <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
-      Perf Report 26 — MTD
+      OMS — Xstack Live Data
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:20px">
-    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Total Dispatched MTD</div><div class="sv blue shimmer" id="s-disp">—</div><div class="ssub" id="s-disp-sub">Perf Report 26</div></div>
-    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Total Delivered</div><div class="sv green shimmer" id="s-delivered"></div><div class="ssub" id="s-delivered-sub">Perf Report 26</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="s-cancel-mtd"></div><div class="ssub" id="s-cancel-mtd-sub">Perf Report 26</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="s-cancel-cf"></div><div class="ssub" id="s-cancel-cf-sub">Perf Report 26</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Return MTD</div><div class="sv red shimmer" id="s-returns-mtd"></div><div class="ssub" id="s-returns-mtd-sub">Perf Report 26</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Return CF</div><div class="sv red shimmer" id="s-returns-cf"></div><div class="ssub" id="s-returns-cf-sub">Perf Report 26</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Order Adj. Returns</div><div class="sv red shimmer" id="s-order-adj"></div><div class="ssub" id="s-order-adj-sub">Perf Report 26</div></div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
+    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub">Current month</div></div>
+    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub">Current month</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="xs-cancel-mtd">—</div><div class="ssub">Current month placed</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="xs-cancel-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="xs-return-mtd">—</div><div class="ssub">Current month placed</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns CF</div><div class="sv red shimmer" id="xs-return-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
   </div>
+
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
   <div class="sh" style="margin-top:4px">
     <div class="st">📅 Date-wise Shopify Breakdown</div>
@@ -563,6 +563,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- MTD SUMMARY — from Google Sheet -->
   <div class="sh"><div class="st" id="csMTDHeader">MTD Agent Performance</div></div>
   <div class="tc" id="csAgentTable"><div class="ldrow"><span class="si"></span>Loading...</div></div>
+  <!-- CANCELLATION REASONS — from Xstack -->
+  <div class="sh" style="margin-top:20px"><div class="st">Cancellation Reasons — MTD</div></div>
+  <div class="ic" id="xs-cancel-reasons" style="padding:16px;margin-bottom:4px">
+    <div style="color:var(--muted);font-size:12px">Loading...</div>
+  </div>
+
   <!-- MANUAL ENTRIES — from Supabase -->
   <div class="sh" style="margin-top:20px"><div class="st" style="color:var(--accent)">📋 Daily Agent Entries</div><div class="ss" id="csEntriesSubtitle"></div></div>
   <div class="tc" id="csEntriesTable"><div class="ldrow"><span class="si"></span>Loading entries...</div></div>
@@ -1420,6 +1426,7 @@ async function reloadShopifyData(){
     if(_csRows.length){try{processCS(_csRows);}catch(e){console.warn('processCS error:',e.message);}}
     renderDailyStats();
     loadAdsTargets(); // reload targets for selected month
+    loadXstackData(); // reload Xstack OMS data
     // Defer heavy renders to next frame so UI stays responsive
     setTimeout(()=>{
       renderWeeklyTop20();
@@ -3486,6 +3493,7 @@ window.addEventListener('load',()=>{
     loadAll().catch(e=>console.warn('Auto-connect failed:',e));
   }
   renderCSFromSupabase();
+  loadXstackData();
   // Restore manual field values
   if(manualData.stock)document.getElementById('i-stock').value=manualData.stock;
   if(manualData.web)document.getElementById('i-web').value=manualData.web;
@@ -4448,6 +4456,155 @@ function renderAdsTargetCards(){
   if(spb){ spb.style.width=spendT>0?barW(spendPct):'0%'; spb.style.background=spendColor(spendPct); }
 }
 
+
+// ══════════════════════════════════════════════════
+// XSTACK INTEGRATION
+// ══════════════════════════════════════════════════
+const XSTACK_AUTH_URL  = 'https://api-copilot-stage-local.xstak.com/v1/admin/service-account/token';
+const XSTACK_ORDERS_URL = 'https://oe-unc-stage-local.xstak.com/oe/v2/orders/sales_orders';
+const XSTACK_CLIENT_ID  = 'api-user-peiUUaIuwe';
+const XSTACK_SECRET     = 'PhiVyUF0HG7bLzUeOATb';
+const XSTACK_COMPANY    = '226b5c53476dbeaf';
+const XSTACK_LOCATION   = '1139';
+
+let _xToken = null;
+let _xTokenExpiry = 0;
+
+async function xGetToken(){
+  if(_xToken && Date.now() < _xTokenExpiry - 30000) return _xToken;
+  const res = await fetch(XSTACK_AUTH_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      clientId: XSTACK_CLIENT_ID,
+      clientSecret: XSTACK_SECRET,
+      grantType: 'client_credentials',
+      companyCode: XSTACK_COMPANY
+    })
+  });
+  const data = await res.json();
+  _xToken = data.access_token;
+  _xTokenExpiry = Date.now() + (data.expires_in||300)*1000;
+  return _xToken;
+}
+
+async function xFetchOrders(status, startDate, endDate){
+  const token = await xGetToken();
+  const start = startDate.toISOString().replace(/\.000Z$/,'+05:00').replace('Z','+05:00');
+  const end   = endDate.toISOString().replace(/\.000Z$/,'+05:00').replace('Z','+05:00');
+  const url = XSTACK_ORDERS_URL
+    + '?order_status='+encodeURIComponent(status)
+    + '&location_id='+XSTACK_LOCATION
+    + '&start_date='+encodeURIComponent(start)
+    + '&end_date='+encodeURIComponent(end)
+    + '&size=500&page=1';
+  const res = await fetch(url, { headers:{ 'Token': token } });
+  if(!res.ok) throw new Error('Xstack '+status+': '+res.status);
+  const data = await res.json();
+  return data.orders || [];
+}
+
+function xGetCancelReason(order){
+  const details = order.orders_brand_details || [];
+  const r = details.find(d=>d.attribute==='cancel_return_reason');
+  return r ? r.value : '';
+}
+
+async function loadXstackData(){
+  const {from, to} = getRange();
+  if(!from || !to) return;
+
+  // MTD = start of month to end of selected range
+  const mtdStart = new Date(from.getFullYear(), from.getMonth(), 1);
+  // CF = start of previous month to day before MTD start  
+  const cfStart  = new Date(from.getFullYear(), from.getMonth()-1, 1);
+  const cfEnd    = new Date(mtdStart.getTime()-1);
+
+  try {
+    // Show loading state
+    ['xs-dispatched','xs-delivered','xs-cancel-mtd','xs-cancel-cf','xs-return-mtd','xs-return-cf'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){el.textContent='...';el.classList.add('shimmer');}
+    });
+
+    // Fetch all 4 statuses for MTD
+    const [dispatched, delivered, cancelledMTD, returnsMTD] = await Promise.all([
+      xFetchOrders('DISPATCHED',        mtdStart, to),
+      xFetchOrders('ORDER_DELIVERED',   mtdStart, to),
+      xFetchOrders('DEAD_VIA_CUSTOMER', mtdStart, to),
+      xFetchOrders('RETURN_VERIFICATION', mtdStart, to),
+    ]);
+
+    // Fetch CF (carry forward = previous month dispatched orders cancelled/returned this month)
+    const [cancelledCF, returnsCF] = await Promise.all([
+      xFetchOrders('DEAD_VIA_CUSTOMER',    cfStart, cfEnd),
+      xFetchOrders('RETURN_VERIFICATION',  cfStart, cfEnd),
+    ]);
+
+    // Update cards
+    const s = id=>{ const el=document.getElementById(id); if(el) el.classList.remove('shimmer'); return el; };
+    const set = (id,val) => { const el=s(id); if(el) el.textContent=val; };
+
+    // Helper: count total items across orders
+    const countItems = orders => orders.reduce((s,o)=>{
+      const qty = (o.products||[]).reduce((ps,p)=>ps+(parseInt(p.quantity)||0),0);
+      return s+qty;
+    },0);
+
+    const countPKR = orders => orders.reduce((s,o)=>s+(parseFloat(o.total_amount_pkr)||0),0);
+
+    const setCard = (id, orders) => {
+      const el = s(id);
+      if(!el) return;
+      const orders_count = orders.length;
+      const items_count  = countItems(orders);
+      const pkr_total    = countPKR(orders);
+      el.innerHTML = `<div style="font-size:20px;font-weight:700;font-family:var(--mono)">PKR ${fmt(Math.round(pkr_total))}</div>`
+        + `<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:3px">${items_count.toLocaleString()} items &nbsp;·&nbsp; ${orders_count.toLocaleString()} orders</div>`;
+    };
+
+    setCard('xs-dispatched',  dispatched);
+    setCard('xs-delivered',   delivered);
+    setCard('xs-cancel-mtd',  cancelledMTD);
+    setCard('xs-cancel-cf',   cancelledCF);
+    setCard('xs-return-mtd',  returnsMTD);
+    setCard('xs-return-cf',   returnsCF);
+
+    // Cancellation reasons from MTD cancelled orders
+    const reasonMap = {};
+    cancelledMTD.forEach(o=>{
+      const reason = xGetCancelReason(o) || 'Not specified';
+      reasonMap[reason] = (reasonMap[reason]||0)+1;
+    });
+    renderXstackCancelReasons(reasonMap, cancelledMTD.length);
+
+  } catch(err) {
+    console.error('Xstack error:', err);
+    ['xs-dispatched','xs-delivered','xs-cancel-mtd','xs-cancel-cf','xs-return-mtd','xs-return-cf'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){el.innerHTML='<div style="font-size:22px;font-family:var(--mono)">—</div><div style="font-size:11px;color:var(--muted)">— items · — orders</div>';el.classList.remove('shimmer');}
+    });
+  }
+}
+
+function renderXstackCancelReasons(reasonMap, total){
+  const el = document.getElementById('xs-cancel-reasons');
+  if(!el) return;
+  const entries = Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px">No cancellations in this period</div>'; return; }
+  el.innerHTML = entries.map(([reason,count])=>{
+    const pct = total>0?Math.round(count/total*100):0;
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+        <span style="color:var(--text)">${reason}</span>
+        <span style="font-family:var(--mono);color:var(--accent)">${count} <span style="color:var(--muted)">(${pct}%)</span></span>
+      </div>
+      <div style="background:var(--surface2);border-radius:3px;height:4px">
+        <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:3px"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
 // ── IMAGE HANDLING — Search & Drop System ──
 // _upImgMatched: productId → {productId, title, sku, images:[{file,pos}]}
 
