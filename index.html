@@ -4591,7 +4591,7 @@ async function loadXstackData(){
 
     // Helper: count total items across orders
     const countItems = orders => orders.reduce((s,o)=>{
-      const qty = (o.products||[]).reduce((ps,p)=>ps+(parseInt(p.quantity)||0),0);
+      const qty = (o.products||[]).filter(p=>p!=null).reduce((ps,p)=>ps+(parseInt(p.quantity)||0),0);
       return s+qty;
     },0);
 
