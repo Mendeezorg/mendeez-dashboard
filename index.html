@@ -4483,13 +4483,16 @@ async function xGetToken(){
 
 async function xFetchOrders(status, startDate, endDate){
   const token = await xGetToken();
-  // Format dates as PKT (+05:00)
+  // Format dates as PKT (+05:00) — use UTC methods since dates are stored as UTC
   const fmtD = d => {
-    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    // Add PKT offset to get PKT date, then format
+    const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
+    const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
     return `${y}-${m}-${dd}T00:00:00%2B05:00`;
   };
   const fmtEnd = d => {
-    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
+    const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
     return `${y}-${m}-${dd}T23:59:59%2B05:00`;
   };
 
@@ -4537,11 +4540,13 @@ async function loadXstackData(){
   const {from, to} = getRange();
   if(!from || !to) return;
 
-  // MTD = start of month to end of selected range
-  const mtdStart = new Date(from.getFullYear(), from.getMonth(), 1);
-  // CF = start of previous month to day before MTD start  
-  const cfStart  = new Date(from.getFullYear(), from.getMonth()-1, 1);
-  const cfEnd    = new Date(mtdStart.getTime()-1);
+  // MTD = start of month to end of selected range (use PKT date for month calc)
+  const toPKT = d => new Date(d.getTime() + PKT_OFFSET_MS);
+  const fromPKT = toPKT(from);
+  const mtdStart = new Date(Date.UTC(fromPKT.getUTCFullYear(), fromPKT.getUTCMonth(), 1) - PKT_OFFSET_MS);
+  // CF = start of previous month to day before MTD start
+  const cfStart  = new Date(Date.UTC(fromPKT.getUTCFullYear(), fromPKT.getUTCMonth()-1, 1) - PKT_OFFSET_MS);
+  const cfEnd    = new Date(mtdStart.getTime() - 1);
 
   try {
     // Show loading state
@@ -4610,9 +4615,14 @@ async function loadXstackData(){
 
   } catch(err) {
     console.error('Xstack error:', err);
-    ['xs-dispatched','xs-delivered','xs-cancel-mtd','xs-cancel-cf','xs-return-mtd','xs-return-cf'].forEach(id=>{
+    const errMsg = err.message || String(err);
+    ['xs-dispatched','xs-delivered','xs-cancel-mtd','xs-cancel-cf','xs-return-mtd','xs-return-cf',
+     'cs-xs-dispatched','cs-xs-delivered','cs-xs-cancel-mtd','cs-xs-cancel-cf','cs-xs-return-mtd','cs-xs-return-cf'].forEach(id=>{
       const el=document.getElementById(id);
-      if(el){el.innerHTML='<div style="font-size:22px;font-family:var(--mono)">—</div><div style="font-size:11px;color:var(--muted)">— items · — orders</div>';el.classList.remove('shimmer');}
+      if(el){
+        el.innerHTML='<div style="font-size:11px;color:var(--red);font-family:var(--mono)">ERR: '+errMsg+'</div>';
+        el.classList.remove('shimmer');
+      }
     });
   }
 }
