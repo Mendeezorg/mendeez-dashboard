@@ -355,9 +355,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
       OMS — Xstack Live Data
     </div>
-    <button onclick="xDebugTest()" style="font-size:10px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border2);color:var(--accent);border-radius:4px;cursor:pointer;font-family:var(--mono)">🔍 Debug Xstack</button>
   </div>
-  <div id="xs-debug-output" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;max-height:300px;overflow-y:auto"></div>
   <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
     <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub">Current month</div></div>
     <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub">Current month</div></div>
@@ -4516,77 +4514,6 @@ function xGetCancelReason(order){
   const details = order.orders_brand_details || [];
   const r = details.find(d=>d.attribute==='cancel_return_reason');
   return r ? r.value : '';
-}
-
-async function xDebugTest(){
-  const out = document.getElementById('xs-debug-output');
-  out.style.display = 'block';
-  out.textContent = 'Testing...\n';
-
-  try {
-    // Get token
-    const res = await fetch(XSTACK_AUTH_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ clientId:XSTACK_CLIENT_ID, clientSecret:XSTACK_SECRET, grantType:'client_credentials', companyCode:XSTACK_COMPANY })
-    });
-    const data = await res.json();
-    const token = data.access_token;
-    if(!token){ out.textContent += '❌ No token!\n' + JSON.stringify(data); return; }
-    out.textContent += '✅ Token OK\n\n';
-
-    // Test different statuses + no location filter
-    const statuses = ['DISPATCHED','ORDER_DELIVERED','DEAD_VIA_CUSTOMER','RETURN_VERIFICATION','DELIVERED','CANCELLED','RETURNED','PLACED','CONFIRMED'];
-    // Use last 30 days wide range
-    const start = '2026-05-01T00:00:00%2B05:00';
-    const end   = '2026-06-05T23:59:59%2B05:00';
-
-    out.textContent += '--- Testing statuses (no location filter, May-Jun 2026) ---\n';
-    for(const status of statuses){
-      const url = XSTACK_ORDERS_URL
-        + '?order_status='+encodeURIComponent(status)
-        + '&start_date='+start+'&end_date='+end
-        + '&size=5&page=1&token='+encodeURIComponent(token);
-      const r = await fetch(url);
-      const d = await r.json();
-      const total = d.page ? d.page.totalElements : (d.orders ? d.orders.length : '?');
-      out.textContent += status + ': ' + total + ' orders\n';
-    }
-
-    // Test with location 1139
-    out.textContent += '\n--- With location_id=1139 ---\n';
-    for(const status of ['DISPATCHED','ORDER_DELIVERED','DEAD_VIA_CUSTOMER']){
-      const url = XSTACK_ORDERS_URL
-        + '?order_status='+encodeURIComponent(status)
-        + '&location_id=1139'
-        + '&start_date='+start+'&end_date='+end
-        + '&size=5&page=1&token='+encodeURIComponent(token);
-      const r = await fetch(url);
-      const d = await r.json();
-      const total = d.page ? d.page.totalElements : '?';
-      out.textContent += status + ' (loc 1139): ' + total + ' orders\n';
-    }
-
-    // Check first order raw to see field names
-    out.textContent += '\n--- First available order (any status, no loc) ---\n';
-    const anyUrl = XSTACK_ORDERS_URL
-      + '?start_date='+start+'&end_date='+end
-      + '&size=1&page=1&token='+encodeURIComponent(token);
-    const anyR = await fetch(anyUrl);
-    const anyD = await anyR.json();
-    if(anyD.orders && anyD.orders.length){
-      const o = anyD.orders[0];
-      out.textContent += 'Keys: ' + Object.keys(o).join(', ') + '\n';
-      out.textContent += 'location_id: ' + (o.location_id||o.locationId||o.location||'N/A') + '\n';
-      out.textContent += 'status: ' + (o.order_status||o.status||'N/A') + '\n';
-      out.textContent += 'total_amount_pkr: ' + (o.total_amount_pkr||'N/A') + '\n';
-    } else {
-      out.textContent += 'No orders found with any status\n';
-      out.textContent += JSON.stringify(anyD).substring(0,200)+'\n';
-    }
-
-  } catch(e) {
-    out.textContent += '\n❌ Error: ' + e.message + '\n';
-  }
 }
 
 async function loadXstackData(){
