@@ -355,7 +355,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
       OMS — Xstack Live Data
     </div>
+    <button onclick="xDebugTest()" style="font-size:10px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border2);color:var(--accent);border-radius:4px;cursor:pointer;font-family:var(--mono)">🔍 Debug Xstack</button>
   </div>
+  <div id="xs-debug-output" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;max-height:300px;overflow-y:auto"></div>
   <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
     <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub">Current month</div></div>
     <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub">Current month</div></div>
@@ -4534,6 +4536,61 @@ function xGetCancelReason(order){
   const details = order.orders_brand_details || [];
   const r = details.find(d=>d.attribute==='cancel_return_reason');
   return r ? r.value : '';
+}
+
+async function xDebugTest(){
+  const out = document.getElementById('xs-debug-output');
+  out.style.display = 'block';
+  out.textContent = 'Testing...\n';
+
+  // Step 1: Token
+  try {
+    out.textContent += '\n[1] Fetching token...\n';
+    const res = await fetch(XSTACK_AUTH_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        clientId: XSTACK_CLIENT_ID,
+        clientSecret: XSTACK_SECRET,
+        grantType: 'client_credentials',
+        companyCode: XSTACK_COMPANY
+      })
+    });
+    const raw = await res.text();
+    out.textContent += 'Status: ' + res.status + '\n';
+    out.textContent += 'Response: ' + raw.substring(0,300) + '\n';
+
+    let data;
+    try { data = JSON.parse(raw); } catch(e){ out.textContent += 'JSON parse failed: '+e.message; return; }
+
+    if(!data.access_token){ out.textContent += '\n❌ No access_token in response!\n'; return; }
+    const token = data.access_token;
+    out.textContent += '\n✅ Token OK: ' + token.substring(0,30) + '...\n';
+
+    // Step 2: Orders - today as test
+    const now = new Date();
+    const pkt = new Date(now.getTime() + 5*60*60*1000);
+    const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), d=String(pkt.getUTCDate()).padStart(2,'0');
+    const monthStart = y+'-'+m+'-01T00:00:00%2B05:00';
+    const todayEnd   = y+'-'+m+'-'+d+'T23:59:59%2B05:00';
+
+    out.textContent += '\n[2] Fetching DISPATCHED orders for '+y+'-'+m+'...\n';
+    const ordUrl = XSTACK_ORDERS_URL
+      + '?order_status=DISPATCHED'
+      + '&location_id='+XSTACK_LOCATION
+      + '&start_date='+monthStart
+      + '&end_date='+todayEnd
+      + '&size=10&page=1'
+      + '&token='+encodeURIComponent(token);
+    out.textContent += 'URL (first 200): ' + ordUrl.substring(0,200) + '\n';
+
+    const res2 = await fetch(ordUrl);
+    const raw2 = await res2.text();
+    out.textContent += 'Status: ' + res2.status + '\n';
+    out.textContent += 'Response (first 500):\n' + raw2.substring(0,500) + '\n';
+  } catch(e) {
+    out.textContent += '\n❌ Error: ' + e.message + '\n';
+  }
 }
 
 async function loadXstackData(){
