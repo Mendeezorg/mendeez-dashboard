@@ -4498,38 +4498,18 @@ async function xFetchOrders(status, startDate, endDate){
     return `${y}-${m}-${dd}T23:59:59%2B05:00`;
   };
 
-  const PAGE_SIZE = 500;
-  let page = 1;
-  let allOrders = [];
-  let guard = 0; // safety: max 20 pages = 10,000 orders
+  const url = XSTACK_ORDERS_URL
+    + '?order_status='+encodeURIComponent(status)
+    + '&location_id='+XSTACK_LOCATION
+    + '&start_date='+fmtD(startDate)
+    + '&end_date='+fmtEnd(endDate)
+    + '&size=500&page=1'
+    + '&token='+encodeURIComponent(token);
 
-  while(guard < 20){
-    guard++;
-    const url = XSTACK_ORDERS_URL
-      + '?order_status='+encodeURIComponent(status)
-      + '&location_id='+XSTACK_LOCATION
-      + '&start_date='+fmtD(startDate)
-      + '&end_date='+fmtEnd(endDate)
-      + '&size='+PAGE_SIZE+'&page='+page
-      + '&token='+encodeURIComponent(token);
-
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('Xstack '+status+' p'+page+': '+res.status);
-    const data = await res.json();
-    const batch = data.orders || [];
-    allOrders = allOrders.concat(batch);
-
-    // Stop if last page: batch smaller than page size, or API gives total_pages
-    const totalPages = data.total_pages || data.totalPages || null;
-    if(totalPages !== null){
-      if(page >= totalPages) break;
-    } else {
-      if(batch.length < PAGE_SIZE) break; // no more pages
-    }
-    page++;
-  }
-
-  return allOrders;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('Xstack '+status+': '+res.status);
+  const data = await res.json();
+  return data.orders || [];
 }
 
 function xGetCancelReason(order){
@@ -4613,12 +4593,12 @@ async function loadXstackData(){
   const {from, to} = getRange();
   if(!from || !to) return;
 
-  // MTD = start of month to end of selected range (use PKT date for month calc)
+  // MTD = start of TO's month to end of TO (so if range is in May, shows May data)
   const toPKT = d => new Date(d.getTime() + PKT_OFFSET_MS);
-  const fromPKT = toPKT(from);
-  const mtdStart = new Date(Date.UTC(fromPKT.getUTCFullYear(), fromPKT.getUTCMonth(), 1) - PKT_OFFSET_MS);
+  const toPKTdate = toPKT(to);  // use 'to' date to determine which month to show
+  const mtdStart = new Date(Date.UTC(toPKTdate.getUTCFullYear(), toPKTdate.getUTCMonth(), 1) - PKT_OFFSET_MS);
   // CF = start of previous month to day before MTD start
-  const cfStart  = new Date(Date.UTC(fromPKT.getUTCFullYear(), fromPKT.getUTCMonth()-1, 1) - PKT_OFFSET_MS);
+  const cfStart  = new Date(Date.UTC(toPKTdate.getUTCFullYear(), toPKTdate.getUTCMonth()-1, 1) - PKT_OFFSET_MS);
   const cfEnd    = new Date(mtdStart.getTime() - 1);
 
   try {
