@@ -5732,9 +5732,10 @@ async function debugRunAll(){
 async function debugCheckShopify(){
   debugSep('SHOPIFY');
   try{
+    const _workerUrl='https://mendeez-shopify.divine-mouse-0258.workers.dev';
     debugLog('Store: '+STORE);
-    debugLog('Worker: '+WORKER_URL);
-    const url=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent('/shop.json');
+    debugLog('Worker: '+_workerUrl);
+    const url=_workerUrl+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent('/shop.json');
     const res=await fetch(url);
     const data=await res.json();
     if(data.shop){
