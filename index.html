@@ -265,6 +265,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <a href="/tasks/" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#e8c547;border:none;border-radius:6px;color:#0d0d0d;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">✅ Task Manager</a>
     <button onclick="doEcomLogout()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #444;border-radius:6px;color:#999;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⇄ Logout</button>
     <button onclick="openSetup()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #555;border-radius:6px;color:#aaa;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⚙ Settings</button>
+    <button onclick="openDebugPanel()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">🔍 Debug</button>
     
     <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
@@ -355,9 +356,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
       OMS — Xstack Live Data
     </div>
-    <button onclick="xDebugTest()" style="font-size:10px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border2);color:var(--accent);border-radius:4px;cursor:pointer;font-family:var(--mono)">🔍 Debug June</button>
+
   </div>
-  <div id="xs-debug-output" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
+
   <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
     <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub">Current month</div></div>
     <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub">Current month</div></div>
@@ -4525,8 +4526,110 @@ function xGetCancelReason(order){
   return r ? r.value : '';
 }
 
+function openDebugPanel(){
+  document.getElementById('debugPanel').style.display='flex';
+}
+function closeDebugPanel(){
+  document.getElementById('debugPanel').style.display='none';
+}
+function debugClear(){
+  document.getElementById('debugOutput').textContent='Ready. Click "Run All Checks" to test all connections.';
+}
+function debugLog(msg, color='#ccc'){
+  const out = document.getElementById('debugOutput');
+  const line = document.createElement('span');
+  line.style.color = color;
+  line.textContent = msg + '\n';
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+}
+function debugSep(title){
+  debugLog('\n━━━ '+title+' ━━━', '#e8c547');
+}
+async function debugRunAll(){
+  debugClear();
+  document.getElementById('debugOutput').textContent='';
+  debugLog('Starting full dashboard diagnostic...\n', '#888');
+  await debugCheckShopify();
+  await debugCheckSheets();
+  await debugCheckXstack();
+  await debugCheckSupabase();
+  debugLog('\n✓ All checks complete.', '#10b981');
+}
+async function debugCheckShopify(){
+  debugSep('SHOPIFY');
+  try {
+    debugLog('Store: '+STORE);
+    debugLog('Worker: '+WORKER_URL);
+    const url = WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent('/shop.json');
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data.shop){
+      debugLog('✅ Connected: '+data.shop.name+' ('+data.shop.domain+')', '#10b981');
+      debugLog('   Plan: '+data.shop.plan_name);
+      debugLog('   Currency: '+data.shop.currency);
+    } else {
+      debugLog('❌ Failed: '+JSON.stringify(data).slice(0,100), '#f87171');
+    }
+    debugLog('   Orders loaded: '+ordersData.length);
+    debugLog('   Products loaded: '+(window.allProducts||[]).length);
+  } catch(e){ debugLog('❌ Error: '+e.message, '#f87171'); }
+}
+async function debugCheckSheets(){
+  debugSep('GOOGLE SHEETS');
+  try {
+    debugLog('Sheet ID: '+SHEET_ID);
+    debugLog('Ads tab: '+ADS_TAB);
+    debugLog('Courier tab: '+CRR_TAB);
+    debugLog('CS tab: '+CS_TAB);
+    const url = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&sheet='+encodeURIComponent(ADS_TAB);
+    const res = await fetch(url);
+    if(res.ok){ debugLog('✅ Sheets accessible', '#10b981'); }
+    else { debugLog('❌ Sheets error: '+res.status, '#f87171'); }
+    debugLog('   Ads rows: '+(window._adsRaw||[]).length);
+    debugLog('   Courier rows: '+(window.allCrr||[]).length);
+  } catch(e){ debugLog('❌ Error: '+e.message, '#f87171'); }
+}
+async function debugCheckXstack(){
+  debugSep('XSTACK OMS');
+  try {
+    debugLog('Worker route: '+XSTACK_AUTH_URL);
+    const res = await fetch(XSTACK_AUTH_URL, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ clientId:XSTACK_CLIENT_ID, clientSecret:XSTACK_SECRET, grantType:'client_credentials', companyCode:XSTACK_COMPANY })
+    });
+    const data = await res.json();
+    if(data.access_token){
+      debugLog('✅ Token OK (expires in '+data.expires_in+'s)', '#10b981');
+      const token = data.access_token;
+      const statuses = ['DISPATCHED','ORDER_DELIVERED','DEAD_VIA_CUSTOMER','RETURN_VERIFICATION'];
+      for(const st of statuses){
+        const url = XSTACK_ORDERS_URL+'?order_status='+encodeURIComponent(st)+'&location_id='+XSTACK_LOCATION+'&start_date=2026-06-01T00:00:00%2B05:00&end_date=2026-06-30T23:59:59%2B05:00&size=5&page=1&token='+encodeURIComponent(token);
+        const r = await fetch(url);
+        const d = await r.json();
+        const total = d.page?(d.page.total_elements||d.page.totalElements||0):0;
+        debugLog('   '+st+': '+total+' orders', total>0?'#10b981':'#888');
+      }
+    } else {
+      debugLog('❌ No token: '+JSON.stringify(data).slice(0,100), '#f87171');
+    }
+  } catch(e){ debugLog('❌ Error: '+e.message, '#f87171'); }
+}
+async function debugCheckSupabase(){
+  debugSep('SUPABASE');
+  try {
+    debugLog('URL: '+SUPA_URL);
+    const rows = await DB.get('cs_entries','date=gte.2026-06-01&date=lte.2026-06-30');
+    debugLog('✅ Connected', '#10b981');
+    debugLog('   CS entries (June): '+(rows||[]).length);
+    const targets = await DB.get('ads_targets','month=eq.2026-06');
+    debugLog('   Ads targets (June): '+(targets||[]).length);
+  } catch(e){ debugLog('❌ Error: '+e.message, '#f87171'); }
+}
+
 async function xDebugTest(){
   const out = document.getElementById('xs-debug-output');
+  if(!out){ openDebugPanel(); debugCheckXstack(); return; }
   out.style.display = 'block';
   const {from, to} = getRange();
   const fmtD = d => {
@@ -6027,6 +6130,25 @@ async function renderCSFromSupabase(){
 }
 
 </script>
+
+<!-- DEBUG PANEL -->
+<div id="debugPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99998;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto">
+  <div style="background:#0d0d0d;border:1px solid #333;border-radius:12px;width:min(820px,96vw);padding:24px;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:#f0ede8;font-family:'Syne',sans-serif">🔍 Dashboard Debug Console</div>
+      <button onclick="closeDebugPanel()" style="background:none;border:none;color:#777;cursor:pointer;font-size:18px;padding:0 4px">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button onclick="debugRunAll()" style="background:#e8c547;color:#000;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif">▶ Run All Checks</button>
+      <button onclick="debugCheckShopify()" style="background:#1a1a1a;border:1px solid #333;color:#aaa;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace">Shopify</button>
+      <button onclick="debugCheckSheets()" style="background:#1a1a1a;border:1px solid #333;color:#aaa;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace">Google Sheets</button>
+      <button onclick="debugCheckXstack()" style="background:#1a1a1a;border:1px solid #333;color:#aaa;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace">Xstack</button>
+      <button onclick="debugCheckSupabase()" style="background:#1a1a1a;border:1px solid #333;color:#aaa;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace">Supabase</button>
+      <button onclick="debugClear()" style="background:#1a1a1a;border:1px solid #333;color:#666;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace">Clear</button>
+    </div>
+    <div id="debugOutput" style="background:#000;border:1px solid #222;border-radius:8px;padding:14px;font-family:'DM Mono',monospace;font-size:12px;color:#ccc;white-space:pre-wrap;max-height:500px;overflow-y:auto;line-height:1.7">Ready. Click "Run All Checks" to test all connections.</div>
+  </div>
+</div>
 
 <script>
 // Add themed buttons to topbar after page loads
