@@ -4372,7 +4372,8 @@ async function saveTarget(){
   if(typeof DB === 'undefined'){ alert('Supabase not connected'); return; }
   const val = parseFloat(document.getElementById('targetModalInput').value)||0;
   if(!val){ alert('Please enter a valid amount'); return; }
-  const key = adsTargetMonthKey();
+  // Use the month key stored when modal was opened — not current date range
+  const key = window._targetEditingMonthKey || adsTargetMonthKey();
   window._adsTargets[_targetEditing] = val;
   // Upsert to Supabase
   await DB.upsert('ads_targets', {
@@ -4391,10 +4392,11 @@ async function saveTarget(){
 function openTargetModal(type){
   _targetEditing = type;
   const isGross = type==='gross';
-  const n=new Date();
-  document.getElementById('targetModalTitle').textContent = isGross?'Set Gross Target':type==='net'?'Set Net Target':'Set Ad Spend Budget';
   const {from:_mFrom}=getRange();
   const _mDate=_mFrom||new Date();
+  // Lock month key at open time — not at save time
+  window._targetEditingMonthKey = _mDate.getFullYear()+'-'+String(_mDate.getMonth()+1).padStart(2,'0');
+  document.getElementById('targetModalTitle').textContent = isGross?'Set Gross Target':type==='net'?'Set Net Target':'Set Ad Spend Budget';
   document.getElementById('targetModalMonth').textContent = _mDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
   document.getElementById('targetModalInput').value = window._adsTargets[type]||'';
   document.getElementById('targetModalInput').placeholder = type==='spend'?'e.g. 1500000':'e.g. 5000000';
