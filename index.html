@@ -3963,6 +3963,7 @@ function switchOverviewMonth(){
   document.getElementById('todayDate').textContent=val+' — MTD';
   if(STORE&&STORE!=='demo'&&TOKEN) reloadShopifyData();
   else renderDailyStats();
+  loadXstackData();
 }
 
 // ══════════════════════════════════════════════════
@@ -4454,8 +4455,8 @@ function renderAdsTargetCards(){
 // ══════════════════════════════════════════════════
 // XSTACK INTEGRATION
 // ══════════════════════════════════════════════════
-const XSTACK_WORKER    = 'https://mendeez-shopify.divine-mouse-0258.workers.dev';
-const XSTACK_AUTH_URL  = XSTACK_WORKER + '/xstack-token';
+const XSTACK_WORKER     = 'https://mendeez-shopify.divine-mouse-0258.workers.dev';
+const XSTACK_AUTH_URL   = XSTACK_WORKER + '/xstack-token';
 const XSTACK_ORDERS_URL = XSTACK_WORKER + '/xstack-orders';
 const XSTACK_CLIENT_ID  = 'api-user-peiUUaIuwe';
 const XSTACK_SECRET     = 'PhiVyUF0HG7bLzUeOATb';
@@ -4487,7 +4488,6 @@ async function xFetchOrders(status, startDate, endDate){
   const token = await xGetToken();
   // Format dates as PKT (+05:00) — use UTC methods since dates are stored as UTC
   const fmtD = d => {
-    // Add PKT offset to get PKT date, then format
     const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
     const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
     return `${y}-${m}-${dd}T00:00:00%2B05:00`;
@@ -4498,18 +4498,24 @@ async function xFetchOrders(status, startDate, endDate){
     return `${y}-${m}-${dd}T23:59:59%2B05:00`;
   };
 
-  const url = XSTACK_ORDERS_URL
-    + '?order_status='+encodeURIComponent(status)
-    + '&location_id='+XSTACK_LOCATION
-    + '&start_date='+fmtD(startDate)
-    + '&end_date='+fmtEnd(endDate)
-    + '&size=500&page=1'
-    + '&token='+encodeURIComponent(token);
-
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('Xstack '+status+': '+res.status);
-  const data = await res.json();
-  return data.orders || [];
+  let allOrders = [], page = 1;
+  while(true){
+    const url = XSTACK_ORDERS_URL
+      + '?order_status='+encodeURIComponent(status)
+      + '&location_id='+XSTACK_LOCATION
+      + '&start_date='+fmtD(startDate)
+      + '&end_date='+fmtEnd(endDate)
+      + '&size=500&page='+page+'&token='+encodeURIComponent(token);
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Xstack '+status+': '+res.status);
+    const data = await res.json();
+    const orders = data.orders || [];
+    allOrders = allOrders.concat(orders);
+    const totalElements = data.page ? (data.page.total_elements || data.page.totalElements || 0) : 0;
+    if(allOrders.length >= totalElements || orders.length === 0) break;
+    page++;
+  }
+  return allOrders;
 }
 
 function xGetCancelReason(order){
@@ -4521,7 +4527,13 @@ function xGetCancelReason(order){
 async function xDebugTest(){
   const out = document.getElementById('xs-debug-output');
   out.style.display = 'block';
-  out.textContent = 'Testing June 2026...\n';
+  const {from, to} = getRange();
+  const fmtD = d => {
+    const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
+    const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+  };
+  out.textContent = 'Testing range: '+fmtD(from)+' to '+fmtD(to)+'...\n';
   try {
     const res = await fetch(XSTACK_AUTH_URL, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -4529,15 +4541,29 @@ async function xDebugTest(){
     });
     const data = await res.json();
     const token = data.access_token;
-    if(!token){ out.textContent += '❌ No token!'; return; }
+    if(!token){ out.textContent += '❌ No token! Response: '+JSON.stringify(data); return; }
+    out.textContent += '✅ Token OK\n\n';
 
-    const statuses = ['DISPATCHED','ORDER_DELIVERED','DEAD_VIA_CUSTOMER','RETURN_VERIFICATION'];
+    const toPKTdate = new Date(to.getTime() + PKT_OFFSET_MS);
+    const mtdStart = new Date(Date.UTC(toPKTdate.getUTCFullYear(), toPKTdate.getUTCMonth(), 1) - PKT_OFFSET_MS);
+    const fmtFull = d => {
+      const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
+      const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
+      return `${y}-${m}-${dd}T00:00:00%2B05:00`;
+    };
+    const fmtFullEnd = d => {
+      const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
+      const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
+      return `${y}-${m}-${dd}T23:59:59%2B05:00`;
+    };
+
+    const statuses = ['ORDER_DISPATCHED','DISPATCHED','ORDER_DELIVERED','DEAD_VIA_CUSTOMER','RETURN_VERIFICATION'];
     for(const st of statuses){
       const url = XSTACK_ORDERS_URL
         + '?order_status='+encodeURIComponent(st)
         + '&location_id='+XSTACK_LOCATION
-        + '&start_date=2026-06-01T00:00:00%2B05:00'
-        + '&end_date=2026-06-05T23:59:59%2B05:00'
+        + '&start_date='+fmtFull(mtdStart)
+        + '&end_date='+fmtFullEnd(to)
         + '&size=10&page=1&token='+encodeURIComponent(token);
       const r = await fetch(url);
       const d = await r.json();
@@ -4546,8 +4572,13 @@ async function xDebugTest(){
       out.textContent += st+': total='+total+', batch='+orders+'\n';
       if(orders > 0){
         const o = d.orders[0];
-        out.textContent += '  → First order: '+o.order_id+' | PKR '+o.total_amount_pkr+' | date: '+o.date+'\n';
+        out.textContent += '  → order_id: '+o.order_id+'\n';
+        out.textContent += '  → date: '+o.date+'\n';
+        out.textContent += '  → all keys: '+JSON.stringify(Object.keys(o))+'\n';
+        out.textContent += '  → amount fields: total_amount_pkr='+o.total_amount_pkr+' | total_amount='+o.total_amount+' | cod_amount='+o.cod_amount+' | grand_total='+o.grand_total+'\n';
+        out.textContent += '  → page object: '+JSON.stringify(d.page)+'\n';
       }
+      out.textContent += '\n';
     }
   } catch(e){ out.textContent += 'ERR: '+e.message; }
 }
@@ -4556,12 +4587,12 @@ async function loadXstackData(){
   const {from, to} = getRange();
   if(!from || !to) return;
 
-  // MTD = start of TO's month to end of TO (so if range is in May, shows May data)
+  // MTD = use actual selected from date (May 1-31 shows May, not June)
   const toPKT = d => new Date(d.getTime() + PKT_OFFSET_MS);
-  const toPKTdate = toPKT(to);  // use 'to' date to determine which month to show
-  const mtdStart = new Date(Date.UTC(toPKTdate.getUTCFullYear(), toPKTdate.getUTCMonth(), 1) - PKT_OFFSET_MS);
-  // CF = start of previous month to day before MTD start
-  const cfStart  = new Date(Date.UTC(toPKTdate.getUTCFullYear(), toPKTdate.getUTCMonth()-1, 1) - PKT_OFFSET_MS);
+  const fromPKTdate = toPKT(from);
+  const toPKTdate   = toPKT(to);
+  const mtdStart = new Date(Date.UTC(fromPKTdate.getUTCFullYear(), fromPKTdate.getUTCMonth(), 1) - PKT_OFFSET_MS);
+  const cfStart  = new Date(Date.UTC(fromPKTdate.getUTCFullYear(), fromPKTdate.getUTCMonth()-1, 1) - PKT_OFFSET_MS);
   const cfEnd    = new Date(mtdStart.getTime() - 1);
 
   try {
@@ -4573,7 +4604,7 @@ async function loadXstackData(){
 
     // Fetch all 4 statuses for MTD
     const [dispatched, delivered, cancelledMTD, returnsMTD] = await Promise.all([
-      xFetchOrders('DISPATCHED',        mtdStart, to),
+      xFetchOrders('ORDER_DISPATCHED',   mtdStart, to),
       xFetchOrders('ORDER_DELIVERED',   mtdStart, to),
       xFetchOrders('DEAD_VIA_CUSTOMER', mtdStart, to),
       xFetchOrders('RETURN_VERIFICATION', mtdStart, to),
@@ -4595,7 +4626,10 @@ async function loadXstackData(){
       return s+qty;
     },0);
 
-    const countPKR = orders => orders.reduce((s,o)=>s+(parseFloat(o.total_amount_pkr)||0),0);
+    const countPKR = orders => orders.reduce((s,o)=>{
+      const amt = parseFloat(o.total_amount_pkr) || parseFloat(o.total_amount) || parseFloat(o.cod_amount) || parseFloat(o.grand_total) || parseFloat(o.amount_pkr) || 0;
+      return s + amt;
+    }, 0);
 
     const setCard = (id, orders) => {
       const el = s(id);
