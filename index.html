@@ -6793,18 +6793,18 @@ function renderCardTab(){
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)"></div>
       <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Debits</div>
       <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--red)">${fmtPKR(totalDr)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.dr>0).length} transactions</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.dr>0).length} debit rows</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--green)"></div>
       <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Credits</div>
       <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--green)">${fmtPKR(totalCr)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.cr>0).length} transactions</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.cr>0).length} credit rows</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--blue)"></div>
       <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Total Transactions</div>
-      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--blue)">${rows.filter(r=>r.dr>0||r.cr>0).length}</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--blue)">${rows.filter(r=>r.dr>0).length}</div>
       <div style="font-size:10px;color:var(--muted);margin-top:6px">${rows.filter(r=>r.dr>0).length} debits · ${rows.filter(r=>r.cr>0).length} credits</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
