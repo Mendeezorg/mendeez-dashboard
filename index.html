@@ -1825,6 +1825,7 @@ function renderAds(){
   const totS=plats.reduce((a,p)=>a+p.s,0),totR=plats.reduce((a,p)=>a+p.rv,0),totO=plats.reduce((a,p)=>a+p.o,0);
   const totRoas=totS>0?totR/totS:0;
   window._adsTot={spend:totS,rev:totR,orders:totO,roas:totRoas};
+  if(typeof renderAdsTargetCards==='function') renderAdsTargetCards();
 
   // Platform cards
   let html=plats.map(p=>{
@@ -4354,10 +4355,12 @@ window._adsTargets = {gross:0, net:0};
 let _targetEditing = 'gross';
 
 function adsTargetMonthKey(){
-  // Use the selected date range's month, not today's month
+  // Use the selected date range's month in PKT (not UTC)
   const {from} = getRange();
   const d = from || new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  // Adjust to PKT (+5h) so June 1 00:00 PKT stays in June
+  const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
+  return pkt.getUTCFullYear()+'-'+String(pkt.getUTCMonth()+1).padStart(2,'0');
 }
 
 async function loadAdsTargets(){
@@ -4426,9 +4429,9 @@ function renderAdsTargetCards(){
 
   // Gross card
   const gv=document.getElementById('grossTargetVal');
-  if(gv) gv.textContent = grossT>0?'PKR '+fmt(grossT):'Not set';
+  if(gv) gv.textContent = grossT>0?'PKR '+fmt(grossT):'—';
   const ga=document.getElementById('grossAchievedLbl');
-  if(ga) ga.textContent = 'Achieved: '+(grossSales>0?'PKR '+fmt(grossSales):'—');
+  if(ga) ga.textContent = grossT>0?'Achieved: '+(grossSales>0?'PKR '+fmt(grossSales):'—'):'—';
   const gp=document.getElementById('grossAchievedPct');
   if(gp){ gp.textContent=grossT>0?grossPct+'%':'—'; gp.style.color=grossT>0?pctColor(grossPct):'var(--muted)'; }
   const gb=document.getElementById('grossProgressBar');
@@ -4436,24 +4439,23 @@ function renderAdsTargetCards(){
 
   // Net card
   const nv=document.getElementById('netTargetVal');
-  if(nv) nv.textContent = netT>0?'PKR '+fmt(netT):'Not set';
+  if(nv) nv.textContent = netT>0?'PKR '+fmt(netT):'—';
   const na=document.getElementById('netAchievedLbl');
-  if(na) na.textContent = 'Achieved: '+(netSales>0?'PKR '+fmt(netSales):'—');
+  if(na) na.textContent = netT>0?'Achieved: '+(netSales>0?'PKR '+fmt(netSales):'—'):'—';
   const np=document.getElementById('netAchievedPct');
   if(np){ np.textContent=netT>0?netPct+'%':'—'; np.style.color=netT>0?pctColor(netPct):'var(--muted)'; }
   const nb=document.getElementById('netProgressBar');
   if(nb){ nb.style.width=netT>0?barW(netPct):'0%'; nb.style.background=pctColor(netPct); }
 
-  // Spend card — get actual spend from ads data
+  // Spend card
   const spendT = gt.spend||0;
   const actualSpend = (window._adsTot||{}).spend||0;
   const spendPct = spendT>0?Math.min(Math.round(actualSpend/spendT*100),999):0;
-  // For spend: lower % is better (green=low, red=high)
   const spendColor = p => p>=90?'var(--red)':p>=70?'var(--accent)':'var(--green)';
   const sv=document.getElementById('spendTargetVal');
-  if(sv) sv.textContent = spendT>0?'PKR '+fmt(spendT):'Not set';
+  if(sv) sv.textContent = spendT>0?'PKR '+fmt(spendT):'—';
   const sul=document.getElementById('spendUsedLbl');
-  if(sul) sul.textContent = 'Spent: '+(actualSpend>0?'PKR '+fmt(actualSpend):'—');
+  if(sul) sul.textContent = spendT>0?'Spent: '+(actualSpend>0?'PKR '+fmt(actualSpend):'—'):'—';
   const sp=document.getElementById('spendUsedPct');
   if(sp){ sp.textContent=spendT>0?spendPct+'%':'—'; sp.style.color=spendT>0?spendColor(spendPct):'var(--muted)'; }
   const spb=document.getElementById('spendProgressBar');
