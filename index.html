@@ -3267,6 +3267,7 @@ function switchTab(name,el){
   if(name==='ads'){ loadAdsTargets(); }
   if(name==='cards') loadCardData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
+  if(name==='gtechinv'){ gtechinvInit(); }
   if(name==='sorter'){
     const sel=document.getElementById('sortCat');
     if(sel&&allCollections.length>0&&sel.options.length<=1)
