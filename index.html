@@ -265,6 +265,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <a href="/tasks/" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#e8c547;border:none;border-radius:6px;color:#0d0d0d;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">✅ Task Manager</a>
     <button onclick="doEcomLogout()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #444;border-radius:6px;color:#999;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⇄ Logout</button>
     <button onclick="openSetup()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #555;border-radius:6px;color:#aaa;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">⚙ Settings</button>
+    <button onclick="openDebugPanel()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Syne',sans-serif">🔍 Debug</button>
     
     <button class="btn btn-s btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
@@ -355,7 +356,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
       OMS — Xstack Live Data
     </div>
-    <button onclick="xDebugTest()" style="font-size:10px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border2);color:var(--accent);border-radius:4px;cursor:pointer;font-family:var(--mono)">🔍 Debug June</button>
+
   </div>
   <div id="xs-debug-output" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
   <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
