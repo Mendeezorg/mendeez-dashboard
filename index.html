@@ -4557,7 +4557,7 @@ async function xDebugTest(){
       return `${y}-${m}-${dd}T23:59:59%2B05:00`;
     };
 
-    const statuses = ['ORDER_DISPATCHED','DISPATCHED','ORDER_DELIVERED','DEAD_VIA_CUSTOMER','RETURN_VERIFICATION'];
+    const statuses = ['ORDER_DISPATCHED','DISPATCHED','AWAITING_SM_APPROVAL','BOOKED','SHIPPED','OUT_FOR_DELIVERY','ORDER_DELIVERED','DEAD_VIA_CUSTOMER','RETURN_VERIFICATION','CANCELLED','RTO'];
     for(const st of statuses){
       const url = XSTACK_ORDERS_URL
         + '?order_status='+encodeURIComponent(st)
@@ -4627,7 +4627,13 @@ async function loadXstackData(){
     },0);
 
     const countPKR = orders => orders.reduce((s,o)=>{
-      const amt = parseFloat(o.total_amount_pkr) || parseFloat(o.total_amount) || parseFloat(o.cod_amount) || parseFloat(o.grand_total) || parseFloat(o.amount_pkr) || 0;
+      // Try direct fields first
+      let amt = parseFloat(o.total_amount_pkr) || parseFloat(o.total_amount) || parseFloat(o.cod_amount) || parseFloat(o.grand_total) || parseFloat(o.amount_pkr) || 0;
+      // Fallback: check orders_brand_details for parent_total_amount
+      if(!amt && Array.isArray(o.orders_brand_details)){
+        const field = o.orders_brand_details.find(d => d.attribute === 'parent_total_amount');
+        if(field) amt = parseFloat(field.value) || 0;
+      }
       return s + amt;
     }, 0);
 
