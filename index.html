@@ -4581,12 +4581,12 @@ async function xGetToken(){
   });
   const data = await res.json();
   _xToken = data.access_token;
-  _xTokenExpiry = Date.now() + ((data.expires_in||300)-30)*1000;
+  _xTokenExpiry = Date.now() + ((data.expires_in||300)-10)*1000;
   return _xToken;
 }
 
-async function xFetchOrders(status, startDate, endDate){
-  const token = await xGetToken();
+async function xFetchOrders(status, startDate, endDate, forcedToken){
+  const token = forcedToken || await xGetToken();
   // Format dates as PKT (+05:00) — use UTC methods since dates are stored as UTC
   const fmtD = d => {
     const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
@@ -4703,18 +4703,21 @@ async function loadXstackData(){
       if(el){el.textContent='...';el.classList.add('shimmer');}
     });
 
+    // Get fresh token once for all requests
+    const freshToken = await xGetToken();
+
     // Fetch all 4 statuses for MTD
     const [dispatched, delivered, cancelledMTD, returnsMTD] = await Promise.all([
-      xFetchOrders('ORDER_DISPATCHED',   mtdStart, to),
-      xFetchOrders('ORDER_DELIVERED',   mtdStart, to),
-      xFetchOrders('DEAD_VIA_CUSTOMER', mtdStart, to),
-      xFetchOrders('RETURN_VERIFICATION', mtdStart, to),
+      xFetchOrders('DISPATCHED',           mtdStart, to, freshToken),
+      xFetchOrders('ORDER_DELIVERED',      mtdStart, to, freshToken),
+      xFetchOrders('DEAD_VIA_CUSTOMER',    mtdStart, to, freshToken),
+      xFetchOrders('RETURN_VERIFICATION',  mtdStart, to, freshToken),
     ]);
 
     // Fetch CF (carry forward = previous month dispatched orders cancelled/returned this month)
     const [cancelledCF, returnsCF] = await Promise.all([
-      xFetchOrders('DEAD_VIA_CUSTOMER',    cfStart, cfEnd),
-      xFetchOrders('RETURN_VERIFICATION',  cfStart, cfEnd),
+      xFetchOrders('DEAD_VIA_CUSTOMER',    cfStart, cfEnd, freshToken),
+      xFetchOrders('RETURN_VERIFICATION',  cfStart, cfEnd, freshToken),
     ]);
 
     // Update cards
