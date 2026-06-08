@@ -1479,7 +1479,7 @@ async function loadProducts(){
     // No hard page cap — load ALL products regardless of catalog size
     // 250 per page × unlimited pages = full catalog always loaded
     while(hasMore){
-      const base=`/products.json?limit=250&order=id+asc&fields=id,title,product_type,status,variants,images,tags,created_at,published_at`;
+      const base=`/products.json?limit=250&order=id+asc&fields=id,title,product_type,status,variants,images,tags,created_at,published_at,handle`;
       const url=sinceId?`${base}&since_id=${sinceId}`:base;
       try{
         const d=await shopFetch(url);
@@ -4559,10 +4559,10 @@ function renderAdsTargetCards(){
 const XSTACK_WORKER     = 'https://mendeez-shopify.divine-mouse-0258.workers.dev';
 const XSTACK_AUTH_URL   = XSTACK_WORKER + '/xstack-token';
 const XSTACK_ORDERS_URL = XSTACK_WORKER + '/xstack-orders';
-const XSTACK_CLIENT_ID  = 'api-user-peiUUaIuwe';
-const XSTACK_SECRET     = 'PhiVyUF0HG7bLzUeOATb';
-const XSTACK_COMPANY    = '226b5c53476dbeaf';
-const XSTACK_LOCATION   = '1139';
+const XSTACK_CLIENT_ID  = 'api-user-vFB6QQAjwX';
+const XSTACK_SECRET     = 'flha1LaPwY-Nuxui2W5Y';
+const XSTACK_COMPANY    = '0b8bd9e671e00824';
+const XSTACK_LOCATION   = '2021';
 
 let _xToken = null;
 let _xTokenExpiry = 0;
@@ -4823,7 +4823,11 @@ function imgSearchProducts(){
 
   const hits = pool.filter(p=>
     p.title.toLowerCase().includes(q) ||
-    (p.variants||[]).some(v=>(v.sku||'').toLowerCase().includes(q))
+    (p.variants||[]).some(v=>
+      (v.sku||'').toLowerCase().includes(q) ||
+      (v.barcode||'').toLowerCase().includes(q)
+    ) ||
+    (p.id||'').toString().includes(q)
   ).slice(0,8);
 
   if(!hits.length){
@@ -5200,6 +5204,13 @@ async function upSubmit(){
       }
       // Render auto-created image slots
       imgRenderSlots();
+      // Reload products from Shopify so search works for newly uploaded products
+      if(csvOk>0){
+        loadProducts().then(()=>{
+          const inp=document.getElementById('imgSearchInput');
+          if(inp) inp.placeholder='🔍 Search '+(allProducts||[]).length.toLocaleString()+' products by name or SKU...';
+        });
+      }
       document.getElementById('upCsvResult').style.display='block';
       document.getElementById('upCsvResult').innerHTML='<div class="alert '+(csvFail===0?'al-green':'al-amber')+'"><div>'+(csvFail===0?'✅':'⚠')+'</div><div>'
         +(csvFail===0
