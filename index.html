@@ -732,13 +732,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
               <option value="Blazers">Blazers</option>
             </select>
           </div>
-          <div class="fg" style="margin:0">
-            <div class="fl">Product Mode <span style="color:var(--red)">*</span></div>
-            <select class="fi" id="pf-mode" onchange="upFormToggleMode()">
-              <option value="sizes">Sizes (with variants)</option>
-              <option value="qty">Quantity (single variant)</option>
-            </select>
-          </div>
+
         </div>
 
         <!-- Clothing Sizes mode -->
@@ -4185,10 +4179,7 @@ function upFormToggleMode(){
   const type = document.getElementById('pf-type').value;
   const catMode = CATEGORY_MODE[type] || 'sizes';
   // Auto-set mode based on category
-  const modeEl = document.getElementById('pf-mode');
-  if(type && catMode) modeEl.value = catMode==='ring'||catMode==='shoe' ? 'sizes' : catMode;
-
-  const mode = catMode || modeEl.value;
+  const mode = catMode;
   document.getElementById('pf-sizes-row').style.display = mode==='sizes' ? '' : 'none';
   document.getElementById('pf-ring-row').style.display  = mode==='ring'  ? '' : 'none';
   document.getElementById('pf-shoe-row').style.display  = mode==='shoe'  ? '' : 'none';
@@ -4199,7 +4190,7 @@ function upFormToggleMode(){
 function upFormPreviewSKUs(){
   const skuRaw = document.getElementById('pf-sku').value.trim();
   const type   = document.getElementById('pf-type').value;
-  const catMode = CATEGORY_MODE[type] || document.getElementById('pf-mode').value;
+  const catMode = CATEGORY_MODE[type] || 'sizes';
   const prev   = document.getElementById('pf-sku-preview');
   if(!skuRaw){ prev.style.display='none'; return; }
 
@@ -4323,7 +4314,7 @@ function upFormBuildProduct(){
   const design  = document.getElementById('pf-design').value.trim();
   const tags    = document.getElementById('pf-tags').value.trim();
   const descRaw = document.getElementById('pf-desc').value.trim();
-  const mode    = document.getElementById('pf-mode').value;
+  const mode    = 'sizes'; // legacy — mode now driven by category
   const qty     = parseInt(document.getElementById('pf-qty').value)||0;
 
   const pType   = document.getElementById('pf-type').value;
