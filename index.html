@@ -4283,7 +4283,7 @@ function upFormValidate(){
   const type  = document.getElementById('pf-type').value.trim();
   const sku   = document.getElementById('pf-sku').value.trim();
   const price = document.getElementById('pf-price').value.trim();
-  const mode  = document.getElementById('pf-mode').value;
+  const catMode = CATEGORY_MODE[type] || 'sizes';
   const errEl = document.getElementById('upCsvErrors');
 
   const errs = [];
@@ -4291,9 +4291,15 @@ function upFormValidate(){
   if(!type)  errs.push('Category / Type is required');
   if(!sku)   errs.push('SKU is required');
   if(!price) errs.push('Price is required');
-  if(mode==='sizes'){
+  if(catMode==='sizes'){
     const checked = Array.from(document.querySelectorAll('.pf-size-cb:checked'));
     if(!checked.length) errs.push('Select at least one size');
+  }
+  if(catMode==='ring' && !document.getElementById('pf-ring-start').value){
+    errs.push('Starting ring size (mm) is required');
+  }
+  if(catMode==='shoe' && !document.getElementById('pf-shoe-start').value){
+    errs.push('Starting shoe size is required');
   }
 
   if(errs.length){
