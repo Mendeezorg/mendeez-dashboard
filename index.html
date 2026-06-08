@@ -692,7 +692,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="fg" style="margin:0">
             <div class="fl">Category / Type <span style="color:var(--red)">*</span></div>
-            <select class="fi" id="pf-type">
+            <select class="fi" id="pf-type" onchange="upFormToggleMode()">
               <option value="">Select category...</option>
               <option value="T-shirts">T-shirts</option>
               <option value="Polo">Polo</option>
@@ -737,7 +737,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           </div>
         </div>
 
-        <!-- Sizes mode -->
+        <!-- Clothing Sizes mode -->
         <div id="pf-sizes-row" class="fg" style="margin:0">
           <div class="fl">Sizes</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -748,6 +748,24 @@ tr:hover td{background:rgba(255,255,255,.02)}
             <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XL" class="pf-size-cb" checked> XL</label>
             <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="XXL" class="pf-size-cb" checked> XXL</label>
             <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" value="3XL" class="pf-size-cb"> 3XL</label>
+          </div>
+        </div>
+
+        <!-- Ring size mode -->
+        <div id="pf-ring-row" class="fg" style="margin:0;display:none">
+          <div class="fl">Starting Size (mm) <span style="color:var(--muted2);font-size:9px">— will auto-generate 4 more sizes</span></div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input class="fi" id="pf-ring-start" type="number" min="10" max="30" placeholder="e.g. 17" style="width:120px" oninput="upFormPreviewSKUs()">
+            <div id="pf-ring-preview" style="font-size:11px;color:var(--accent);font-family:var(--mono)"></div>
+          </div>
+        </div>
+
+        <!-- Shoe size mode -->
+        <div id="pf-shoe-row" class="fg" style="margin:0;display:none">
+          <div class="fl">Starting Size <span style="color:var(--muted2);font-size:9px">— will auto-generate 4 more sizes</span></div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input class="fi" id="pf-shoe-start" type="number" min="30" max="50" placeholder="e.g. 38" style="width:120px" oninput="upFormPreviewSKUs()">
+            <div id="pf-shoe-preview" style="font-size:11px;color:var(--accent);font-family:var(--mono)"></div>
           </div>
         </div>
 
@@ -4139,16 +4157,44 @@ function upClearCSV(){
 // PRODUCT FORM — Direct entry system
 // ══════════════════════════════════════════════════
 
+
+// Category → variant mode mapping
+const CATEGORY_MODE = {
+  // Clothing → S/M/L sizes
+  'T-shirts':'sizes','Polo':'sizes','Hoodies':'sizes','Sweatshirts':'sizes',
+  'Shirts':'sizes','Jackets':'sizes','Cargo Pants':'sizes','Jogger Pants':'sizes',
+  'Shorts':'sizes','Trunks':'sizes','Boxer Trunks':'sizes','Boxer Shorts':'sizes',
+  'Boxer Briefs':'sizes','Boxers':'sizes','Brief':'sizes','Vest':'sizes',
+  'Undershirt':'sizes','Pajama':'sizes','Pajama Sets':'sizes','Socks':'sizes',
+  'Tanktops':'sizes','Sweaters':'sizes','Tie & Dye':'sizes','Blazers':'sizes',
+  // Rings → mm sizes
+  'Jewelry':'ring',
+  // Shoes → number sizes
+  'Shoes':'shoe','Slides':'shoe',
+  // Qty only
+  'Caps':'qty','Beanies':'qty','Sunglasses':'qty','Belts':'qty',
+  'Bags':'qty','Perfume':'qty','Fragrances':'qty',
+};
+
 function upFormToggleMode(){
-  const mode = document.getElementById('pf-mode').value;
+  const type = document.getElementById('pf-type').value;
+  const catMode = CATEGORY_MODE[type] || 'sizes';
+  // Auto-set mode based on category
+  const modeEl = document.getElementById('pf-mode');
+  if(type && catMode) modeEl.value = catMode==='ring'||catMode==='shoe' ? 'sizes' : catMode;
+
+  const mode = catMode || modeEl.value;
   document.getElementById('pf-sizes-row').style.display = mode==='sizes' ? '' : 'none';
+  document.getElementById('pf-ring-row').style.display  = mode==='ring'  ? '' : 'none';
+  document.getElementById('pf-shoe-row').style.display  = mode==='shoe'  ? '' : 'none';
   document.getElementById('pf-qty-row').style.display   = mode==='qty'   ? '' : 'none';
   upFormPreviewSKUs();
 }
 
 function upFormPreviewSKUs(){
   const skuRaw = document.getElementById('pf-sku').value.trim();
-  const mode   = document.getElementById('pf-mode').value;
+  const type   = document.getElementById('pf-type').value;
+  const catMode = CATEGORY_MODE[type] || document.getElementById('pf-mode').value;
   const prev   = document.getElementById('pf-sku-preview');
   if(!skuRaw){ prev.style.display='none'; return; }
 
@@ -4157,7 +4203,30 @@ function upFormPreviewSKUs(){
   const skuPad    = skuRaw.replace(skuPrefix, '').length || 7;
 
   let lines = [];
-  if(mode === 'sizes'){
+
+  if(catMode === 'ring'){
+    const start = parseInt(document.getElementById('pf-ring-start').value) || 0;
+    if(start){
+      const sizes = [start, start+1, start+2, start+3, start+4];
+      sizes.forEach((sz,i)=>{
+        const sku = skuPrefix + String(skuBase+i).padStart(skuPad,'0');
+        lines.push(sz+'mm → '+sku);
+      });
+      const rp = document.getElementById('pf-ring-preview');
+      if(rp) rp.textContent = sizes.map(s=>s+'mm').join(', ');
+    }
+  } else if(catMode === 'shoe'){
+    const start = parseInt(document.getElementById('pf-shoe-start').value) || 0;
+    if(start){
+      const sizes = [start, start+1, start+2, start+3, start+4];
+      sizes.forEach((sz,i)=>{
+        const sku = skuPrefix + String(skuBase+i).padStart(skuPad,'0');
+        lines.push(sz+' → '+sku);
+      });
+      const sp = document.getElementById('pf-shoe-preview');
+      if(sp) sp.textContent = sizes.join(', ');
+    }
+  } else if(catMode === 'sizes'){
     const checked = Array.from(document.querySelectorAll('.pf-size-cb:checked')).map(cb=>cb.value);
     checked.forEach((sz,i)=>{
       const sku = skuPrefix + String(skuBase+i).padStart(skuPad,'0');
@@ -4166,7 +4235,7 @@ function upFormPreviewSKUs(){
   } else {
     lines.push('Default → ' + skuRaw);
   }
-  prev.style.display = 'block';
+  prev.style.display = lines.length ? 'block' : 'none';
   prev.textContent = lines.join('  ·  ');
 }
 
@@ -4252,10 +4321,22 @@ function upFormBuildProduct(){
   const mode    = document.getElementById('pf-mode').value;
   const qty     = parseInt(document.getElementById('pf-qty').value)||0;
 
-  const isQty = mode === 'qty';
-  const sizes = isQty
-    ? ['Default Title']
-    : Array.from(document.querySelectorAll('.pf-size-cb:checked')).map(cb=>cb.value);
+  const pType   = document.getElementById('pf-type').value;
+  const catMode = CATEGORY_MODE[pType] || mode;
+  const isQty = catMode === 'qty';
+
+  let sizes;
+  if(catMode === 'ring'){
+    const start = parseInt(document.getElementById('pf-ring-start').value)||17;
+    sizes = [start, start+1, start+2, start+3, start+4].map(s=>s+'mm');
+  } else if(catMode === 'shoe'){
+    const start = parseInt(document.getElementById('pf-shoe-start').value)||38;
+    sizes = [start, start+1, start+2, start+3, start+4].map(s=>String(s));
+  } else if(isQty){
+    sizes = ['Default Title'];
+  } else {
+    sizes = Array.from(document.querySelectorAll('.pf-size-cb:checked')).map(cb=>cb.value);
+  }
 
   const skuPrefix = skuRaw.replace(/\d+$/, '');
   const skuBase   = parseInt(skuRaw.replace(skuPrefix,'')) || 0;
@@ -4342,6 +4423,12 @@ function upFormReset(){
   document.getElementById('pf-qty').value='';
   document.getElementById('pf-sku-preview').style.display='none';
   document.getElementById('upCsvErrors').style.display='none';
+  document.getElementById('pf-ring-start').value='';
+  document.getElementById('pf-shoe-start').value='';
+  const rp=document.getElementById('pf-ring-preview');
+  const sp=document.getElementById('pf-shoe-preview');
+  if(rp) rp.textContent='';
+  if(sp) sp.textContent='';
   // reset sizes to default S,M,L,XL,XXL
   document.querySelectorAll('.pf-size-cb').forEach(cb=>{
     cb.checked = ['S','M','L','XL','XXL'].includes(cb.value);
