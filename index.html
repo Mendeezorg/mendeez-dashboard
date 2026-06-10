@@ -892,6 +892,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <button class="btn btn-s btn-sm" onclick="upReset()">✕ Clear All</button>
         <button class="btn btn-p" id="upSubmitBtn" onclick="upSubmit()" disabled style="opacity:.4;padding:10px 24px">↑ Submit to Shopify</button>
       </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:8px">
+        <input type="checkbox" id="autoLimitNewIn" checked>
+        Auto-limit New In to 100 products after upload
+      </label>
     </div>
 
     <!-- Progress -->
@@ -1274,6 +1278,11 @@ const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function shopFetch(ep,method,body){
   const WORKER_URL='https://mendeez-shopify.divine-mouse-0258.workers.dev';
   const workerUrl=WORKER_URL+'?store='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(TOKEN)+'&ep='+encodeURIComponent(ep);
+  if(method==='DELETE'){
+    const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopifyMethod:'DELETE',shopifyBody:null})});
+    if(!r.ok){const t=await r.text();throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
+    return {};
+  }
   if(body&&(method==='POST'||method==='PUT')){
     const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopifyMethod:method,shopifyBody:body})});
     if(!r.ok){const t=await r.text();throw new Error('Shopify '+r.status+': '+t.slice(0,80));}
@@ -3924,33 +3933,40 @@ async function applyLimitProducts(toKeep, toRemove){
   let done = 0;
   let failed = 0;
 
-  // Step 1: Remove products from collection
-  for(const p of toRemove){
-    try {
-      // Remove from collection via Shopify API
-      await shopFetch('/collects.json', 'GET');
-      // Find the collect ID for this product+collection
-      const collects = await shopFetch(`/collects.json?product_id=${p.id}&collection_id=${collectionId}`);
-      if(collects && collects.collects && collects.collects.length){
-        for(const c of collects.collects){
-          await shopFetch(`/collects/${c.id}.json`, 'DELETE');
-        }
-      }
-
-      // Step 2: Remove collection tag from product
-      const collectionTitle = document.getElementById('sortCat').options[document.getElementById('sortCat').selectedIndex].text;
-      const currentTags = (p.tags||'').split(',').map(t=>t.trim()).filter(t=>t);
-      const newTags = currentTags.filter(t=>t.toLowerCase()!==collectionTitle.toLowerCase());
-      if(newTags.length !== currentTags.length){
-        await shopFetch(`/products/${p.id}.json`,'PUT',{product:{id:p.id,tags:newTags.join(', ')}});
-      }
-
-      done++;
-      logEl.textContent = `Removing products... ${done}/${toRemove.length}`;
-    } catch(e){
-      failed++;
-      console.warn('Failed to remove product', p.id, e);
+  // Get collection rules to find which tag qualifies products
+  // For smart collections: remove the qualifying tag from products
+  // First check if it's a smart collection
+  let qualifyingTag = null;
+  try {
+    const colInfo = await shopFetch(`/smart_collections/${collectionId}.json`);
+    if(colInfo && colInfo.smart_collection){
+      // Find tag rule
+      const tagRule = (colInfo.smart_collection.rules||[]).find(r=>r.column==='tag' && r.relation==='equals');
+      if(tagRule) qualifyingTag = tagRule.condition;
     }
+  } catch(e){ /* manual collection — use collects API */ }
+
+  // Remove products in batches of 5 for speed
+  const BATCH = 5;
+  for(let i=0; i<toRemove.length; i+=BATCH){
+    const batch = toRemove.slice(i, i+BATCH);
+    await Promise.all(batch.map(async p=>{
+      try{
+        // Remove from collection via collects API
+        const collectsResp = await shopFetch(`/collects.json?product_id=${p.id}&collection_id=${collectionId}`);
+        if(collectsResp?.collects?.length){
+          await Promise.all(collectsResp.collects.map(c=>
+            shopFetch(`/collects/${c.id}.json`,'DELETE')
+          ));
+        }
+        done++;
+      } catch(e){
+        failed++;
+        console.warn('Failed:', p.id, e.message);
+      }
+    }));
+    logEl.textContent = 'Removing products... '+done+'/'+toRemove.length;
+    await new Promise(r=>setTimeout(r,300)); // small delay to avoid rate limit
   }
 
   // Step 3: Set sort order for kept products
@@ -5316,6 +5332,11 @@ async function upSubmit(){
           const inp=document.getElementById('imgSearchInput');
           if(inp) inp.placeholder='🔍 Search '+(allProducts||[]).length.toLocaleString()+' products by name or SKU...';
         });
+        // Auto-limit New In collection if checkbox is checked
+        const autoLimit = document.getElementById('autoLimitNewIn');
+        if(autoLimit && autoLimit.checked){
+          autoLimitNewInCollection();
+        }
       }
       document.getElementById('upCsvResult').style.display='block';
       document.getElementById('upCsvResult').innerHTML='<div class="alert '+(csvFail===0?'al-green':'al-amber')+'"><div>'+(csvFail===0?'✅':'⚠')+'</div><div>'
@@ -5904,6 +5925,48 @@ function hashPwd(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h)+s.charCod
 function toggleLoginPwd(){
   const inp=document.getElementById('li-pwd');
   inp.type=inp.type==='password'?'text':'password';
+}
+
+// ── Auto-limit New In Collection ──
+async function autoLimitNewInCollection(){
+  const NEW_IN_ID = '316670607469';
+  const LIMIT = 100;
+  try {
+    // Fetch all products in New In collection
+    let allProds = [];
+    let sinceId = 0;
+    while(true){
+      const data = await shopFetch(`/products.json?limit=250&collection_id=${NEW_IN_ID}&fields=id,title,created_at&since_id=${sinceId}`);
+      const prods = data.products||[];
+      if(!prods.length) break;
+      allProds = [...allProds, ...prods];
+      sinceId = prods[prods.length-1].id;
+      if(prods.length < 250) break;
+    }
+
+    if(allProds.length <= LIMIT) return; // already within limit
+
+    // Sort newest first
+    allProds.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    const toRemove = allProds.slice(LIMIT);
+
+    // Remove in batches of 5
+    for(let i=0; i<toRemove.length; i+=5){
+      const batch = toRemove.slice(i, i+5);
+      await Promise.all(batch.map(async p=>{
+        try{
+          const c = await shopFetch(`/collects.json?product_id=${p.id}&collection_id=${NEW_IN_ID}`);
+          if(c?.collects?.length){
+            await Promise.all(c.collects.map(col=>shopFetch(`/collects/${col.id}.json`,'DELETE')));
+          }
+        }catch(e){ console.warn('Auto-limit remove failed:', p.id); }
+      }));
+      await new Promise(r=>setTimeout(r,300));
+    }
+    console.log('✅ Auto-limit: New In collection limited to '+LIMIT+' products');
+  } catch(e){
+    console.warn('Auto-limit failed:', e.message);
+  }
 }
 
 function openDebugPanel(){
