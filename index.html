@@ -631,7 +631,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;align-items:end">
     <div>
       <div class="fl" style="margin-bottom:6px">Auto-Sort Rule</div>
-      <select class="fi" id="sortRule">
+      <select class="fi" id="sortRule" onchange="sortRuleChanged()">
         <option value="avail_desc">All sizes available first</option>
         <option value="stock_desc">Highest total stock first</option>
         <option value="stock_asc">Lowest stock first (clearance)</option>
@@ -640,8 +640,26 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <option value="price_asc">Lowest price first</option>
         <option value="date_desc">New to Old (latest uploaded first)</option>
         <option value="date_asc">Old to New (oldest uploaded first)</option>
+        <option value="limit_products">Number of Products to Show</option>
       </select>
       <button class="btn btn-p btn-sm" style="margin-top:8px;width:100%" onclick="runSort()">▶ Auto-Sort</button>
+      <!-- Limit Products fields — shown only when limit_products selected -->
+      <div id="limitProductsFields" style="display:none;margin-top:10px;display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <div>
+            <div class="fl" style="margin-bottom:4px">Show how many</div>
+            <input class="fi" type="number" id="limitCount" placeholder="e.g. 100" min="1">
+          </div>
+          <div>
+            <div class="fl" style="margin-bottom:4px">Which ones</div>
+            <select class="fi" id="limitOrder">
+              <option value="most_recent">Most Recent</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;font-family:var(--mono)">Remaining products will be removed from collection + tag removed</div>
+      </div>
     </div>
     <div>
       <div class="fl" style="margin-bottom:6px">Collection</div>
@@ -3821,9 +3839,43 @@ function sorterDragEnd(e){
   _dragSrcIdx=null;
 }
 
+function sortRuleChanged(){
+  const rule = document.getElementById('sortRule').value;
+  const fields = document.getElementById('limitProductsFields');
+  fields.style.display = rule === 'limit_products' ? 'block' : 'none';
+}
+
 function runSort(){
   if(!_sorterProds.length){document.getElementById('sortSts').textContent='Select a collection first';return;}
   const rule=document.getElementById('sortRule').value;
+
+  // ── Limit Products ──
+  if(rule==='limit_products'){
+    const count=parseInt(document.getElementById('limitCount').value)||0;
+    const order=document.getElementById('limitOrder').value;
+    if(!count){alert('Please enter how many products to show');return;}
+    if(!document.getElementById('sortCat').value){alert('Please select a collection first');return;}
+
+    let sorted=[..._sorterProds];
+    sorted.sort((a,b)=>{
+      const da=new Date(a.created_at||0),db=new Date(b.created_at||0);
+      return order==='most_recent'?db-da:da-db;
+    });
+
+    const toKeep=sorted.slice(0,count);
+    const toRemove=sorted.slice(count);
+
+    if(!toRemove.length){
+      alert('Collection has '+_sorterProds.length+' products — already within limit of '+count);
+      return;
+    }
+
+    const confirmMsg='This will keep '+toKeep.length+' products and remove '+toRemove.length+' products from collection and their collection tag. Continue?';
+    const confirmed=confirm(confirmMsg);
+    if(!confirmed)return;
+    applyLimitProducts(toKeep,toRemove);
+    return;
+  }
   const gT=p=>(p.variants||[]).reduce((s,v)=>s+Math.max(0,v.inventory_quantity||0),0);
   const gA=p=>(p.variants||[]).filter(v=>(v.inventory_quantity||0)>0).length;
 
@@ -3862,6 +3914,57 @@ function runSort(){
   const lockedCount=_lockedIds.size;
   document.getElementById('sortSts').textContent='✓ Sorted'+(lockedCount>0?' ('+lockedCount+' pinned products kept in place)':'')+' — drag to fine-tune, then Apply to Shopify';
 }
+async function applyLimitProducts(toKeep, toRemove){
+  const collectionId = document.getElementById('sortCat').value;
+  const logEl = document.getElementById('sortSts');
+  const countEl = document.getElementById('sortCount');
+
+  logEl.textContent = 'Applying limit — removing '+toRemove.length+' products...';
+
+  let done = 0;
+  let failed = 0;
+
+  // Step 1: Remove products from collection
+  for(const p of toRemove){
+    try {
+      // Remove from collection via Shopify API
+      await shopFetch('/collects.json', 'GET');
+      // Find the collect ID for this product+collection
+      const collects = await shopFetch(`/collects.json?product_id=${p.id}&collection_id=${collectionId}`);
+      if(collects && collects.collects && collects.collects.length){
+        for(const c of collects.collects){
+          await shopFetch(`/collects/${c.id}.json`, 'DELETE');
+        }
+      }
+
+      // Step 2: Remove collection tag from product
+      const collectionTitle = document.getElementById('sortCat').options[document.getElementById('sortCat').selectedIndex].text;
+      const currentTags = (p.tags||'').split(',').map(t=>t.trim()).filter(t=>t);
+      const newTags = currentTags.filter(t=>t.toLowerCase()!==collectionTitle.toLowerCase());
+      if(newTags.length !== currentTags.length){
+        await shopFetch(`/products/${p.id}.json`,'PUT',{product:{id:p.id,tags:newTags.join(', ')}});
+      }
+
+      done++;
+      logEl.textContent = `Removing products... ${done}/${toRemove.length}`;
+    } catch(e){
+      failed++;
+      console.warn('Failed to remove product', p.id, e);
+    }
+  }
+
+  // Step 3: Set sort order for kept products
+  _sorterProds = toKeep;
+  renderSorterGrid();
+
+  const msg = `✅ Done! Kept ${toKeep.length} products · Removed ${done} · Failed ${failed}`;
+  logEl.textContent = msg;
+  countEl.textContent = toKeep.length + ' products remaining';
+
+  // Show apply button to finalize sort order
+  document.getElementById('applyToShopifyBtn').style.display = 'block';
+}
+
 async function applyCollectionSort(){
   const cat=document.getElementById('sortCat').value;
   if(!cat||!_sorterProds.length)return;
