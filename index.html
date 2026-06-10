@@ -3880,6 +3880,19 @@ function upCollectionTypeChange(){
     autoLimit.disabled = !isNew;
     if(autoLimitLabel) autoLimitLabel.style.opacity = isNew ? '1' : '0.4';
   }
+  // Auto-fill tags field
+  const tagsField = document.getElementById('pf-tags');
+  if(tagsField){
+    if(!isNew){
+      tagsField.value = 'factory outlet';
+      tagsField.disabled = true;
+      tagsField.style.opacity = '0.6';
+    } else {
+      if(tagsField.value === 'factory outlet') tagsField.value = '';
+      tagsField.disabled = false;
+      tagsField.style.opacity = '1';
+    }
+  }
 }
 
 function sortRuleChanged(){
@@ -4471,7 +4484,10 @@ function upFormBuildProduct(){
   const price   = document.getElementById('pf-price').value.trim();
   const compare = document.getElementById('pf-compare').value.trim();
   const design  = document.getElementById('pf-design').value.trim();
-  const tags    = document.getElementById('pf-tags').value.trim();
+  const tagsRaw = document.getElementById('pf-tags').value.trim();
+  const isFO    = document.getElementById('ct-fo')?.checked;
+  // Factory Outlet products get only 'factory outlet' tag
+  const tags    = isFO ? 'factory outlet' : tagsRaw;
   const descRaw = document.getElementById('pf-desc').value.trim();
   const mode    = 'sizes'; // legacy — mode now driven by category
   const qty     = parseInt(document.getElementById('pf-qty').value)||0;
