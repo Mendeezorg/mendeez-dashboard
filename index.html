@@ -791,6 +791,21 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <input class="fi" id="pf-qty" type="number" min="0" placeholder="e.g. 50">
         </div>
 
+        <!-- Collection Type -->
+        <div class="fg">
+          <div class="fl">Collection Type</div>
+          <div style="display:flex;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;flex:1;justify-content:center" id="ct-new-label">
+              <input type="radio" name="collectionType" id="ct-new" value="new" checked onchange="upCollectionTypeChange()">
+              <span style="font-size:12px;font-weight:600;color:var(--accent)">🆕 New In</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;flex:1;justify-content:center" id="ct-fo-label">
+              <input type="radio" name="collectionType" id="ct-fo" value="fo" onchange="upCollectionTypeChange()">
+              <span style="font-size:12px;font-weight:600;color:var(--muted)">🏭 Factory Outlet</span>
+            </label>
+          </div>
+        </div>
+
         <!-- SKU + Price row -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="fg" style="margin:0">
@@ -894,7 +909,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:8px">
         <input type="checkbox" id="autoLimitNewIn" checked>
-        Auto-limit New In to 100 products after upload
+        Auto-limit New In to 100 after upload
       </label>
     </div>
 
@@ -3848,6 +3863,25 @@ function sorterDragEnd(e){
   _dragSrcIdx=null;
 }
 
+function upCollectionTypeChange(){
+  const isNew = document.getElementById('ct-new').checked;
+  const newLabel = document.getElementById('ct-new-label');
+  const foLabel  = document.getElementById('ct-fo-label');
+  if(newLabel) newLabel.style.borderColor = isNew ? 'var(--accent)' : 'var(--border)';
+  if(foLabel)  foLabel.style.borderColor  = !isNew ? '#f59e0b' : 'var(--border)';
+  const newSpan = newLabel?.querySelector('span');
+  const foSpan  = foLabel?.querySelector('span');
+  if(newSpan) newSpan.style.color = isNew ? 'var(--accent)' : 'var(--muted)';
+  if(foSpan)  foSpan.style.color  = !isNew ? '#f59e0b' : 'var(--muted)';
+  // Auto-limit only relevant for New In
+  const autoLimit = document.getElementById('autoLimitNewIn');
+  const autoLimitLabel = autoLimit?.parentElement;
+  if(autoLimit){
+    autoLimit.disabled = !isNew;
+    if(autoLimitLabel) autoLimitLabel.style.opacity = isNew ? '1' : '0.4';
+  }
+}
+
 function sortRuleChanged(){
   const rule = document.getElementById('sortRule').value;
   const fields = document.getElementById('limitProductsFields');
@@ -5326,12 +5360,22 @@ async function upSubmit(){
       }
       // Render auto-created image slots
       imgRenderSlots();
+      // Store uploaded products for New In 2 addition
+      window._lastUploadedProducts = window._lastUploadedProducts || [];
       // Reload products from Shopify so search works for newly uploaded products
       if(csvOk>0){
         loadProducts().then(()=>{
           const inp=document.getElementById('imgSearchInput');
           if(inp) inp.placeholder='🔍 Search '+(allProducts||[]).length.toLocaleString()+' products by name or SKU...';
         });
+        // Add to correct collection based on type
+        const ctNew = document.getElementById('ct-new');
+        const collId = ctNew && ctNew.checked ? 316670607469 : 305756930157;
+        for(const prod of window._lastUploadedProducts||[]){
+          try{
+            await shopFetch('/collects.json','POST',{collect:{product_id:prod.id,collection_id:collId}});
+          }catch(e){ console.warn('Add to collection failed:', e.message); }
+        }
         // Auto-limit New In collection if checkbox is checked
         const autoLimit = document.getElementById('autoLimitNewIn');
         if(autoLimit && autoLimit.checked){
