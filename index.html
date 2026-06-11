@@ -3423,7 +3423,7 @@ function switchTab(name,el){
   if(datebar) datebar.style.display='flex';
   if(name==='report')buildReport();
   if(name==='report')buildReport();
-  if(name==='cs'){ setTimeout(renderCSFromSupabase,200); setTimeout(opsLoadFromSupabase,300); }
+  if(name==='cs'){ setTimeout(renderCSFromSupabase,200); if(!_opsRows||_opsRows.length===0) setTimeout(opsLoadFromSupabase,300); else setTimeout(opsRenderCards,300); }
   if(name==='ads'){ loadAdsTargets(); }
   if(name==='cards') loadCardData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
@@ -7352,8 +7352,10 @@ async function opsLoadFromSupabase(){
     if(statusEl){ statusEl.style.display='block'; statusEl.textContent='Loading operations data...'; }
     const data = await DB.get(OPS_TABLE, 'select=*&order=id.asc&limit=10000');
     if(data && data.length){
-      _opsRows = data;
-      if(statusEl) statusEl.textContent='✅ Loaded '+data.length+' rows from Supabase';
+      // Only update if Supabase has MORE rows than current memory
+      if(data.length >= _opsRows.length){
+        _opsRows = data;
+        if(statusEl) statusEl.textContent='✅ Loaded '+data.length+' rows from Supabase';
       // Filter only rows relevant to selected date range ± 2 months
       const {from} = getRange();
       const cutoff = new Date(from.getFullYear(), from.getMonth()-1, 1);
@@ -7361,7 +7363,11 @@ async function opsLoadFromSupabase(){
         const d = opsPd(r.created);
         return !d || d >= cutoff;
       });
-      opsRenderCards();
+        opsRenderCards();
+      } else {
+        if(statusEl) statusEl.textContent='Using '+_opsRows.length+' rows from memory';
+        opsRenderCards();
+      }
     } else {
       if(statusEl){ statusEl.style.display='none'; }
     }
