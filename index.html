@@ -354,18 +354,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="sh" style="margin-bottom:8px">
     <div class="st" style="display:flex;align-items:center;gap:7px">
       <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
-      OMS — Xstack Live Data
+      Operations Data
+      <span style="font-size:10px;color:var(--muted);font-weight:400;font-family:var(--mono)"></span>
     </div>
-
   </div>
   <div id="xs-debug-output" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
-  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
-    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub">Current month</div></div>
-    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub">Current month</div></div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:14px">
+    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub" id="xs-dispatched-sub">Current month</div></div>
+    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub" id="xs-delivered-sub">Current month</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="xs-cancel-mtd">—</div><div class="ssub">Current month placed</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="xs-cancel-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="xs-return-mtd">—</div><div class="ssub">Current month placed</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns CF</div><div class="sv red shimmer" id="xs-return-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
+    <div class="sc" style="border-color:#8b5cf6"><div class="sl">Order Adjustment</div><div class="sv shimmer" id="xs-order-adj" style="color:#8b5cf6">—</div><div class="ssub" id="xs-order-adj-sub">Shopify Returns − CSV</div></div>
   </div>
 
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
@@ -559,23 +560,114 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
 
-  <!-- XSTACK CARDS — same as overview -->
-  <div class="sh"><div class="st" style="color:var(--accent)">OMS — Xstack Live Data</div></div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
-    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="cs-xs-dispatched">—</div><div class="ssub">Current month</div></div>
-    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="cs-xs-delivered">—</div><div class="ssub">Current month</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="cs-xs-cancel-mtd">—</div><div class="ssub">Current month placed</div></div>
+  <!-- OPERATIONS DATA CARDS -->
+  <div class="sh" style="margin-bottom:8px">
+    <div class="st" style="display:flex;align-items:center;gap:7px">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
+      Operations Data
+      <span style="font-size:10px;color:var(--muted);font-weight:400;font-family:var(--mono)"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="opsLastUpload" style="font-size:11px;color:var(--muted);font-family:var(--mono)"></span>
+      <div id="opsDropZone" onclick="document.getElementById('opsFileInput').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+        ondragleave="this.style.borderColor='var(--border2)'"
+        ondrop="opsHandleDrop(event)"
+        title="Upload Order Dump (.xlsx or .csv)"
+        style="cursor:pointer;border:1.5px dashed var(--border2);border-radius:8px;padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);transition:all .2s">
+        <span style="font-size:16px">📂</span>
+        <span>Upload Order Dump</span>
+      </div>
+      <input type="file" id="opsFileInput" accept=".csv,.xlsx,.xls" style="display:none" onchange="opsHandleFile(this.files[0])">
+    </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="cs-xs-cancel-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="cs-xs-return-mtd">—</div><div class="ssub">Current month placed</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns CF</div><div class="sv red shimmer" id="cs-xs-return-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
+  <div id="opsUploadStatus" style="display:none;font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:6px"></div>
+  <!-- Top 4 simple cards -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px" id="opsTopCards">
+    <div class="sc" style="border-color:var(--blue-dim)">
+      <div class="sl">Dispatched</div>
+      <div class="sv blue" id="ops-dispatched">—</div>
+      <div class="ssub" id="ops-dispatched-sub">—</div>
+      <div style="font-size:11px;color:#e8c547;font-family:var(--mono);margin-top:2px" id="ops-dispatched-pct">—</div>
+    </div>
+    <div class="sc" style="border-color:var(--green-dim)">
+      <div class="sl">Delivered</div>
+      <div class="sv green" id="ops-delivered">—</div>
+      <div class="ssub" id="ops-delivered-sub">—</div>
+      <div style="font-size:11px;color:#e8c547;font-family:var(--mono);margin-top:2px" id="ops-delivered-pct">—</div>
+    </div>
+    <div class="sc" style="border-color:var(--accent-dim,#333)">
+      <div class="sl">Pending MTD</div>
+      <div class="sv" id="ops-pending" style="color:#e8c547">—</div>
+      <div class="ssub" id="ops-pending-sub">—</div>
+      <div style="font-size:11px;color:#e8c547;font-family:var(--mono);margin-top:2px" id="ops-pending-pct">—</div>
+    </div>
+    <div class="sc" style="border-color:#8b5cf6">
+      <div class="sl">Order Adjustment</div>
+      <div class="sv" id="ops-adj" style="color:#8b5cf6">—</div>
+      <div class="ssub">Shopify Returns − CSV</div>
+      <div style="font-size:11px;font-family:var(--mono);margin-top:2px" id="ops-adj-dir">—</div>
+    </div>
   </div>
 
-  <!-- CANCELLATION REASONS — from Xstack -->
-  <div class="sh"><div class="st">Cancellation Reasons — MTD</div></div>
-  <div class="ic" id="xs-cancel-reasons" style="padding:16px;margin-bottom:4px">
-    <div style="color:var(--muted);font-size:12px">Loading...</div>
+  <!-- Returns expandable card -->
+  <div class="ic" id="opsRetCard" style="margin-bottom:10px;padding:0;overflow:hidden;display:none">
+    <div onclick="opsToggle('ret')" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-left:3px solid #f59e0b">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Returns</div>
+        <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:#f59e0b" id="ops-ret-total">—</div>
+        <div style="font-size:11px;color:var(--muted);font-family:var(--mono)" id="ops-ret-total-sub">—</div>
+        <div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="ops-ret-total-pct">—</div>
+      </div>
+      <span id="ops-ret-arrow" style="color:var(--muted);transition:transform .2s">▼</span>
+    </div>
+    <div id="ops-ret-body" style="display:none;border-top:1px solid var(--border);padding:16px">
+      <div style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Returns MTD</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Orders</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f59e0b" id="ops-rmtd-orders">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Items</div><div style="font-size:14px;font-weight:700;font-family:var(--mono)" id="ops-rmtd-items">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">PKR</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f59e0b" id="ops-rmtd-pkr">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">% Gross</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#e8c547" id="ops-rmtd-pct">—</div></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Returns CF</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Orders</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f87171" id="ops-rcf-orders">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Items</div><div style="font-size:14px;font-weight:700;font-family:var(--mono)" id="ops-rcf-items">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">PKR</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f87171" id="ops-rcf-pkr">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">% Gross</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#e8c547" id="ops-rcf-pct">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cancellations expandable card -->
+  <div class="ic" id="opsCancelCard" style="margin-bottom:16px;padding:0;overflow:hidden;display:none">
+    <div onclick="opsToggle('cancel')" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-left:3px solid #f87171">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#f87171;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Total Cancellations</div>
+        <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:#f87171" id="ops-cancel-total">—</div>
+        <div style="font-size:11px;color:var(--muted);font-family:var(--mono)" id="ops-cancel-total-sub">—</div>
+        <div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="ops-cancel-total-pct">—</div>
+      </div>
+      <span id="ops-cancel-arrow" style="color:var(--muted);transition:transform .2s">▼</span>
+    </div>
+    <div id="ops-cancel-body" style="display:none;border-top:1px solid var(--border);padding:16px">
+      <div style="font-size:10px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Cancellation MTD</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Orders</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f87171" id="ops-cmtd-orders">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Items</div><div style="font-size:14px;font-weight:700;font-family:var(--mono)" id="ops-cmtd-items">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">PKR</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f87171" id="ops-cmtd-pkr">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">% Gross</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#e8c547" id="ops-cmtd-pct">—</div></div>
+      </div>
+      <div id="ops-cmtd-reasons"></div>
+      <div style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px">Cancellation CF</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Orders</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f59e0b" id="ops-ccf-orders">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Items</div><div style="font-size:14px;font-weight:700;font-family:var(--mono)" id="ops-ccf-items">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">PKR</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#f59e0b" id="ops-ccf-pkr">—</div></div>
+        <div style="background:var(--surface2);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">% Gross</div><div style="font-size:14px;font-weight:700;font-family:var(--mono);color:#e8c547" id="ops-ccf-pct">—</div></div>
+      </div>
+      <div id="ops-ccf-reasons"></div>
+    </div>
   </div>
 
   <!-- DAILY AGENT ENTRIES — from Supabase -->
@@ -1480,6 +1572,7 @@ async function reloadShopifyData(){
     renderDailyStats();
     loadAdsTargets(); // reload targets for selected month
     loadXstackData(); // reload Xstack OMS data
+    opsRenderCards(); // re-render ops data cards
     // Defer heavy renders to next frame so UI stays responsive
     setTimeout(()=>{
       renderWeeklyTop20();
@@ -3327,7 +3420,7 @@ function switchTab(name,el){
   if(datebar) datebar.style.display='flex';
   if(name==='report')buildReport();
   if(name==='report')buildReport();
-  if(name==='cs') setTimeout(renderCSFromSupabase,200);
+  if(name==='cs'){ setTimeout(renderCSFromSupabase,200); setTimeout(opsLoadFromSupabase,300); }
   if(name==='ads'){ loadAdsTargets(); }
   if(name==='cards') loadCardData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
@@ -7294,6 +7387,270 @@ function clearCardFilter(){
 }
 
 function fmtPKR(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+// ═══════════════════════════════════════════════════
+// OPERATIONS DATA — CSV/Excel Upload + Supabase
+// ═══════════════════════════════════════════════════
+let _opsRows = [];
+const OPS_TABLE = 'ops_order_dump';
+
+function opsColIdx(letter){
+  letter=letter.toUpperCase();
+  if(letter.length===1) return letter.charCodeAt(0)-65;
+  return (letter.charCodeAt(0)-64)*26+(letter.charCodeAt(1)-65);
+}
+
+function opsPd(str){
+  if(!str||str==='null'||str==='')return null;
+  str=str.trim();
+  // Format 1: DD/MM/YYYY HH:MM
+  const m1=str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if(m1){ const hr=parseInt(m1[4])||0,mn=parseInt(m1[5])||0; return new Date(+m1[3],+m1[2]-1,+m1[1],hr,mn,0); }
+  // Format 2: M/DD/YY HH:MM (Excel)
+  const m2=str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if(m2){ const yr=parseInt(m2[3])+2000,hr=parseInt(m2[4])||0,mn=parseInt(m2[5])||0; return new Date(yr,+m2[1]-1,+m2[2],hr,mn,0); }
+  const d=new Date(str); if(!isNaN(d)) return d;
+  return null;
+}
+
+function opsIsBlank(s){ return !s||s.trim()===''||s.trim()==='null'; }
+function opsFmt(n){ return Math.round(n).toLocaleString(); }
+function opsSumPKR(arr){ const seen={}; return arr.reduce((s,r)=>{ if(!r.orderId||seen[r.orderId])return s; seen[r.orderId]=true; return s+r.value; },0); }
+function opsCountOrders(arr){ return new Set(arr.map(r=>r.orderId).filter(Boolean)).size||arr.length; }
+function opsSumQty(arr){ return arr.reduce((s,r)=>s+r.qty,0); }
+function opsPct(val,gross){ if(!gross||!val)return'—'; return(val/gross*100).toFixed(1)+'%'; }
+
+function opsParseRows(headers, dataRows){
+  const idx={
+    orderId: headers.findIndex(h=>h.includes('orderid')),
+    value:   headers.findIndex(h=>h==='ordertotal_basecurrency'),
+    qty:     headers.findIndex(h=>h.includes('itemquantity')),
+    created: headers.findIndex(h=>h==='orderdate'),
+    dispatched: headers.findIndex(h=>h==='dispatched'),
+    delivered:  headers.findIndex(h=>h==='orderdelivered'),
+    cancelled:  headers.findIndex(h=>h==='cancelled'),
+    returned:   headers.findIndex(h=>h==='orderreturned'),
+    retStatus:  headers.findIndex(h=>h.includes('return') && h.includes('status')),
+    cancelReason: headers.findIndex(h=>h.includes('cancellation_reason')),
+  };
+  const rows=[];
+  for(const r of dataRows){
+    if(!r||!r[idx.orderId])continue;
+    const toStr = v => v ? String(v).trim() : '';
+    rows.push({
+      orderId:      toStr(r[idx.orderId]),
+      value:        parseFloat(r[idx.value])||0,
+      qty:          parseInt(r[idx.qty])||0,
+      created:      toStr(r[idx.created]),
+      dispatched:   toStr(r[idx.dispatched]),
+      delivered:    toStr(r[idx.delivered]),
+      cancelled:    toStr(r[idx.cancelled]),
+      returned:     toStr(r[idx.returned]),
+      retStatus:    toStr(r[idx.retStatus]),
+      cancelReason: toStr(r[idx.cancelReason]),
+    });
+  }
+  return rows;
+}
+
+function opsHandleDrop(e){
+  e.preventDefault();
+  document.getElementById('opsDropZone').style.borderColor='var(--border2)';
+  opsHandleFile(e.dataTransfer.files[0]);
+}
+
+async function opsHandleFile(file){
+  if(!file)return;
+  const statusEl=document.getElementById('opsUploadStatus');
+  statusEl.style.display='block';
+  statusEl.textContent='Reading '+file.name+'...';
+
+  const isExcel=file.name.match(/\.xlsx?$/i);
+  let rows=[];
+
+  if(isExcel){
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:false});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'MM/DD/YY HH:mm'});
+    if(!data.length){statusEl.textContent='Empty file';return;}
+    const headers=data[0].map(h=>(h||'').toString().toLowerCase().trim());
+    rows=opsParseRows(headers, data.slice(1));
+  } else {
+    const text=await file.text();
+    const lines=text.split('\n');
+    const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+    const dataRows=lines.slice(1).filter(l=>l.trim()).map(l=>{
+      const cols=[]; let cur=''; let inQ=false;
+      for(const ch of l){ if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){cols.push(cur.trim().replace(/^"|"$/g,''));cur='';}else{cur+=ch;} }
+      cols.push(cur.trim().replace(/^"|"$/g,''));
+      return cols;
+    });
+    rows=opsParseRows(headers, dataRows);
+  }
+
+  statusEl.textContent='Saving '+rows.length+' rows to Supabase...';
+  _opsRows=rows;
+
+  // Save to Supabase
+  await opsSaveToSupabase(rows, file.name);
+
+  statusEl.textContent='✅ '+rows.length+' rows saved from '+file.name;
+  document.getElementById('opsLastUpload').textContent='Last upload: '+file.name.replace(/^.*[\\/]/,'');
+
+  // Update cards with current date range
+  opsRenderCards();
+}
+
+async function opsSaveToSupabase(rows, filename){
+  try {
+    // Delete existing rows for this upload (use filename as batch key)
+    const batchKey = filename.replace(/[^a-zA-Z0-9-_]/g,'_');
+    // Save in batches of 100
+    const BATCH=100;
+    for(let i=0;i<rows.length;i+=BATCH){
+      const batch=rows.slice(i,i+BATCH).map(r=>({...r, upload_file: batchKey}));
+      await supa.upsert(OPS_TABLE, batch);
+    }
+  } catch(e){ console.warn('Supabase save failed:', e.message); }
+}
+
+async function opsLoadFromSupabase(){
+  try {
+    const statusEl=document.getElementById('opsUploadStatus');
+    if(statusEl){ statusEl.style.display='block'; statusEl.textContent='Loading operations data...'; }
+    const data = await supa.select(OPS_TABLE, '*');
+    if(data && data.length){
+      _opsRows = data;
+      if(statusEl) statusEl.textContent='✅ Loaded '+data.length+' rows from Supabase';
+      opsRenderCards();
+    } else {
+      if(statusEl){ statusEl.style.display='none'; }
+    }
+  } catch(e){ console.warn('Supabase load failed:', e.message); }
+}
+
+function opsRenderCards(){
+  if(!_opsRows.length) return;
+
+  const {from, to} = getRange();
+  const monthStart = new Date(from.getFullYear(), from.getMonth(), 1);
+
+  // Get Shopify gross from existing data
+  const shopifyGross = parseFloat(document.getElementById('s-shopify-gross')?.textContent?.replace(/[^0-9.]/g,''))||0;
+  const shopifyReturns = parseFloat(document.getElementById('s-shopify-net-sub')?.textContent?.replace(/[^0-9.]/g,''))||0;
+
+  // Filter rows
+  const disp    = _opsRows.filter(r=>{ const d=opsPd(r.dispatched); return d&&d>=from&&d<=to; });
+  const deliv   = _opsRows.filter(r=>{ const d=opsPd(r.delivered);  return d&&d>=from&&d<=to; });
+  const cancAll = _opsRows.filter(r=>{ const d=opsPd(r.cancelled);  return d&&d>=from&&d<=to; });
+  const retAll  = _opsRows.filter(r=>{ const d=opsPd(r.returned);   return d&&d>=from&&d<=to&&(r.retStatus||'').toLowerCase().includes('return'); });
+  const pend    = _opsRows.filter(r=>{ const d=opsPd(r.created); return d&&d>=from&&d<=to&&opsIsBlank(r.dispatched)&&opsIsBlank(r.cancelled); });
+
+  const cMTD = cancAll.filter(r=>{ const d=opsPd(r.created); return d&&d>=monthStart; });
+  const cCF  = cancAll.filter(r=>{ const d=opsPd(r.created); return d&&d<monthStart; });
+  const rMTD = retAll.filter(r=>{ const d=opsPd(r.created);  return d&&d>=monthStart; });
+  const rCF  = retAll.filter(r=>{ const d=opsPd(r.created);  return d&&d<monthStart; });
+
+  const gross = _shopifyGross || shopifyGross;
+
+  // ── Overview cards ──
+  const setOv=(id,arr)=>{
+    const el=document.getElementById(id); if(!el)return;
+    el.textContent='PKR '+opsFmt(opsSumPKR(arr));
+    const sub=document.getElementById(id+'-sub'); if(sub) sub.textContent=opsSumQty(arr)+' items · '+opsCountOrders(arr)+' orders';
+  };
+  setOv('xs-dispatched',disp); setOv('xs-delivered',deliv);
+  setOv('xs-cancel-mtd',cMTD); setOv('xs-cancel-cf',cCF);
+  setOv('xs-return-mtd',rMTD); setOv('xs-return-cf',rCF);
+
+  // Overview Order Adjustment card
+  const ovAdjEl  = document.getElementById('xs-order-adj');
+  const ovAdjSub = document.getElementById('xs-order-adj-sub');
+  const csvDed2  = opsSumPKR(rMTD)+opsSumPKR(rCF)+opsSumPKR(cMTD)+opsSumPKR(cCF);
+  const shopRet2 = _shopifyReturns||0;
+  const adj2     = shopRet2 - csvDed2;
+  if(ovAdjEl){
+    ovAdjEl.textContent = shopRet2>0 ? 'PKR '+opsFmt(Math.abs(adj2)) : '—';
+    ovAdjEl.style.color = adj2>=0 ? '#8b5cf6' : '#f87171';
+  }
+  if(ovAdjSub){
+    ovAdjSub.textContent = shopRet2>0 ? (adj2>=0?'▲ Surplus':'▼ Shortfall') : 'Upload CSV to calculate';
+  }
+
+  // ── CS cards ──
+  const set=(id,sid,pctId,arr)=>{
+    const pkr=opsSumPKR(arr);
+    const el=document.getElementById(id); if(el) el.textContent='PKR '+opsFmt(pkr);
+    const sub=document.getElementById(sid); if(sub) sub.textContent=opsSumQty(arr)+' items · '+opsCountOrders(arr)+' orders';
+    const p=document.getElementById(pctId); if(p) p.textContent=opsPct(pkr,gross)+' of Shopify gross';
+  };
+
+  set('ops-dispatched','ops-dispatched-sub','ops-dispatched-pct',disp);
+  set('ops-delivered','ops-delivered-sub','ops-delivered-pct',deliv);
+  set('ops-pending','ops-pending-sub','ops-pending-pct',pend);
+
+  // Order Adjustment
+  const csvDed = opsSumPKR(rMTD)+opsSumPKR(rCF)+opsSumPKR(cMTD)+opsSumPKR(cCF);
+  const shopRet = _shopifyReturns || 0;
+  const adj = shopRet - csvDed;
+  const adjEl=document.getElementById('ops-adj');
+  const adjDir=document.getElementById('ops-adj-dir');
+  if(adjEl){ adjEl.textContent = shopRet>0 ? 'PKR '+opsFmt(Math.abs(adj)) : '—'; adjEl.style.color=adj>=0?'#8b5cf6':'#f87171'; }
+  if(adjDir){ adjDir.textContent=shopRet>0?(adj>=0?'▲ Surplus':'▼ Shortfall'):'Enter Shopify returns'; adjDir.style.color=adj>=0?'#10b981':'#f87171'; }
+
+  // Returns expandable
+  const retTotalPKR=opsSumPKR(retAll);
+  const retCard=document.getElementById('opsRetCard'); if(retCard) retCard.style.display='block';
+  const rte=document.getElementById('ops-ret-total'); if(rte) rte.textContent='PKR '+opsFmt(retTotalPKR);
+  const rts=document.getElementById('ops-ret-total-sub'); if(rts) rts.textContent=opsSumQty(retAll)+' items · '+opsCountOrders(retAll)+' orders';
+  const rtp=document.getElementById('ops-ret-total-pct'); if(rtp) rtp.textContent=opsPct(retTotalPKR,gross)+' of Shopify gross';
+
+  const setMini=(pre,arr)=>{
+    const o=document.getElementById(pre+'-orders'); if(o) o.textContent=opsCountOrders(arr);
+    const i=document.getElementById(pre+'-items');  if(i) i.textContent=opsSumQty(arr);
+    const p=document.getElementById(pre+'-pkr');    if(p) p.textContent='PKR '+opsFmt(opsSumPKR(arr));
+    const pct=document.getElementById(pre+'-pct');  if(pct) pct.textContent=opsPct(opsSumPKR(arr),gross);
+  };
+  setMini('ops-rmtd',rMTD); setMini('ops-rcf',rCF);
+
+  // Cancellations expandable
+  const cancelTotalPKR=opsSumPKR(cancAll);
+  const cancelCard=document.getElementById('opsCancelCard'); if(cancelCard) cancelCard.style.display='block';
+  const cte=document.getElementById('ops-cancel-total'); if(cte) cte.textContent='PKR '+opsFmt(cancelTotalPKR);
+  const cts=document.getElementById('ops-cancel-total-sub'); if(cts) cts.textContent=opsSumQty(cancAll)+' items · '+opsCountOrders(cancAll)+' orders';
+  const ctp=document.getElementById('ops-cancel-total-pct'); if(ctp) ctp.textContent=opsPct(cancelTotalPKR,gross)+' of Shopify gross';
+
+  setMini('ops-cmtd',cMTD); setMini('ops-ccf',cCF);
+  opsRenderReasons(cMTD,'ops-cmtd-reasons'); opsRenderReasons(cCF,'ops-ccf-reasons');
+}
+
+function opsRenderReasons(arr, elId){
+  const el=document.getElementById(elId); if(!el)return;
+  const reasons={};
+  arr.forEach(r=>{ const k=r.cancelReason||'Not specified'; reasons[k]=(reasons[k]||0)+1; });
+  const sorted=Object.entries(reasons).sort((a,b)=>b[1]-a[1]);
+  const total=arr.length;
+  if(!sorted.length){el.innerHTML='';return;}
+  el.innerHTML='<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 6px">Reasons</div>'+
+    sorted.map(([reason,count])=>{
+      const p=total?Math.round(count/total*100):0;
+      return`<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${reason}</span><span style="color:#e8c547;font-family:var(--mono)">${count} (${p}%)</span></div><div style="background:var(--border);border-radius:3px;height:4px"><div style="width:${p}%;height:100%;background:#e8c547;border-radius:3px"></div></div></div>`;
+    }).join('');
+}
+
+function opsToggle(name){
+  const body=document.getElementById('ops-'+name+'-body');
+  const arrow=document.getElementById('ops-'+name+'-arrow');
+  if(!body)return;
+  const open=body.style.display==='block';
+  body.style.display=open?'none':'block';
+  if(arrow) arrow.style.transform=open?'':'rotate(180deg)';
+}
+
+// Store Shopify returns for order adjustment
+let _shopifyGross=0, _shopifyReturns=0;
+
 </script>
 
 </body>
