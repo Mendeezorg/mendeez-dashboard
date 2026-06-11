@@ -7336,8 +7336,8 @@ async function opsSaveToSupabase(rows, filename){
         const {id, ...rest} = r;
         return {...rest, upload_file: batchKey};
       });
-      // Insert only new orders — skip duplicates (ignore conflict)
-      await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}`, {
+      // Insert only new orders — skip duplicates
+      await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?on_conflict=orderId`, {
         method: 'POST',
         headers: {
           ...DB.h,
