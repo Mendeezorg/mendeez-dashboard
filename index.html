@@ -7325,24 +7325,28 @@ async function opsSaveToSupabase(rows, filename){
     const batchKey = filename.replace(/[^a-zA-Z0-9-_]/g,'_');
     const statusEl = document.getElementById('opsUploadStatus');
 
-    // Delete ALL existing data first
-    if(statusEl) statusEl.textContent = 'Clearing old data from Supabase...';
-    await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?id=gte.0`, {
-      method: 'DELETE',
-      headers: DB.h
-    });
-
-    // Save new data in batches of 100
+    // Upsert rows — duplicate orderIds will be updated, new ones added
+    // Supabase upsert on orderId column
     const BATCH=100;
+    let saved=0;
     for(let i=0;i<rows.length;i+=BATCH){
       const batch=rows.slice(i,i+BATCH).map(r=>{
         const {id, ...rest} = r;
         return {...rest, upload_file: batchKey};
       });
-      await DB.upsert(OPS_TABLE, batch);
-      if(statusEl) statusEl.textContent = `Saving... ${Math.min(i+BATCH, rows.length)}/${rows.length} rows`;
+      // Insert only new orders — skip duplicates (ignore conflict)
+      await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}`, {
+        method: 'POST',
+        headers: {
+          ...DB.h,
+          'Prefer': 'resolution=ignore-duplicates,return=minimal',
+        },
+        body: JSON.stringify(batch)
+      });
+      saved += batch.length;
+      if(statusEl) statusEl.textContent = `Saving... ${saved}/${rows.length} rows`;
     }
-    if(statusEl) statusEl.textContent = `✅ ${rows.length} rows saved to Supabase`;
+    if(statusEl) statusEl.textContent = `✅ ${rows.length} rows saved to Supabase (duplicates updated)`;
   } catch(e){ console.warn('Supabase save failed:', e.message); }
 }
 
