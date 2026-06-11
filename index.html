@@ -7248,7 +7248,7 @@ function opsParseRows(headers, dataRows){
     delivered:  headers.findIndex(h=>h==='orderdelivered'),
     cancelled:  headers.findIndex(h=>h==='cancelled'),
     returned:   headers.findIndex(h=>h==='orderreturned'),
-    retStatus:  headers.findIndex(h=>h.toLowerCase().replace(/[^a-z]/g,'').includes('returnedstatus')||h.toLowerCase().replace(/[^a-z]/g,'').includes('returnstatus')||h.toLowerCase().replace(/[^a-z]/g,'').includes('retusstatus')),
+    retStatus:  headers.findIndex(h=>h.toLowerCase().trim()==='returned status'||h.toLowerCase().trim()==='returnedstatus'||h.toLowerCase().trim()==='return status'),
     cancelReason: headers.findIndex(h=>h.includes('cancellation_reason')),
   };
   const rows=[];
@@ -7350,7 +7350,7 @@ async function opsLoadFromSupabase(){
   try {
     const statusEl=document.getElementById('opsUploadStatus');
     if(statusEl){ statusEl.style.display='block'; statusEl.textContent='Loading operations data...'; }
-    const data = await DB.get(OPS_TABLE, 'select=*&order=created_at.desc');
+    const data = await DB.get(OPS_TABLE, 'select=*&order=id.asc&limit=10000');
     if(data && data.length){
       _opsRows = data;
       if(statusEl) statusEl.textContent='✅ Loaded '+data.length+' rows from Supabase';
