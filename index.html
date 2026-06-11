@@ -4272,6 +4272,8 @@ let _upImgUnmatched = [];
     });
   }
   document.addEventListener('DOMContentLoaded', () => {
+    // Load ops data from Supabase on page init
+    setTimeout(opsLoadFromSupabase, 1500);
     setupDrop('upCsvDrop',  files => upHandleCSV(files[0]));
     setupDrop('upImgDrop',  files => upHandleImages(files));
   });
