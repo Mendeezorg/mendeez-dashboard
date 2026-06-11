@@ -2852,6 +2852,8 @@ async function fetchReturnsByDate(){
     }
 
         window._shopifyReturnValue=returnValue;
+    // Re-render ops cards now that returns value is known
+    if(typeof opsRenderCards==='function') setTimeout(opsRenderCards, 50);
     if(retEl){
       retEl.textContent=returnValue>0?'PKR '+fmt(returnValue):'—';
       retEl.className=returnValue>0?'sv red':'sv muted';
@@ -7325,8 +7327,11 @@ async function opsSaveToSupabase(rows, filename){
     // Save in batches of 100
     const BATCH=100;
     for(let i=0;i<rows.length;i+=BATCH){
-      const batch=rows.slice(i,i+BATCH).map(r=>({...r, upload_file: batchKey}));
-      await supa.upsert(OPS_TABLE, batch);
+      const batch=rows.slice(i,i+BATCH).map(r=>{
+        const {id, ...rest} = r; // remove local id — Supabase auto-generates
+        return {...rest, upload_file: batchKey};
+      });
+      await DB.upsert(OPS_TABLE, batch);
     }
   } catch(e){ console.warn('Supabase save failed:', e.message); }
 }
@@ -7335,7 +7340,7 @@ async function opsLoadFromSupabase(){
   try {
     const statusEl=document.getElementById('opsUploadStatus');
     if(statusEl){ statusEl.style.display='block'; statusEl.textContent='Loading operations data...'; }
-    const data = await supa.select(OPS_TABLE, '*');
+    const data = await DB.get(OPS_TABLE, 'select=*&order=created_at.desc');
     if(data && data.length){
       _opsRows = data;
       if(statusEl) statusEl.textContent='✅ Loaded '+data.length+' rows from Supabase';
