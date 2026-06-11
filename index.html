@@ -360,12 +360,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
   <div id="xs-debug-output" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:14px">
-    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub" id="xs-dispatched-sub">Current month</div></div>
-    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub" id="xs-delivered-sub">Current month</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="xs-cancel-mtd">—</div><div class="ssub">Current month placed</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="xs-cancel-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="xs-return-mtd">—</div><div class="ssub">Current month placed</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns CF</div><div class="sv red shimmer" id="xs-return-cf">—</div><div class="ssub">Prev month carry fwd</div></div>
+    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub" id="xs-dispatched-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-dispatched-pct">—</div></div>
+    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub" id="xs-delivered-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-delivered-pct">—</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="xs-cancel-mtd">—</div><div class="ssub" id="xs-cancel-mtd-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-cancel-mtd-pct">—</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="xs-cancel-cf">—</div><div class="ssub" id="xs-cancel-cf-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-cancel-cf-pct">—</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="xs-return-mtd">—</div><div class="ssub" id="xs-return-mtd-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-return-mtd-pct">—</div></div>
+    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns CF</div><div class="sv red shimmer" id="xs-return-cf">—</div><div class="ssub" id="xs-return-cf-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-return-cf-pct">—</div></div>
     <div class="sc" style="border-color:#8b5cf6"><div class="sl">Order Adjustment</div><div class="sv shimmer" id="xs-order-adj" style="color:#8b5cf6">—</div><div class="ssub" id="xs-order-adj-sub">Shopify Returns − CSV</div></div>
   </div>
 
@@ -7526,6 +7526,13 @@ async function opsLoadFromSupabase(){
     if(data && data.length){
       _opsRows = data;
       if(statusEl) statusEl.textContent='✅ Loaded '+data.length+' rows from Supabase';
+      // Filter only rows relevant to selected date range ± 2 months
+      const {from} = getRange();
+      const cutoff = new Date(from.getFullYear(), from.getMonth()-1, 1);
+      _opsRows = data.filter(r=>{
+        const d = opsPd(r.created);
+        return !d || d >= cutoff;
+      });
       opsRenderCards();
     } else {
       if(statusEl){ statusEl.style.display='none'; }
@@ -7562,8 +7569,10 @@ function opsRenderCards(){
   // ── Overview cards ──
   const setOv=(id,arr)=>{
     const el=document.getElementById(id); if(!el)return;
-    el.textContent='PKR '+opsFmt(opsSumPKR(arr));
+    const pkr=opsSumPKR(arr);
+    el.textContent='PKR '+opsFmt(pkr);
     const sub=document.getElementById(id+'-sub'); if(sub) sub.textContent=opsSumQty(arr)+' items · '+opsCountOrders(arr)+' orders';
+    const pctEl=document.getElementById(id+'-pct'); if(pctEl) pctEl.textContent=opsPct(pkr,gross)+' of Shopify gross';
   };
   setOv('xs-dispatched',disp); setOv('xs-delivered',deliv);
   setOv('xs-cancel-mtd',cMTD); setOv('xs-cancel-cf',cCF);
