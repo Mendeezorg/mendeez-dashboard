@@ -7427,7 +7427,7 @@ function opsRenderCards(){
   const disp    = _opsRows.filter(r=>{ const d=opsPd(r.dispatched); return d&&d>=from&&d<=to; });
   const deliv   = _opsRows.filter(r=>{ const d=opsPd(r.delivered);  return d&&d>=from&&d<=to; });
   const cancAll = _opsRows.filter(r=>{ const d=opsPd(r.cancelled);  return d&&d>=from&&d<=to; });
-  const retAll  = _opsRows.filter(r=>{ const d=opsPd(r.returned);   return d&&d>=from&&d<=to&&!opsIsBlank(r.returned); });
+  const retAll  = _opsRows.filter(r=>{ const d=opsPd(r.returned);   return d&&d>=from&&d<=to&&(r.retStatus||'').toLowerCase().trim()==='returned'; });
   const pend    = _opsRows.filter(r=>{ const d=opsPd(r.created); return d&&d>=from&&d<=to&&opsIsBlank(r.dispatched)&&opsIsBlank(r.cancelled); });
 
   const cMTD = cancAll.filter(r=>{ const d=opsPd(r.created); return d&&d>=monthStart; });
