@@ -1571,7 +1571,6 @@ async function reloadShopifyData(){
     if(_csRows.length){try{processCS(_csRows);}catch(e){console.warn('processCS error:',e.message);}}
     renderDailyStats();
     loadAdsTargets(); // reload targets for selected month
-    loadXstackData(); // reload Xstack OMS data
     opsRenderCards(); // re-render ops data cards
     // Defer heavy renders to next frame so UI stays responsive
     setTimeout(()=>{
@@ -3648,7 +3647,7 @@ window.addEventListener('load',()=>{
     loadAll().catch(e=>console.warn('Auto-connect failed:',e));
   }
   renderCSFromSupabase();
-  loadXstackData();
+
   // Restore manual field values
   if(manualData.stock)document.getElementById('i-stock').value=manualData.stock;
   if(manualData.web)document.getElementById('i-web').value=manualData.web;
@@ -4248,7 +4247,7 @@ function switchOverviewMonth(){
   document.getElementById('todayDate').textContent=val+' — MTD';
   if(STORE&&STORE!=='demo'&&TOKEN) reloadShopifyData();
   else renderDailyStats();
-  loadXstackData();
+
 }
 
 // ══════════════════════════════════════════════════
@@ -4822,73 +4821,9 @@ function renderAdsTargetCards(){
 // XSTACK INTEGRATION
 // ══════════════════════════════════════════════════
 const XSTACK_WORKER     = 'https://mendeez-shopify.divine-mouse-0258.workers.dev';
-const XSTACK_AUTH_URL   = XSTACK_WORKER + '/xstack-token';
-const XSTACK_ORDERS_URL = XSTACK_WORKER + '/xstack-orders';
-const XSTACK_CLIENT_ID  = 'api-user-vFB6QQAjwX';
-const XSTACK_SECRET     = 'flha1LaPwY-Nuxui2W5Y';
-const XSTACK_COMPANY    = '0b8bd9e671e00824';
-const XSTACK_LOCATION   = '2021';
 
-let _xToken = null;
-let _xTokenExpiry = 0;
 
-async function xGetToken(){
-  if(_xToken && Date.now() < _xTokenExpiry - 30000) return _xToken;
-  const res = await fetch(XSTACK_AUTH_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      clientId: XSTACK_CLIENT_ID,
-      clientSecret: XSTACK_SECRET,
-      grantType: 'client_credentials',
-      companyCode: XSTACK_COMPANY
-    })
-  });
-  const data = await res.json();
-  _xToken = data.access_token;
-  _xTokenExpiry = Date.now() + ((data.expires_in||300)-10)*1000;
-  return _xToken;
-}
 
-async function xFetchOrders(status, startDate, endDate, forcedToken){
-  const token = forcedToken || await xGetToken();
-  // Format dates as PKT (+05:00) — use UTC methods since dates are stored as UTC
-  const fmtD = d => {
-    const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
-    const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
-    return `${y}-${m}-${dd}T00:00:00%2B05:00`;
-  };
-  const fmtEnd = d => {
-    const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
-    const y=pkt.getUTCFullYear(), m=String(pkt.getUTCMonth()+1).padStart(2,'0'), dd=String(pkt.getUTCDate()).padStart(2,'0');
-    return `${y}-${m}-${dd}T23:59:59%2B05:00`;
-  };
-
-  let allOrders = [], page = 1;
-  while(true){
-    const url = XSTACK_ORDERS_URL
-      + '?order_status='+encodeURIComponent(status)
-      + '&location_id='+XSTACK_LOCATION
-      + '&start_date='+fmtD(startDate)
-      + '&end_date='+fmtEnd(endDate)
-      + '&size=500&page='+page+'&token='+encodeURIComponent(token);
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('Xstack '+status+': '+res.status);
-    const data = await res.json();
-    const orders = data.orders || [];
-    allOrders = allOrders.concat(orders);
-    const totalElements = data.page ? (data.page.total_elements || data.page.totalElements || 0) : 0;
-    if(allOrders.length >= totalElements || orders.length === 0) break;
-    page++;
-  }
-  return allOrders;
-}
-
-function xGetCancelReason(order){
-  const details = order.orders_brand_details || [];
-  const r = details.find(d=>d.attribute==='cancel_return_reason');
-  return r ? r.value : '';
-}
 
 async function xDebugTest(){
   const out = document.getElementById('xs-debug-output');
@@ -4949,127 +4884,6 @@ async function xDebugTest(){
   } catch(e){ out.textContent += 'ERR: '+e.message; }
 }
 
-async function loadXstackData(){
-  const {from, to} = getRange();
-  if(!from || !to) return;
-
-  // MTD = use actual selected from date (May 1-31 shows May, not June)
-  const toPKT = d => new Date(d.getTime() + PKT_OFFSET_MS);
-  const fromPKTdate = toPKT(from);
-  const toPKTdate   = toPKT(to);
-  const mtdStart = new Date(Date.UTC(fromPKTdate.getUTCFullYear(), fromPKTdate.getUTCMonth(), 1) - PKT_OFFSET_MS);
-  const cfStart  = new Date(Date.UTC(fromPKTdate.getUTCFullYear(), fromPKTdate.getUTCMonth()-1, 1) - PKT_OFFSET_MS);
-  const cfEnd    = new Date(mtdStart.getTime() - 1);
-
-  try {
-    // Show loading state
-    ['xs-dispatched','xs-delivered','xs-cancel-mtd','xs-cancel-cf','xs-return-mtd','xs-return-cf'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el){el.textContent='...';el.classList.add('shimmer');}
-    });
-
-    // Get fresh token once for all requests
-    const freshToken = await xGetToken();
-
-    // Fetch all 4 statuses for MTD
-    const [dispatched, delivered, cancelledMTD, returnsMTD] = await Promise.all([
-      xFetchOrders('DISPATCHED',           mtdStart, to, freshToken),
-      xFetchOrders('ORDER_DELIVERED',      mtdStart, to, freshToken),
-      xFetchOrders('DEAD_VIA_CUSTOMER',    mtdStart, to, freshToken),
-      xFetchOrders('RETURN_VERIFICATION',  mtdStart, to, freshToken),
-    ]);
-
-    // Fetch CF (carry forward = previous month dispatched orders cancelled/returned this month)
-    const [cancelledCF, returnsCF] = await Promise.all([
-      xFetchOrders('DEAD_VIA_CUSTOMER',    cfStart, cfEnd, freshToken),
-      xFetchOrders('RETURN_VERIFICATION',  cfStart, cfEnd, freshToken),
-    ]);
-
-    // Update cards
-    const s = id=>{ const el=document.getElementById(id); if(el) el.classList.remove('shimmer'); return el; };
-    const set = (id,val) => { const el=s(id); if(el) el.textContent=val; };
-
-    // Helper: count total items across orders
-    const countItems = orders => orders.reduce((s,o)=>{
-      const qty = (o.products||[]).filter(p=>p!=null).reduce((ps,p)=>ps+(parseInt(p.quantity)||0),0);
-      return s+qty;
-    },0);
-
-    const countPKR = orders => orders.reduce((s,o)=>{
-      // Try direct fields first
-      let amt = parseFloat(o.total_amount_pkr) || parseFloat(o.total_amount) || parseFloat(o.cod_amount) || parseFloat(o.grand_total) || parseFloat(o.amount_pkr) || 0;
-      // Fallback: check orders_brand_details for parent_total_amount
-      if(!amt && Array.isArray(o.orders_brand_details)){
-        const field = o.orders_brand_details.find(d => d.attribute === 'parent_total_amount');
-        if(field) amt = parseFloat(field.value) || 0;
-      }
-      return s + amt;
-    }, 0);
-
-    const setCard = (id, orders) => {
-      const el = s(id);
-      if(!el) return;
-      const orders_count = orders.length;
-      const items_count  = countItems(orders);
-      const pkr_total    = countPKR(orders);
-      el.innerHTML = `<div style="font-size:20px;font-weight:700;font-family:var(--mono)">PKR ${fmt(Math.round(pkr_total))}</div>`
-        + `<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:3px">${items_count.toLocaleString()} items &nbsp;·&nbsp; ${orders_count.toLocaleString()} orders</div>`;
-    };
-
-    setCard('xs-dispatched',  dispatched);
-    setCard('xs-delivered',   delivered);
-    setCard('xs-cancel-mtd',  cancelledMTD);
-    setCard('xs-cancel-cf',   cancelledCF);
-    setCard('xs-return-mtd',  returnsMTD);
-    setCard('xs-return-cf',   returnsCF);
-    // Mirror to CS tab cards
-    setCard('cs-xs-dispatched',  dispatched);
-    setCard('cs-xs-delivered',   delivered);
-    setCard('cs-xs-cancel-mtd',  cancelledMTD);
-    setCard('cs-xs-cancel-cf',   cancelledCF);
-    setCard('cs-xs-return-mtd',  returnsMTD);
-    setCard('cs-xs-return-cf',   returnsCF);
-
-    // Cancellation reasons from MTD cancelled orders
-    const reasonMap = {};
-    cancelledMTD.forEach(o=>{
-      const reason = xGetCancelReason(o) || 'Not specified';
-      reasonMap[reason] = (reasonMap[reason]||0)+1;
-    });
-    renderXstackCancelReasons(reasonMap, cancelledMTD.length);
-
-  } catch(err) {
-    console.error('Xstack error:', err);
-    const errMsg = err.message || String(err);
-    ['xs-dispatched','xs-delivered','xs-cancel-mtd','xs-cancel-cf','xs-return-mtd','xs-return-cf',
-     'cs-xs-dispatched','cs-xs-delivered','cs-xs-cancel-mtd','cs-xs-cancel-cf','cs-xs-return-mtd','cs-xs-return-cf'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el){
-        el.innerHTML='<div style="font-size:11px;color:var(--red);font-family:var(--mono)">ERR: '+errMsg+'</div>';
-        el.classList.remove('shimmer');
-      }
-    });
-  }
-}
-
-function renderXstackCancelReasons(reasonMap, total){
-  const el = document.getElementById('xs-cancel-reasons');
-  if(!el) return;
-  const entries = Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]);
-  if(!entries.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px">No cancellations in this period</div>'; return; }
-  el.innerHTML = entries.map(([reason,count])=>{
-    const pct = total>0?Math.round(count/total*100):0;
-    return `<div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-        <span style="color:var(--text)">${reason}</span>
-        <span style="font-family:var(--mono);color:var(--accent)">${count} <span style="color:var(--muted)">(${pct}%)</span></span>
-      </div>
-      <div style="background:var(--surface2);border-radius:3px;height:4px">
-        <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:3px"></div>
-      </div>
-    </div>`;
-  }).join('');
-}
 // ── IMAGE HANDLING — Search & Drop System ──
 // _upImgMatched: productId → {productId, title, sku, images:[{file,pos}]}
 
