@@ -2759,6 +2759,7 @@ function renderDailyStats(){
     const net=document.getElementById('s-shopify-net');
     if(gross){
       const g=ordersData.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
+      window._shopifyGrossValue = g;
       gross.textContent=g>0?'PKR '+fmt(g):'—';
       gross.className='sv amber';
       gross.style.height='';gross.style.width='';
@@ -2772,6 +2773,8 @@ function renderDailyStats(){
       const n=g-disc-returns;
       window._netSalesBase={gross:g,disc:disc};
       net.textContent=n>0?'PKR '+fmt(n):'—';
+      // Refresh ops cards with updated Shopify gross/returns
+      if(typeof opsRenderCards === 'function') setTimeout(opsRenderCards, 100);
       net.className='sv green';
       net.style.height='';net.style.width='';
       const ns=document.getElementById('s-shopify-net-sub');
@@ -7536,9 +7539,11 @@ function opsRenderCards(){
   const {from, to} = getRange();
   const monthStart = new Date(from.getFullYear(), from.getMonth(), 1);
 
-  // Get Shopify gross from existing data
-  const shopifyGross = parseFloat(document.getElementById('s-shopify-gross')?.textContent?.replace(/[^0-9.]/g,''))||0;
-  const shopifyReturns = parseFloat(document.getElementById('s-shopify-net-sub')?.textContent?.replace(/[^0-9.]/g,''))||0;
+  // Get Shopify gross and returns from already-loaded Shopify data
+  const shopifyGross = window._shopifyGrossValue || 0;
+  const shopifyReturns = window._shopifyReturnValue || 0;
+  _shopifyGross = shopifyGross;
+  _shopifyReturns = shopifyReturns;
 
   // Filter rows
   const disp    = _opsRows.filter(r=>{ const d=opsPd(r.dispatched); return d&&d>=from&&d<=to; });
