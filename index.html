@@ -2851,8 +2851,7 @@ async function fetchReturnsByDate(){
       cursor=ordersData.pageInfo.endCursor;
     }
 
-    window._shopifyReturns=returnCount;
-    window._shopifyReturnValue=returnValue;
+        window._shopifyReturnValue=returnValue;
     if(retEl){
       retEl.textContent=returnValue>0?'PKR '+fmt(returnValue):'—';
       retEl.className=returnValue>0?'sv red':'sv muted';
@@ -7476,7 +7475,7 @@ function opsToggle(name){
 }
 
 // Store Shopify returns for order adjustment
-let _shopifyGross=0, _shopifyReturns=0;
+let _shopifyGross=0;
 
 </script>
 
