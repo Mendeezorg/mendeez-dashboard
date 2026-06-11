@@ -7391,11 +7391,21 @@ async function opsLoadFromSupabase(){
         const d = opsPd(r.created);
         return !d || d >= cutoff;
       });
-        opsRenderCards();
       } else {
         if(statusEl) statusEl.textContent='Using '+_opsRows.length+' rows from memory';
-        opsRenderCards();
       }
+      // Wait for Shopify returns to load before rendering
+      // If returns already loaded render now, otherwise wait up to 10s
+      const _tryRender = (attempts) => {
+        if(window._shopifyReturnValue !== undefined && window._shopifyReturnValue > 0){
+          opsRenderCards();
+        } else if(attempts > 0){
+          setTimeout(()=>_tryRender(attempts-1), 500);
+        } else {
+          opsRenderCards(); // render anyway after timeout
+        }
+      };
+      _tryRender(20); // try every 500ms for up to 10 seconds
     } else {
       if(statusEl){ statusEl.style.display='none'; }
     }
