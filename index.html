@@ -7248,7 +7248,7 @@ function opsParseRows(headers, dataRows){
     delivered:  headers.findIndex(h=>h==='orderdelivered'),
     cancelled:  headers.findIndex(h=>h==='cancelled'),
     returned:   headers.findIndex(h=>h==='orderreturned'),
-    retStatus:  headers.findIndex(h=>h.includes('return') && h.includes('status')),
+    retStatus:  headers.findIndex(h=>h.toLowerCase().replace(/[^a-z]/g,'').includes('returnedstatus')||h.toLowerCase().replace(/[^a-z]/g,'').includes('returnstatus')||h.toLowerCase().replace(/[^a-z]/g,'').includes('retusstatus')),
     cancelReason: headers.findIndex(h=>h.includes('cancellation_reason')),
   };
   const rows=[];
@@ -7322,17 +7322,27 @@ async function opsHandleFile(file){
 
 async function opsSaveToSupabase(rows, filename){
   try {
-    // Delete existing rows for this upload (use filename as batch key)
     const batchKey = filename.replace(/[^a-zA-Z0-9-_]/g,'_');
-    // Save in batches of 100
+    const statusEl = document.getElementById('opsUploadStatus');
+
+    // Delete ALL existing data first
+    if(statusEl) statusEl.textContent = 'Clearing old data from Supabase...';
+    await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?id=gte.0`, {
+      method: 'DELETE',
+      headers: DB.h
+    });
+
+    // Save new data in batches of 100
     const BATCH=100;
     for(let i=0;i<rows.length;i+=BATCH){
       const batch=rows.slice(i,i+BATCH).map(r=>{
-        const {id, ...rest} = r; // remove local id — Supabase auto-generates
+        const {id, ...rest} = r;
         return {...rest, upload_file: batchKey};
       });
       await DB.upsert(OPS_TABLE, batch);
+      if(statusEl) statusEl.textContent = `Saving... ${Math.min(i+BATCH, rows.length)}/${rows.length} rows`;
     }
+    if(statusEl) statusEl.textContent = `✅ ${rows.length} rows saved to Supabase`;
   } catch(e){ console.warn('Supabase save failed:', e.message); }
 }
 
