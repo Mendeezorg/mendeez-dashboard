@@ -7327,16 +7327,26 @@ async function opsSaveToSupabase(rows, filename){
     const batchKey = filename.replace(/[^a-zA-Z0-9-_]/g,'_');
     const statusEl = document.getElementById('opsUploadStatus');
 
-    // Upsert rows — duplicate orderIds will be updated, new ones added
-    // Supabase upsert on orderId column
+    // Deduplicate by orderId — keep one row per order (sum qty, keep first value)
+    const orderMap = {};
+    rows.forEach(r => {
+      if(!r.orderId) return;
+      if(!orderMap[r.orderId]){
+        orderMap[r.orderId] = {...r};
+      } else {
+        // Add qty for multi-item orders
+        orderMap[r.orderId].qty += r.qty || 0;
+      }
+    });
+    const uniqueRows = Object.values(orderMap);
+
     const BATCH=100;
     let saved=0;
-    for(let i=0;i<rows.length;i+=BATCH){
-      const batch=rows.slice(i,i+BATCH).map(r=>{
+    for(let i=0;i<uniqueRows.length;i+=BATCH){
+      const batch=uniqueRows.slice(i,i+BATCH).map(r=>{
         const {id, ...rest} = r;
         return {...rest, upload_file: batchKey};
       });
-      // Insert only new orders — skip duplicates
       await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?on_conflict=orderId`, {
         method: 'POST',
         headers: {
@@ -7346,9 +7356,9 @@ async function opsSaveToSupabase(rows, filename){
         body: JSON.stringify(batch)
       });
       saved += batch.length;
-      if(statusEl) statusEl.textContent = `Saving... ${saved}/${rows.length} rows`;
+      if(statusEl) statusEl.textContent = `Saving... ${saved}/${uniqueRows.length} unique orders`;
     }
-    if(statusEl) statusEl.textContent = `✅ ${rows.length} rows saved to Supabase (duplicates updated)`;
+    if(statusEl) statusEl.textContent = `✅ ${uniqueRows.length} unique orders saved (from ${rows.length} rows)`;
   } catch(e){ console.warn('Supabase save failed:', e.message); }
 }
 
