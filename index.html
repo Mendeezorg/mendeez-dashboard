@@ -7295,6 +7295,16 @@ async function opsHandleFile(file){
     const data=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'MM/DD/YY HH:mm'});
     if(!data.length){statusEl.textContent='Empty file';return;}
     const headers=data[0].map(h=>(h||'').toString().toLowerCase().trim());
+    // Debug: log key column indices
+    console.log('[OPS Parse] returned idx:', headers.findIndex(h=>h==='orderreturned'));
+    console.log('[OPS Parse] retStatus idx:', headers.findIndex(h=>h.toLowerCase().trim()==='returned status'||h.toLowerCase().trim()==='return status'));
+    // Sample first returned row
+    const sampleRet = data.slice(1).find(r=>r[headers.findIndex(h=>h==='orderreturned')]);
+    if(sampleRet){
+      const ri=headers.findIndex(h=>h==='orderreturned');
+      const si=headers.findIndex(h=>h.toLowerCase().trim()==='returned status'||h.toLowerCase().trim()==='return status');
+      console.log('[OPS Parse] Sample returned:', sampleRet[ri], '| retStatus:', sampleRet[si]);
+    }
     rows=opsParseRows(headers, data.slice(1));
   } else {
     const text=await file.text();
