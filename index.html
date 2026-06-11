@@ -7364,7 +7364,6 @@ function opsRenderCards(){
   const shopifyGross = window._shopifyGrossValue || 0;
   const shopifyReturns = window._shopifyReturnValue || 0;
   _shopifyGross = shopifyGross;
-  _shopifyReturns = shopifyReturns;
 
   // Filter rows
   const disp    = _opsRows.filter(r=>{ const d=opsPd(r.dispatched); return d&&d>=from&&d<=to; });
@@ -7396,7 +7395,7 @@ function opsRenderCards(){
   const ovAdjEl  = document.getElementById('xs-order-adj');
   const ovAdjSub = document.getElementById('xs-order-adj-sub');
   const csvDed2  = opsSumPKR(rMTD)+opsSumPKR(rCF)+opsSumPKR(cMTD)+opsSumPKR(cCF);
-  const shopRet2 = _shopifyReturns||0;
+  const shopRet2 = window._shopifyReturnValue||0;
   const adj2     = shopRet2 - csvDed2;
   if(ovAdjEl){
     ovAdjEl.textContent = shopRet2>0 ? 'PKR '+opsFmt(Math.abs(adj2)) : '—';
@@ -7420,7 +7419,7 @@ function opsRenderCards(){
 
   // Order Adjustment
   const csvDed = opsSumPKR(rMTD)+opsSumPKR(rCF)+opsSumPKR(cMTD)+opsSumPKR(cCF);
-  const shopRet = _shopifyReturns || 0;
+  const shopRet = window._shopifyReturnValue || 0;
   const adj = shopRet - csvDed;
   const adjEl=document.getElementById('ops-adj');
   const adjDir=document.getElementById('ops-adj-dir');
