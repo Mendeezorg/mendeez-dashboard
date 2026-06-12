@@ -7374,19 +7374,26 @@ async function opsLoadFromSupabase(){
   try {
     const statusEl=document.getElementById('opsUploadStatus');
     if(statusEl){ statusEl.style.display='block'; statusEl.textContent='Loading operations data...'; }
-    // Fetch all rows using Range header to bypass Supabase default 1000 row limit
+    // Fetch all rows with proper pagination
     let data = [];
     let offset = 0;
     const CHUNK = 1000;
     while(true){
       const chunk = await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?select=*&order=id.asc&limit=${CHUNK}&offset=${offset}`, {
-        headers: {...DB.h, 'Range-Unit':'items', 'Range':`${offset}-${offset+CHUNK-1}`}
+        headers: {
+          ...DB.h,
+          'Range-Unit': 'items',
+          'Range': `${offset}-${offset+CHUNK-1}`,
+          'Prefer': 'count=none'
+        }
       }).then(r=>r.json()).catch(()=>[]);
-      if(!chunk||!chunk.length) break;
+      if(!chunk||!chunk.length||!Array.isArray(chunk)) break;
       data = data.concat(chunk);
+      console.log('[OPS Load] Loaded chunk:', chunk.length, 'total:', data.length);
       if(chunk.length < CHUNK) break;
       offset += CHUNK;
     }
+    console.log('[OPS Load] Final total:', data.length);
     if(data && data.length){
       // Only update if Supabase has MORE rows than current memory
       if(data.length >= _opsRows.length){
