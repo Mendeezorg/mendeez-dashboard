@@ -7328,7 +7328,7 @@ async function opsSaveToSupabase(rows, filename){
     const batchKey = filename.replace(/[^a-zA-Z0-9-_]/g,'_');
     const statusEl = document.getElementById('opsUploadStatus');
 
-    // Deduplicate by orderId — keep one row per order (sum qty, keep first value)
+    // Deduplicate by orderId — keep one row per order (sum qty, preserve important fields)
     const orderMap = {};
     rows.forEach(r => {
       if(!r.orderId) return;
@@ -7337,6 +7337,13 @@ async function opsSaveToSupabase(rows, filename){
       } else {
         // Add qty for multi-item orders
         orderMap[r.orderId].qty += r.qty || 0;
+        // Preserve non-blank values — if later row has retStatus/returned, use it
+        if(r.retStatus && r.retStatus.trim()) orderMap[r.orderId].retStatus = r.retStatus;
+        if(r.returned && r.returned.trim()) orderMap[r.orderId].returned = r.returned;
+        if(r.cancelled && r.cancelled.trim()) orderMap[r.orderId].cancelled = r.cancelled;
+        if(r.dispatched && r.dispatched.trim()) orderMap[r.orderId].dispatched = r.dispatched;
+        if(r.delivered && r.delivered.trim()) orderMap[r.orderId].delivered = r.delivered;
+        if(r.cancelReason && r.cancelReason.trim()) orderMap[r.orderId].cancelReason = r.cancelReason;
       }
     });
     const uniqueRows = Object.values(orderMap);
@@ -7352,7 +7359,7 @@ async function opsSaveToSupabase(rows, filename){
         method: 'POST',
         headers: {
           ...DB.h,
-          'Prefer': 'resolution=ignore-duplicates,return=minimal',
+          'Prefer': 'resolution=merge-duplicates,return=minimal',
         },
         body: JSON.stringify(batch)
       });
