@@ -7312,6 +7312,7 @@ async function opsHandleFile(file){
 
   statusEl.textContent='Saving '+rows.length+' rows to Supabase...';
   _opsRows=rows;
+  window._opsRowsFresh=true; // mark as fresh upload — don't overwrite from Supabase
 
   // Save to Supabase
   await opsSaveToSupabase(rows, file.name);
@@ -7389,17 +7390,13 @@ async function opsLoadFromSupabase(){
     }
     console.log('[OPS Load] Final:', data.length);
     if(data && data.length){
-      // Only update if Supabase has MORE rows than current memory
-      if(data.length >= _opsRows.length){
+      // Only update if fresh upload hasn't happened (fresh upload has priority)
+      if(window._opsRowsFresh){
+        window._opsRowsFresh = false; // reset flag
+        if(statusEl) statusEl.textContent='✅ Using uploaded data ('+_opsRows.length+' rows)';
+      } else if(data.length >= _opsRows.length){
         _opsRows = data;
         if(statusEl) statusEl.textContent='✅ Loaded '+data.length+' rows from Supabase';
-      // Filter only rows relevant to selected date range ± 2 months
-      const {from} = getRange();
-      const cutoff = new Date(from.getFullYear(), from.getMonth()-1, 1);
-      _opsRows = data.filter(r=>{
-        const d = opsPd(r.created);
-        return !d || d >= cutoff;
-      });
       } else {
         if(statusEl) statusEl.textContent='Using '+_opsRows.length+' rows from memory';
       }
