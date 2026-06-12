@@ -7374,21 +7374,20 @@ async function opsLoadFromSupabase(){
   try {
     const statusEl=document.getElementById('opsUploadStatus');
     if(statusEl){ statusEl.style.display='block'; statusEl.textContent='Loading operations data...'; }
-    // Fetch all rows with proper pagination
+    // Fetch all rows using cursor-based pagination (id > lastId)
     let data = [];
-    let offset = 0;
+    let lastId = 0;
     const CHUNK = 1000;
     while(true){
-      const chunk = await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?select=*&order=id.asc&limit=${CHUNK}&offset=${offset}`, {
-        headers: {...DB.h}
-      }).then(r=>r.json()).catch(()=>[]);
-      if(!chunk||!chunk.length||!Array.isArray(chunk)) break;
+      const url = `${SUPA_URL}/rest/v1/${OPS_TABLE}?select=*&order=id.asc&limit=${CHUNK}&id=gt.${lastId}`;
+      const chunk = await fetch(url, {headers: DB.h}).then(r=>r.json()).catch(()=>[]);
+      if(!chunk||!Array.isArray(chunk)||!chunk.length) break;
       data = data.concat(chunk);
-      console.log('[OPS Load] Loaded chunk:', chunk.length, 'total:', data.length);
+      lastId = chunk[chunk.length-1].id;
+      console.log('[OPS Load] chunk:', chunk.length, 'lastId:', lastId, 'total:', data.length);
       if(chunk.length < CHUNK) break;
-      offset += CHUNK;
     }
-    console.log('[OPS Load] Final total:', data.length);
+    console.log('[OPS Load] Final:', data.length);
     if(data && data.length){
       // Only update if Supabase has MORE rows than current memory
       if(data.length >= _opsRows.length){
