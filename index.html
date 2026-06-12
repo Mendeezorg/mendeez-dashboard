@@ -7699,8 +7699,26 @@ function popupHandleFile(file){
         if(r.delivered&&r.delivered.trim()) orderMap[r.orderId].delivered=r.delivered;
       }
     });
-    _popRows = Object.values(orderMap);
-    popupSetStatus('✅ '+_popRows.length+' unique orders from '+file.name);
+    const newRows = Object.values(orderMap);
+    // Merge with existing _popRows — deduplicate by orderId
+    const mergedMap = {};
+    _popRows.forEach(r=>{ if(r.orderId) mergedMap[r.orderId]={...r}; });
+    newRows.forEach(r=>{
+      if(!r.orderId) return;
+      if(!mergedMap[r.orderId]){ mergedMap[r.orderId]={...r}; }
+      else {
+        mergedMap[r.orderId].qty += r.qty||0;
+        if(r.retStatus&&r.retStatus.trim()) mergedMap[r.orderId].retStatus=r.retStatus;
+        if(r.returned&&r.returned.trim()) mergedMap[r.orderId].returned=r.returned;
+        if(r.cancelled&&r.cancelled.trim()) mergedMap[r.orderId].cancelled=r.cancelled;
+        if(r.dispatched&&r.dispatched.trim()) mergedMap[r.orderId].dispatched=r.dispatched;
+        if(r.delivered&&r.delivered.trim()) mergedMap[r.orderId].delivered=r.delivered;
+      }
+    });
+    const prevCount = _popRows.length;
+    _popRows = Object.values(mergedMap);
+    const added = _popRows.length - prevCount;
+    popupSetStatus('✅ '+_popRows.length+' unique orders ('+added+' new added) from '+file.name);
     popupCalcAndRender();
   };
   reader.readAsArrayBuffer(file);
@@ -7764,15 +7782,41 @@ function popupCalcAndRender(){
   window._popCalc = {disp,deliv,pend,cMTD,cCF,rMTD,rCF,adj,shopRet,csvDed,gross};
 }
 
-function popupApplyToMainDash(){
-  if(!window._popCalc){ alert('Upload file first!'); return; }
-  // Update _opsRows with popup data
+async function popupApplyToMainDash(){
+  if(!_popRows||!_popRows.length){ alert('Upload file first!'); return; }
+
+  // Update _opsRows instantly and render
   _opsRows = _popRows;
   opsRenderCards();
   closeOpsPopup();
-  // Show success status
   const statusEl=document.getElementById('opsUploadStatus');
-  if(statusEl){ statusEl.style.display='block'; statusEl.textContent='✅ Ops data applied from popup ('+_popRows.length+' orders)'; }
+  if(statusEl){ statusEl.style.display='block'; statusEl.textContent='⏳ Saving '+_popRows.length+' orders to Supabase...'; }
+
+  // Save to Supabase in batches
+  try{
+    const OPS_TABLE = 'ops_order_dump';
+    const batchKey = 'popup-'+new Date().toISOString().slice(0,10);
+    const uniqueRows = _popRows.map(r=>{
+      const {id,...rest}=r;
+      return {...rest, upload_file: batchKey};
+    });
+    const BATCH = 200;
+    let saved = 0;
+    for(let i=0;i<uniqueRows.length;i+=BATCH){
+      const batch = uniqueRows.slice(i,i+BATCH);
+      await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?on_conflict=orderId`,{
+        method:'POST',
+        headers:{...DB.h,'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify(batch)
+      });
+      saved += batch.length;
+      if(statusEl) statusEl.textContent='⏳ Saving... '+saved+'/'+uniqueRows.length;
+    }
+    if(statusEl) statusEl.textContent='✅ '+_popRows.length+' orders saved to Supabase & applied!';
+  } catch(e){
+    if(statusEl) statusEl.textContent='✅ Applied locally (Supabase save failed)';
+    console.error('Supabase save error:', e);
+  }
 }
 </script>
 
