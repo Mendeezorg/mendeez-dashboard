@@ -7380,12 +7380,7 @@ async function opsLoadFromSupabase(){
     const CHUNK = 1000;
     while(true){
       const chunk = await fetch(`${SUPA_URL}/rest/v1/${OPS_TABLE}?select=*&order=id.asc&limit=${CHUNK}&offset=${offset}`, {
-        headers: {
-          ...DB.h,
-          'Range-Unit': 'items',
-          'Range': `${offset}-${offset+CHUNK-1}`,
-          'Prefer': 'count=none'
-        }
+        headers: {...DB.h}
       }).then(r=>r.json()).catch(()=>[]);
       if(!chunk||!chunk.length||!Array.isArray(chunk)) break;
       data = data.concat(chunk);
