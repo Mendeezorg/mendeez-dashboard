@@ -7512,7 +7512,7 @@ function opsRenderCards(){
   if(adjEl){ adjEl.textContent = shopRet>0 ? 'PKR '+opsFmt(Math.abs(adj)) : '—'; adjEl.style.color=adj>=0?'#8b5cf6':'#f87171'; }
   if(adjDir){ adjDir.textContent=shopRet>0?(adj>=0?'▲ Surplus':'▼ Shortfall'):'Enter Shopify returns'; adjDir.style.color=adj>=0?'#10b981':'#f87171'; }
   const adjPctEl=document.getElementById('ops-adj-pct');
-  if(adjPctEl) adjPctEl.textContent=shopifyGross>0&&shopRet>0?(Math.abs(adj)/shopifyGross*100).toFixed(1)+'% of Shopify gross':'—';
+  if(adjPctEl) adjPctEl.textContent=gross>0&&shopRet>0?(Math.abs(adj)/gross*100).toFixed(1)+'% of Shopify gross':'—';
 
   // Returns expandable
   const retTotalPKR=opsSumPKR(retAll);
