@@ -350,24 +350,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Net Sales</div><div class="sv green shimmer" id="s-shopify-net"></div><div class="ssub" id="s-shopify-net-sub">After discounts & returns</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono);margin-top:2px" id="s-shopify-net-pct">—</div></div>
   </div>
 
-  <!-- ── OMS XSTACK CARDS ── -->
-  <div class="sh" style="margin-bottom:8px">
-    <div class="st" style="display:flex;align-items:center;gap:7px">
-      <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block"></span>
-      Operations Data
-      <span style="font-size:10px;color:var(--muted);font-weight:400;font-family:var(--mono)"></span>
-    </div>
-  </div>
-  <div id="xs-debug-output" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:14px">
-    <div class="sc" style="border-color:var(--blue-dim)"><div class="sl">Dispatched MTD</div><div class="sv blue shimmer" id="xs-dispatched">—</div><div class="ssub" id="xs-dispatched-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-dispatched-pct">—</div></div>
-    <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Delivered MTD</div><div class="sv green shimmer" id="xs-delivered">—</div><div class="ssub" id="xs-delivered-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-delivered-pct">—</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation MTD</div><div class="sv red shimmer" id="xs-cancel-mtd">—</div><div class="ssub" id="xs-cancel-mtd-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-cancel-mtd-pct">—</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Cancellation CF</div><div class="sv red shimmer" id="xs-cancel-cf">—</div><div class="ssub" id="xs-cancel-cf-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-cancel-cf-pct">—</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns MTD</div><div class="sv red shimmer" id="xs-return-mtd">—</div><div class="ssub" id="xs-return-mtd-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-return-mtd-pct">—</div></div>
-    <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns CF</div><div class="sv red shimmer" id="xs-return-cf">—</div><div class="ssub" id="xs-return-cf-sub">—</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono)" id="xs-return-cf-pct">—</div></div>
-    <div class="sc" style="border-color:#8b5cf6"><div class="sl">Order Adjustment</div><div class="sv shimmer" id="xs-order-adj" style="color:#8b5cf6">—</div><div class="ssub" id="xs-order-adj-sub">Shopify Returns − CSV</div></div>
-  </div>
+
 
   <!-- DATE-WISE SHOPIFY BREAKDOWN -->
   <div class="sh" style="margin-top:4px">
@@ -569,16 +552,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span id="opsLastUpload" style="font-size:11px;color:var(--muted);font-family:var(--mono)"></span>
-      <div id="opsDropZone" onclick="document.getElementById('opsFileInput').click()"
-        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
-        ondragleave="this.style.borderColor='var(--border2)'"
-        ondrop="opsHandleDrop(event)"
-        title="Upload Order Dump (.xlsx or .csv)"
-        style="cursor:pointer;border:1.5px dashed var(--border2);border-radius:8px;padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);transition:all .2s">
-        <span style="font-size:16px">📂</span>
-        <span>Upload Order Dump</span>
-      </div>
-      <input type="file" id="opsFileInput" accept=".csv,.xlsx,.xls" style="display:none" onchange="opsHandleFile(this.files[0])">
+
       <div onclick="openOpsPopup()" title="Open Operations Data Popup"
         style="cursor:pointer;border:1.5px solid var(--accent);border-radius:8px;padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--accent);transition:all .2s;background:rgba(232,197,71,0.07)">
         <span style="font-size:14px">📊</span>
@@ -5748,8 +5722,9 @@ async function loadComplaintsFromSupabase(){
     if(!data||!data.length) return;
 
     // Map Supabase rows — same format as Google Sheet rows
+    // Map to match Google Sheet column order: Date, Order#, Description, Complaint Nature, Status
     window._supaComplaintRows = data.map(c=>[
-      c.date||'', c.order_id||'', c.nature||'', c.agent||'', c.status||'', c.remarks||''
+      c.date||'', c.order_id||'', c.remarks||'', c.nature||'', c.status||''
     ]);
 
     // Update nature filter with any new natures from Supabase
