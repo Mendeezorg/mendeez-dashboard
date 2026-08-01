@@ -8741,7 +8741,7 @@ function seRenderAll(){
     prev = idxInAll>0 ? allComputed[idxInAll-1] : null;
   }
 
-  function pctOf(part,whole){ return (part&&whole) ? (part/whole*100).toFixed(1)+'% of gross' : ''; }
+  function pctOf(part,whole){ return (part&&whole) ? (part/whole*100).toFixed(1)+'% of net' : ''; }
   function deltaVsPrev(curV,prevV,prevLbl){
     if(!prevV) return '';
     const d=(curV-prevV)/prevV*100; const up=d>=0;
@@ -8752,9 +8752,9 @@ function seRenderAll(){
   document.getElementById('seKpis').innerHTML = `
     <div class="sc"><div class="sl">Gross Sales</div><div class="sv">${seFmtPKR(cur.grossSales)}</div><div class="ssub">${prev?deltaVsPrev(cur.grossSales,prev.grossSales,prev.label):''}</div></div>
     <div class="sc"><div class="sl">Net Sales</div><div class="sv">${seFmtPKR(cur.netSales)}</div></div>
-    <div class="sc"><div class="sl">Marketing Spend</div><div class="sv amber">${seFmtPKR(cur.totalMkt)}</div><div class="ssub">${pctOf(cur.totalMkt,cur.grossSales)}</div></div>
-    <div class="sc"><div class="sl">Operations Spend</div><div class="sv blue">${seFmtPKR(cur.totalOps)}</div><div class="ssub">${pctOf(cur.totalOps,cur.grossSales)}</div></div>
-    <div class="sc"><div class="sl">Grand Total Spent</div><div class="sv red">${seFmtPKR(cur.grandTotal)}</div><div class="ssub">${pctOf(cur.grandTotal,cur.grossSales)}</div></div>
+    <div class="sc"><div class="sl">Marketing Spend</div><div class="sv amber">${seFmtPKR(cur.totalMkt)}</div><div class="ssub">${pctOf(cur.totalMkt,cur.netSales)}</div></div>
+    <div class="sc"><div class="sl">Operations Spend</div><div class="sv blue">${seFmtPKR(cur.totalOps)}</div><div class="ssub">${pctOf(cur.totalOps,cur.netSales)}</div></div>
+    <div class="sc"><div class="sl">Grand Total Spent</div><div class="sv red">${seFmtPKR(cur.grandTotal)}</div><div class="ssub">${pctOf(cur.grandTotal,cur.netSales)}</div></div>
     <div class="sc"><div class="sl">Net ROAS</div><div class="sv green">${cur.netROAS!==null?cur.netROAS.toFixed(2)+'x':'–'}</div></div>
     <div class="sc"><div class="sl">Net ROI</div><div class="sv green">${cur.netROI!==null?cur.netROI.toFixed(2)+'x':'–'}</div></div>
     <div class="sc"><div class="sl">CPA</div><div class="sv">${seFmtPKR(cur.cpa)}</div><div class="ssub">${cur.orders?cur.orders.toLocaleString()+' orders':''}</div></div>
@@ -8825,8 +8825,8 @@ function seRenderAll(){
       else if(def.intRow) display=Math.round(v).toLocaleString();
       else{
         display=seFmtPKR(v);
-        if(def.showPct && m.grossSales){
-          const pct = (v/m.grossSales*100).toFixed(1);
+        if(def.showPct && m.netSales){
+          const pct = (v/m.netSales*100).toFixed(1);
           display += ` <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`;
         }
       }
