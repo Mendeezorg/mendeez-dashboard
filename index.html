@@ -1932,7 +1932,13 @@ async function ovRenderTrendChart(){
       // assumption we'd hardcode, so it should match the Reports section exactly.
       try{
         const fromStr = buckets[0].dateKey;
-        const toStr = buckets[buckets.length-1].dateKey;
+        // Request one day past the actual end — Shopify's UNTIL may be exclusive (meaning "up
+        // to but not including" that date), which would otherwise silently drop the last day.
+        // We only ever use as many rows as we have buckets, so the extra day (if returned) is
+        // simply ignored — this is safe whichever way UNTIL actually behaves.
+        const lastDate = new Date(buckets[buckets.length-1].dateKey+'T00:00:00Z');
+        lastDate.setUTCDate(lastDate.getUTCDate()+1);
+        const toStr = lastDate.toISOString().slice(0,10);
         const rows = await ovWithTimeout(ovFetchShopifyQLGrouped(fromStr, toStr, 'day'), 20000, 'ShopifyQL fetch');
         // Rows come back in chronological order with no date field of their own — reconstruct
         // each row's date as SINCE + i days and match against our buckets' PKT calendar dateKey.
@@ -1942,7 +1948,7 @@ async function ovRenderTrendChart(){
           const d = new Date(startDate); d.setUTCDate(d.getUTCDate()+i);
           byKey[d.toISOString().slice(0,10)] = r;
         });
-        if(rows.length !== buckets.length) console.warn('ShopifyQL returned', rows.length, 'day rows, expected', buckets.length);
+        if(rows.length < buckets.length) console.warn('ShopifyQL returned', rows.length, 'day rows, expected at least', buckets.length);
         buckets.forEach(b=>{
           const r = byKey[b.dateKey];
           b.value = r ? r.gross : 0;
@@ -1990,7 +1996,12 @@ async function ovRenderTrendChart(){
       // MoM/YoY — try ShopifyQL grouped by month first, fall back to Sales & Exp saved totals
       try{
         const fromStr = buckets[0].from.toISOString().slice(0,10);
-        const toStr = buckets[buckets.length-1].to.toISOString().slice(0,10);
+        // Request one extra month past the end, same reasoning as DoD above — guards against
+        // an exclusive UNTIL boundary silently dropping the last month. Extra row, if any, is
+        // simply unused since we only reconstruct as many months as we have data for.
+        const lastTo = new Date(buckets[buckets.length-1].to);
+        lastTo.setUTCMonth(lastTo.getUTCMonth()+1);
+        const toStr = lastTo.toISOString().slice(0,10);
         const rows = await ovWithTimeout(ovFetchShopifyQLGrouped(fromStr, toStr, 'month'), 20000, 'ShopifyQL fetch');
         // Rows come back in chronological order with no month field of their own — reconstruct
         // each row's YYYY-MM as the starting month + i months.
@@ -2001,7 +2012,7 @@ async function ovRenderTrendChart(){
           const y = fy + Math.floor(totalM/12), m = (totalM%12)+1;
           byKey[`${y}-${ovPad2(m)}`] = r;
         });
-        if(gran==='mom' && rows.length!==buckets.length){
+        if(gran==='mom' && rows.length<buckets.length){
           console.warn('ShopifyQL returned', rows.length, 'month rows, expected', buckets.length);
         }
         buckets.forEach(b=>{
