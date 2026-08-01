@@ -50,8 +50,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 /* FORMS */
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
 .fl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.fi{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 11px;border-radius:6px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s;width:100%}
+.fi{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 11px;border-radius:6px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s;width:100%;color-scheme:dark}
 .fi:focus{border-color:var(--accent)}.fi::placeholder{color:var(--muted2)}
+select.fi{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:28px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 16px) calc(50% - 2px),calc(100% - 11px) calc(50% - 2px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+input[type=file].fi{padding:7px 10px;font-family:var(--sans);font-size:11px;cursor:pointer}
+input[type=file].fi::file-selector-button{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:5px 10px;border-radius:4px;font-family:var(--sans);font-size:11px;cursor:pointer;margin-right:10px}
+.se-chip-btn{display:inline-flex;align-items:center;gap:4px;background:var(--accent-dim);color:var(--accent);border:1px solid transparent;padding:4px 10px;border-radius:5px;font-size:10.5px;font-weight:600;letter-spacing:.02em;cursor:pointer;transition:background .15s,color .15s;text-transform:none}
+.se-chip-btn:hover{background:var(--accent);color:#000}
+.se-remove-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:12px;line-height:1;transition:all .15s;flex-shrink:0}
+.se-remove-btn:hover{background:var(--red-dim);color:var(--red);border-color:var(--red)}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .btn{border:none;padding:9px 18px;border-radius:6px;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
 .btn-p{background:var(--accent);color:#000}.btn-p:hover{opacity:.85}
@@ -200,6 +210,137 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .login-role.agent{background:rgba(232,197,71,0.12);color:#e8c547;}
 .login-role.manager{background:rgba(76,175,125,0.12);color:#4caf7d;}
 
+
+/* ===== CHATBOT EMBED (scoped to .cb-embed) ===== */
+.cb-embed{
+  --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;
+  --border:#2a2a2a;--border2:#333;--text:#f0ede8;--muted:#777;--muted2:#444;
+  --accent:#e8c547;--accent-dim:#3a3010;
+  --red:#e05252;--red-dim:#2e1212;
+  --green:#4caf7d;--green-dim:#0d2719;
+  --blue:#5b9cf6;--blue-dim:#0e1f3a;
+  --mono:'DM Mono',monospace;--sans:'Syne',sans-serif;
+  --cb:#e8c547;--cb2:#f0d479;--cb-dim:rgba(232,197,71,.15);
+  --sh-sm:0 1px 3px rgba(0,0,0,.3);
+  --sh-md:0 6px 20px rgba(0,0,0,.35);
+  --sh-lg:0 20px 50px rgba(0,0,0,.5);
+  --ease:cubic-bezier(.16,.8,.3,1);
+}
+*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted2)}
+svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
+
+.cb-root{display:flex;height:730px;max-width:1400px;margin:0 auto;border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:var(--sh-lg);background:var(--bg);position:relative}
+.cb-col{display:flex;flex-direction:column;border-right:1px solid var(--border)}
+.cb-nav-col{width:206px;flex-shrink:0;background:linear-gradient(180deg,var(--surface),#141416)}
+.cb-list-col{width:312px;flex-shrink:0;background:var(--bg)}
+.cb-chat-col{flex:1;min-width:0;background:var(--bg)}
+.cb-right-col{width:224px;flex-shrink:0;background:linear-gradient(180deg,var(--surface),#141416);border-right:none;padding:18px 12px;overflow-y:auto}
+
+.cb-logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(145deg,var(--cb2),var(--cb));display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px;box-shadow:0 4px 14px rgba(123,110,240,.45),inset 0 1px 1px rgba(255,255,255,.25)}
+.cb-nav-item{display:flex;align-items:center;gap:11px;padding:9px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);border-radius:10px;margin:2px 8px;transition:background .2s var(--ease),color .2s var(--ease),transform .15s var(--ease)}
+.cb-nav-item:hover{background:var(--surface2);color:var(--text);transform:translateX(2px)}
+.cb-nav-item:active{transform:scale(.97)}
+.cb-nav-item.active{background:linear-gradient(135deg,var(--cb2),var(--cb));color:#fff;box-shadow:0 6px 16px rgba(123,110,240,.4)}
+.cb-nav-icon{width:17px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.cb-nav-scroll{flex:1;overflow-y:auto;padding-bottom:6px;padding-top:10px}
+.cb-nav-support{border-top:1px solid var(--border);padding:10px 8px}
+
+.cb-filter-card{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:11px;border:1px solid;font-size:11.5px;font-weight:700;cursor:pointer;margin-bottom:8px;transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+.cb-filter-card:hover{transform:translateY(-2px) scale(1.01);box-shadow:var(--sh-sm)}
+.cb-filter-green{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.cb-filter-blue{border-color:var(--blue);color:var(--blue);background:var(--blue-dim)}
+.cb-filter-red{border-color:var(--red);color:var(--red);background:var(--red-dim)}
+.cb-filter-card.active{box-shadow:0 0 0 2px currentColor inset,var(--sh-sm)}
+.cb-channel-row{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;cursor:pointer;font-size:11.5px;font-weight:500;margin-bottom:1px;transition:background .2s var(--ease),transform .15s var(--ease)}
+.cb-channel-row:hover{background:var(--surface2);transform:translateX(2px)}
+.cb-channel-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 4px currentColor;opacity:.85}
+.cb-channel-count{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.cb-section-lbl{padding:18px 4px 9px;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2)}
+
+.cb-conv-row{display:flex;gap:11px;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .18s var(--ease);position:relative}
+.cb-conv-row:hover{background:var(--surface2)}
+.cb-conv-row.active{background:var(--surface2)}
+.cb-conv-row.active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--cb2),var(--cb));box-shadow:0 0 10px rgba(123,110,240,.7)}
+.cb-avatar{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#fff;position:relative;box-shadow:var(--sh-sm),inset 0 1px 2px rgba(255,255,255,.2);transition:transform .2s var(--ease)}
+.cb-conv-row:hover .cb-avatar{transform:scale(1.05)}
+.cb-avatar-badge{position:absolute;bottom:-2px;right:-2px;width:15px;height:15px;border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:800;color:#fff;box-shadow:var(--sh-sm)}
+.cb-unread-dot{position:absolute;top:10px;right:13px;background:var(--red);color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:2px 7px;font-family:var(--mono);box-shadow:0 3px 8px rgba(224,87,90,.55)}
+
+.cb-chat-header{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;min-height:56px;background:rgba(255,255,255,.015);backdrop-filter:blur(6px)}
+.cb-chat-subheader{padding:11px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface)}
+.cb-chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:13px}
+.cb-chat-input-bar{padding:13px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+.cb-chat-input-bar input{flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px 14px;border-radius:10px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
+.cb-chat-input-bar input:focus{border-color:var(--cb);box-shadow:0 0 0 4px var(--cb-dim)}
+
+.cb-day-sep{align-self:center;font-size:10px;color:var(--muted2);background:var(--surface2);padding:4px 12px;border-radius:20px;border:1px solid var(--border)}
+@keyframes cbFadeIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes cbFadeInPanel{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cbDot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+.cb-msg-row{display:flex;gap:9px;align-items:flex-end;animation:cbFadeIn .35s var(--ease) both}
+.cb-msg-row.out{flex-direction:row-reverse}
+.cb-msg-avatar{width:25px;height:25px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;box-shadow:var(--sh-sm)}
+.cb-msg-wrap{max-width:64%;display:flex;flex-direction:column}
+.cb-msg-row.out .cb-msg-wrap{align-items:flex-end}
+.cb-msg-label{font-size:9px;color:var(--muted2);margin-bottom:4px;display:flex;align-items:center;gap:4px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.cb-msg{padding:11px 15px;border-radius:16px;font-size:13px;line-height:1.6;box-shadow:var(--sh-sm)}
+.cb-msg-customer{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:5px}
+.cb-msg-ai{background:linear-gradient(155deg,var(--cb2),var(--cb));color:#fff;border-bottom-right-radius:5px}
+.cb-msg-agent{background:linear-gradient(155deg,#79aefc,var(--blue));color:#fff;border-bottom-right-radius:5px}
+.cb-msg-system{align-self:center;background:var(--surface2);color:var(--muted);font-size:11px;padding:6px 14px;border-radius:20px;border:1px solid var(--border)}
+.cb-msg-time{font-size:9px;color:var(--muted2);margin-top:4px;font-family:var(--mono)}
+.cb-msg ul{margin:7px 0 0 16px;padding:0}
+.cb-msg li{margin-bottom:3px}
+.cb-msg b{font-weight:700}
+.cb-typing{display:flex;gap:4px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:16px;border-bottom-right-radius:5px;width:fit-content}
+.cb-typing span{width:6px;height:6px;border-radius:50%;background:var(--cb);animation:cbDot 1.2s infinite}
+.cb-typing span:nth-child(2){animation-delay:.15s}
+.cb-typing span:nth-child(3){animation-delay:.3s}
+
+.cb-take-control{background:linear-gradient(135deg,var(--cb2),var(--cb));color:#fff;border:none;padding:9px 17px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);box-shadow:0 4px 14px rgba(123,110,240,.4);transition:transform .18s var(--ease),box-shadow .18s var(--ease)}
+.cb-take-control:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(123,110,240,.5)}
+.cb-take-control:active{transform:translateY(0) scale(.97)}
+.cb-take-control.taken{background:var(--surface2);color:var(--muted);border:1px solid var(--border2);cursor:default;box-shadow:none}
+.cb-take-control.taken:hover{transform:none;box-shadow:none}
+.cb-action-link{font-size:10.5px;color:var(--muted);background:var(--surface2);border:1px solid var(--border2);padding:5px 11px;border-radius:9px;cursor:pointer;font-family:var(--sans);display:inline-flex;align-items:center;gap:5px;transition:background .18s var(--ease),color .18s var(--ease),transform .15s var(--ease)}
+.cb-action-link:hover{background:var(--border2);color:var(--text);transform:translateY(-1px)}
+.cb-connected-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;box-shadow:0 0 0 4px var(--green-dim);animation:cbPulse 2.4s infinite}
+@keyframes cbPulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+.cb-toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(10px);background:linear-gradient(135deg,var(--cb2),var(--cb));color:#fff;padding:11px 22px;border-radius:11px;font-size:12px;font-weight:600;z-index:999;opacity:0;transition:opacity .3s var(--ease),transform .3s var(--ease);pointer-events:none;box-shadow:var(--sh-md);display:flex;align-items:center;gap:8px}
+.cb-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.cb-stub{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--muted);animation:cbFadeInPanel .3s var(--ease) both}
+.cb-stub-icon{width:64px;height:64px;border-radius:18px;background:var(--cb-dim);color:var(--cb);display:flex;align-items:center;justify-content:center}
+.cb-stub-title{font-size:15px;font-weight:700;color:var(--text)}
+.cb-stub-sub{font-size:12px;max-width:280px;text-align:center;line-height:1.7}
+
+.cb-dash{flex:1;overflow-y:auto;padding:24px 28px;animation:cbFadeInPanel .3s var(--ease) both}
+.cb-dash-title{font-size:18px;font-weight:700;margin-bottom:5px;letter-spacing:-.01em}
+.cb-dash-sub{font-size:11.5px;color:var(--muted);margin-bottom:20px}
+.cb-metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:20px}
+.cb-metric-card{background:linear-gradient(160deg,var(--surface),#131315);border:1px solid var(--border);border-radius:13px;padding:15px 17px;transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s var(--ease)}
+.cb-metric-card:hover{transform:translateY(-3px);box-shadow:var(--sh-md);border-color:var(--border2)}
+.cb-metric-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+.cb-metric-val{font-size:21px;font-weight:600;font-family:var(--mono)}
+.cb-metric-sub{font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+.cb-section-head{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted2);margin:22px 0 11px}
+.cb-panel{background:linear-gradient(160deg,var(--surface),#131315);border:1px solid var(--border);border-radius:13px;padding:17px;box-shadow:var(--sh-sm);transition:box-shadow .2s var(--ease),transform .2s var(--ease)}
+.cb-comment-row{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--border)}
+.cb-comment-row:last-child{border-bottom:none}
+.cb-thumb{width:44px;height:44px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;box-shadow:var(--sh-sm)}
+.cb-bar-row{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.cb-bar-name{font-size:11px;color:var(--muted);width:150px;flex-shrink:0;display:flex;align-items:center;gap:7px}
+.cb-bar-track{flex:1;height:7px;background:var(--border);border-radius:5px;overflow:hidden}
+.cb-bar-fill{height:100%;border-radius:5px;transition:width .6s var(--ease)}
+.cb-bar-val{font-size:11px;font-family:var(--mono);width:40px;text-align:right;flex-shrink:0}
+.cb-connect-row{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;border:1px solid var(--border);border-radius:13px;margin-bottom:10px;background:linear-gradient(160deg,var(--surface),#131315);transition:box-shadow .2s var(--ease),transform .2s var(--ease)}
+.cb-connect-row:hover{box-shadow:var(--sh-sm);transform:translateY(-1px)}
+
 </style>
 </head>
 <body>
@@ -276,13 +417,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="tab active" onclick="switchTab('daily',this)">Overview</div>
   <div class="tab" onclick="switchTab('ads',this)">Ads</div>
   <div class="tab" onclick="switchTab('courier',this)">Courier</div>
-  <div class="tab" onclick="switchTab('cs',this)">CS & Confirmations</div>
+  <div class="tab" onclick="switchTab('cs',this)">Chatbot & Report</div>
   <div class="tab" onclick="switchTab('products',this)">Products & Stock</div>
   <div class="tab" onclick="switchTab('sorter',this)">Catalog Sorter</div>
   <div class="tab" onclick="switchTab('uploader',this)">📦 Product Uploader</div>
   <div class="tab" onclick="switchTab('gtech',this)">📊 G-Tech Data & Demand</div>
   <div class="tab" onclick="switchTab('gtechinv',this)">🏪 G-Tech Inventory</div>
   <div class="tab" onclick="switchTab('cards',this)">💳 Card Balances</div>
+  <div class="tab" onclick="switchTab('salesexp',this)">📈 Sales & Exp</div>
 </div>
 
 <!-- DATE RANGE BAR -->
@@ -348,6 +490,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sc" style="border-color:var(--accent-dim)"><div class="sl">Total Revenue</div><div class="sv amber shimmer" id="s-rev"></div><div class="ssub">Net after discounts</div></div>
     <div class="sc" style="border-color:var(--red-dim)"><div class="sl">Returns · <span id="returns-range-lbl">Range</span></div><div class="sv muted" id="s-shopify-returns">—</div><div class="ssub" id="s-shopify-returns-sub">Refund value PKR</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono);margin-top:2px" id="s-shopify-returns-pct">—</div></div>
     <div class="sc" style="border-color:var(--green-dim)"><div class="sl">Net Sales</div><div class="sv green shimmer" id="s-shopify-net"></div><div class="ssub" id="s-shopify-net-sub">After discounts & returns</div><div style="font-size:11px;color:#e8c547;font-family:var(--mono);margin-top:2px" id="s-shopify-net-pct">—</div></div>
+  </div>
+
+  <!-- REVENUE TREND (DoD / MoM / YoY) -->
+  <div class="sh" style="margin-top:4px;flex-wrap:wrap;gap:10px">
+    <div class="st">📊 Gross & Net Sales Trend</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <select class="fi" id="trendGranularity" style="width:auto" onchange="ovOnGranularityChange()">
+        <option value="dod">Day over Day</option>
+        <option value="mom">Month over Month</option>
+        <option value="yoy">Year over Year</option>
+      </select>
+      <span id="ovRangeInputs" style="display:flex;align-items:center;gap:6px"></span>
+      <button class="btn btn-p btn-sm" onclick="ovRenderTrendChart()">Load</button>
+    </div>
+  </div>
+  <div class="tc" style="margin-bottom:20px;padding:16px" id="trendChartWrap">
+    <div style="display:flex;align-items:center;justify-content:center;padding:50px;gap:10px">
+      <div class="spinner"></div><span style="color:var(--muted);font-size:12px">Loading trend...</span>
+    </div>
   </div>
 
 
@@ -537,7 +698,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <!-- ══ CS & CONFIRMATIONS ══ -->
 <div class="panel" id="panel-cs">
   <div class="ds">
-    <div><div class="dt">CS & Confirmations</div><div class="dsub">Live from Xstack · Supabase agent entries</div></div>
+    <div><div class="dt">Chatbot & Report</div><div class="dsub">Ops data · Live chatbot dashboard</div></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-s btn-sm" onclick="openComplaintsPage()" style="border-color:var(--red);color:var(--red)">🔴 Review Complaints</button>
     </div>
@@ -650,9 +811,29 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </div>
 
-  <!-- DAILY AGENT ENTRIES — from Supabase -->
-  <div class="sh" style="margin-top:20px"><div class="st" style="color:var(--accent)">📋 Daily Agent Entries</div><div class="ss" id="csEntriesSubtitle"></div></div>
-  <div class="tc" id="csEntriesTable"><div class="ldrow"><span class="si"></span>Loading entries...</div></div>
+  <!-- CHATBOT DASHBOARD — embedded -->
+  <div class="sh" style="margin-top:20px"><div class="st" style="color:var(--accent)">💬 Chatbot Dashboard</div></div>
+  <div class="cb-embed">
+    <div class="cb-root">
+      <div class="cb-col cb-nav-col">
+        <div class="cb-nav-scroll" id="cb-nav-scroll"></div>
+        <div class="cb-nav-support" id="cb-nav-support"></div>
+      </div>
+      <div class="cb-col cb-list-col" id="cb-list-col">
+        <div style="padding:17px 16px 13px">
+          <div style="font-size:16px;font-weight:700;margin-bottom:11px">Messages</div>
+          <div style="position:relative">
+            <span id="ic-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted2)"></span>
+            <input id="cb-search" placeholder="Search message" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:9px 12px 9px 32px;border-radius:10px;font-family:var(--sans);font-size:12px;outline:none;transition:border-color .2s var(--ease)" oninput="cbRenderList()">
+          </div>
+        </div>
+        <div id="cb-conv-list" style="flex:1;overflow-y:auto"></div>
+      </div>
+      <div class="cb-col cb-chat-col" id="cb-chat-col"></div>
+      <div class="cb-col cb-right-col" id="cb-right-col"></div>
+    </div>
+    <div class="cb-toast" id="cb-toast"></div>
+  </div>
 
   <!-- hidden compat elements -->
   <div style="display:none" id="csAgentTable"></div>
@@ -1348,6 +1529,9 @@ async function loadAll(){
   renderDailyStats();
   document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+  // Trend chart is its own Shopify Worker fetch too — awaited here (not fired in parallel)
+  // so it doesn't compete with products/collections below for the same rate-limited Worker.
+  await ovRenderTrendChart();
   // Products start AFTER orders — same Worker, avoids rate-limit competition
   loadProducts();   // background, non-blocking
   fetchProductCounts();
@@ -1388,6 +1572,462 @@ async function shopFetch(ep,method,body){
   catch(e){throw new Error('Invalid JSON from Shopify');}
 
   return parsed;
+}
+
+// ═══════════ OVERVIEW REVENUE TREND (DoD / MoM / YoY) ═══════════
+function ovFmtCompact(n){
+  n = Math.round(n||0);
+  if(Math.abs(n)>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(Math.abs(n)>=1000) return Math.round(n/1000)+'K';
+  return String(n);
+}
+
+function ovPad2(n){ return String(n).padStart(2,'0'); }
+
+// Sensible starting defaults the first time each granularity's inputs appear
+function ovDefaultRange(gran){
+  const now = new Date();
+  if(gran==='mom'){
+    const to = `${now.getUTCFullYear()}-${ovPad2(now.getUTCMonth()+1)}`;
+    const f = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()-11, 1));
+    return { from:`${f.getUTCFullYear()}-${ovPad2(f.getUTCMonth()+1)}`, to };
+  }
+  if(gran==='yoy'){
+    return { from:String(now.getUTCFullYear()-4), to:String(now.getUTCFullYear()) };
+  }
+  // dod — use PKT "today", not raw UTC now (they can differ near midnight)
+  const nowPkt = pktNow();
+  const to = nowPkt.toISOString().slice(0,10);
+  const f = new Date(nowPkt); f.setUTCDate(f.getUTCDate()-13);
+  return { from:f.toISOString().slice(0,10), to };
+}
+
+// Builds the From/To picker matching the chosen granularity — date pickers for DoD,
+// month pickers for MoM, plain year numbers for YoY.
+function ovRangeInputsHtml(gran){
+  const d = ovDefaultRange(gran);
+  if(gran==='mom') return `<input class="fi" type="month" id="ovFrom" value="${d.from}" style="width:auto">
+    <span style="color:var(--muted);font-size:11px">to</span>
+    <input class="fi" type="month" id="ovTo" value="${d.to}" style="width:auto">`;
+  if(gran==='yoy') return `<input class="fi" type="number" id="ovFrom" value="${d.from}" style="width:78px" min="2015" max="2100">
+    <span style="color:var(--muted);font-size:11px">to</span>
+    <input class="fi" type="number" id="ovTo" value="${d.to}" style="width:78px" min="2015" max="2100">`;
+  return `<input class="fi" type="date" id="ovFrom" value="${d.from}" style="width:auto">
+    <span style="color:var(--muted);font-size:11px">to</span>
+    <input class="fi" type="date" id="ovTo" value="${d.to}" style="width:auto">`;
+}
+
+function ovOnGranularityChange(){
+  const gran = document.getElementById('trendGranularity').value;
+  document.getElementById('ovRangeInputs').innerHTML = ovRangeInputsHtml(gran);
+  ovRenderTrendChart();
+}
+
+// Builds one bucket per day/month/year strictly between the From/To inputs the person picked.
+// Caps how many bars it'll draw so an accidentally huge range (e.g. 20 years of daily bars)
+// doesn't choke the chart or trigger a massive Shopify fetch — clamps to the most recent
+// window instead and says so.
+function ovBuildBuckets(gran){
+  const fromEl = document.getElementById('ovFrom'), toEl = document.getElementById('ovTo');
+  const def = ovDefaultRange(gran);
+  const buckets = [];
+  let clampNote = '';
+
+  if(gran==='mom'){
+    const MAX=36;
+    let [fy,fm] = ((fromEl&&fromEl.value)||def.from).split('-').map(Number);
+    const [ty,tm] = ((toEl&&toEl.value)||def.to).split('-').map(Number);
+    let totalMonths = (ty-fy)*12 + (tm-fm) + 1;
+    if(totalMonths>MAX){ const back=new Date(Date.UTC(ty,tm-1-(MAX-1),1)); fy=back.getUTCFullYear(); fm=back.getUTCMonth()+1; clampNote=`Showing the most recent ${MAX} months of the selected range.`; }
+    let cy=fy, cm=fm, guard=0;
+    while((cy<ty || (cy===ty && cm<=tm)) && guard<MAX+1){
+      guard++;
+      const from = new Date(Date.UTC(cy,cm-1,1,0,0,0));
+      const to = new Date(Date.UTC(cy,cm,0,23,59,59));
+      buckets.push({label: from.toLocaleDateString('en-GB',{month:'short',year:'2-digit'}), from, to, sortKey:`${cy}-${ovPad2(cm)}`});
+      cm++; if(cm>12){cm=1; cy++;}
+    }
+  } else if(gran==='yoy'){
+    const MAX=15;
+    let fy = parseInt((fromEl&&fromEl.value)||def.from), ty = parseInt((toEl&&toEl.value)||def.to);
+    let lo=Math.min(fy,ty), hi=Math.max(fy,ty);
+    if(hi-lo+1>MAX){ lo = hi-MAX+1; clampNote=`Showing the most recent ${MAX} years of the selected range.`; }
+    for(let y=lo; y<=hi; y++) buckets.push({label:String(y), from:new Date(Date.UTC(y,0,1,0,0,0)), to:new Date(Date.UTC(y,11,31,23,59,59))});
+  } else { // dod
+    const MAX=60;
+    const fv = (fromEl&&fromEl.value)||def.from, tv=(toEl&&toEl.value)||def.to;
+    let cur = new Date(fv+'T00:00:00Z');
+    const end = new Date(tv+'T00:00:00Z');
+    const totalDays = Math.round((end-cur)/86400000)+1;
+    if(totalDays>MAX){ cur = new Date(end); cur.setUTCDate(cur.getUTCDate()-(MAX-1)); clampNote=`Showing the most recent ${MAX} days of the selected range.`; }
+    let guard=0;
+    while(cur<=end && guard<MAX+1){
+      guard++;
+      // Day boundaries in the store's actual PKT calendar day, not raw UTC — otherwise up to
+      // 5 hours of orders land in the wrong day's bar (evening PKT orders are still the
+      // previous UTC calendar day).
+      const y=cur.getUTCFullYear(), mo=cur.getUTCMonth(), da=cur.getUTCDate();
+      const from = new Date(Date.UTC(y,mo,da,0,0,0) - PKT_OFFSET_MS);
+      const to   = new Date(Date.UTC(y,mo,da,23,59,59,999) - PKT_OFFSET_MS);
+      buckets.push({label: cur.toLocaleDateString('en-GB',{day:'2-digit',month:'short',timeZone:'UTC'}), from, to, dateKey:`${y}-${ovPad2(mo+1)}-${ovPad2(da)}`});
+      cur.setUTCDate(cur.getUTCDate()+1);
+    }
+  }
+  buckets._clampNote = clampNote;
+  return buckets;
+}
+
+// Smooth Catmull-Rom → cubic-bezier path through the bar-top points, like the reference chart's glowing curve
+function ovSmoothPath(pts){
+  if(pts.length<2) return '';
+  let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+  for(let i=0;i<pts.length-1;i++){
+    const p0 = pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+    const c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6;
+    const c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
+    d += ` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+function ovTrendChartSVG(buckets){
+  const W=1100, H=300, padL=54, padR=16, padT=40, padB=40;
+  const chartW=W-padL-padR, chartH=H-padT-padB;
+  const hasNet = buckets.some(b=>b.netValue!=null);
+  const maxV = Math.max(1, ...buckets.map(b=>b.value), ...(hasNet?buckets.map(b=>b.netValue||0):[]));
+  const n = buckets.length;
+  const slot = chartW/n;
+  const barW = Math.max(8, slot*0.46);
+
+  const points = buckets.map((b,i)=>{
+    const x = padL + slot*i + slot/2;
+    const y = padT + chartH - (b.value/maxV*chartH);
+    const yNet = b.netValue!=null ? padT + chartH - (b.netValue/maxV*chartH) : null;
+    return {x, y, yNet, ...b};
+  });
+
+  const gridLines = [0,1,2,3,4].map(i=>{
+    const y = padT + chartH - (chartH/4*i);
+    const val = maxV/4*i;
+    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+      <text x="${padL-8}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">${ovFmtCompact(val)}</text>`;
+  }).join('');
+
+  const bars = points.map(p=>{
+    const barH = Math.max(1, chartH - (p.y-padT));
+    return `<rect x="${(p.x-barW/2).toFixed(1)}" y="${p.y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="url(#ovBarGrad)"/>`;
+  }).join('');
+
+  const labels = points.map(p=>`
+    <text x="${p.x.toFixed(1)}" y="${(H-padB+18).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--sans)">${p.label}</text>
+    <text x="${p.x.toFixed(1)}" y="${(p.y-10).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--text)" font-family="var(--mono)" font-weight="700">${ovFmtCompact(p.value)}</text>`
+  ).join('');
+
+  const netLine = hasNet ? `<path d="${ovSmoothPath(points.map(p=>({x:p.x,y:p.yNet})))}" fill="none" stroke="#3ecf8e" stroke-width="3" stroke-linecap="round" filter="url(#ovGlowGreen)"/>` : '';
+  const netLabels = hasNet ? points.map(p=>`
+    <text x="${p.x.toFixed(1)}" y="${(p.yNet+16).toFixed(1)}" text-anchor="middle" font-size="9" fill="#3ecf8e" font-family="var(--mono)" font-weight="700">${ovFmtCompact(p.netValue)}</text>`
+  ).join('') : '';
+
+  const legend = hasNet ? `
+    <g transform="translate(${W-190},14)" font-family="var(--sans)" font-size="11">
+      <circle cx="0" cy="-4" r="4" fill="#b06cff"/><text x="10" y="0" fill="var(--muted)">Gross Sales</text>
+      <circle cx="100" cy="-4" r="4" fill="#3ecf8e"/><text x="110" y="0" fill="var(--muted)">Net Sales</text>
+    </g>` : '';
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:280px;display:block">
+    <defs>
+      <linearGradient id="ovBarGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6b8fd6" stop-opacity="0.55"/>
+        <stop offset="100%" stop-color="#6b8fd6" stop-opacity="0.10"/>
+      </linearGradient>
+      <linearGradient id="ovLineGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#7c5cff"/>
+        <stop offset="50%" stop-color="#c46cff"/>
+        <stop offset="100%" stop-color="#7c5cff"/>
+      </linearGradient>
+      <filter id="ovGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="ovGlowGreen" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    ${gridLines}
+    ${bars}
+    <path d="${ovSmoothPath(points)}" fill="none" stroke="url(#ovLineGrad)" stroke-width="3" stroke-linecap="round" filter="url(#ovGlow)"/>
+    ${netLine}
+    ${labels}
+    ${netLabels}
+    ${legend}
+  </svg>`;
+}
+
+function ovWithTimeout(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error((label||'Request')+' timed out after '+Math.round(ms/1000)+'s — the Shopify Worker may be slow or stalled right now.')), ms))
+  ]);
+}
+
+// MoM/YoY pull from the Sales & Exp tab's already-saved monthly gross sales (sales_exp_months)
+// instead of re-fetching raw Shopify orders — a multi-month range can mean tens of thousands
+// of individual orders to page through live, which is what was timing out. Supabase already
+// has the monthly totals, so this is instant and doesn't touch Shopify at all.
+// Tries Shopify's real analytics query language (ShopifyQL) — the same engine that powers
+// Shopify's own Analytics/Reports section — to get gross/net sales pre-summed on Shopify's
+// side, grouped by day or month. SINCE/UNTIL are interpreted in the store's own configured
+// timezone (confirmed PKT for this store) — plain "YYYY-MM-DD" dates, no UTC conversion needed
+// or wanted here. Needs the `read_reports` scope on the app token; if missing, this throws and
+// the caller falls back to another method.
+// Confirmed real response shape: `rows` is an array of objects keyed by column name (e.g.
+// {gross_sales:"121901", net_sales:"68663.10"}) — there's no date/day field in each row; with
+// TIMESERIES the rows come back in chronological order starting at SINCE, one per period, plus
+// one extra trailing totals row from WITH TOTALS. The caller reconstructs each row's actual
+// date from its position.
+async function ovFetchShopifyQLGrouped(fromDateStr, toDateStr, unit){ // unit: 'day' | 'month'
+  const q = `FROM sales SHOW gross_sales, net_sales TIMESERIES ${unit} WITH TOTALS SINCE ${fromDateStr} UNTIL ${toDateStr}`;
+  const gql = { query: `{ shopifyqlQuery(query: ${JSON.stringify(q)}) { tableData { columns { name } rows } parseErrors } }` };
+  const res = await shopFetch('/graphql.json', 'POST', gql);
+  if(res.errors && res.errors.length) throw new Error(res.errors.map(e=>e.message).join('; '));
+  const resp = res.data && res.data.shopifyqlQuery;
+  if(resp && resp.parseErrors && resp.parseErrors.length) throw new Error('ShopifyQL: ' + resp.parseErrors.join('; '));
+  const table = resp && resp.tableData;
+  if(!table || !Array.isArray(table.rows)) throw new Error('Store\'s API token likely lacks the "read_reports" scope needed for ShopifyQL.');
+  // "WITH TOTALS" appends one extra summary row at the end — drop it, we only want per-period rows
+  const dataRows = table.rows.length > 1 ? table.rows.slice(0, -1) : table.rows;
+  return dataRows.map(row => ({ gross: parseFloat(row.gross_sales)||0, net: parseFloat(row.net_sales)||0 }));
+}
+
+// MoM/YoY pull from the Sales & Exp tab's already-saved monthly gross sales (sales_exp_months)
+// instead of re-fetching raw Shopify orders — a multi-month range can mean tens of thousands
+// of individual orders to page through live, which is what was timing out. Supabase already
+// has the monthly totals, so this is instant and doesn't touch Shopify at all.
+async function ovFillBucketsFromSalesExp(buckets, gran){
+  let rows = [];
+  try{
+    rows = await DB.get('sales_exp_months', 'select=sort_key,gross_sales,net_sales&order=sort_key.asc');
+  }catch(e){ /* leave rows empty — buckets just show no data */ }
+  rows = Array.isArray(rows) ? rows : [];
+  const byGross = {}, byNet = {};
+  rows.forEach(r=>{ byGross[r.sort_key] = parseFloat(r.gross_sales)||0; byNet[r.sort_key] = parseFloat(r.net_sales)||0; });
+
+  buckets.forEach(b=>{
+    if(gran==='mom'){
+      b.value = byGross[b.sortKey] || 0;
+      b.netValue = byNet[b.sortKey] || 0;
+      b.count = null;
+    } else { // yoy — sum every month whose sort_key falls in that year
+      const yearRows = rows.filter(r=>(r.sort_key||'').startsWith(b.label+'-'));
+      b.value = yearRows.reduce((s,r)=>s+(parseFloat(r.gross_sales)||0), 0);
+      b.netValue = yearRows.reduce((s,r)=>s+(parseFloat(r.net_sales)||0), 0);
+      b.count = null;
+    }
+  });
+}
+
+// Uses Shopify's own per-order money fields (the "current" ones, which reflect edits/refunds
+// already applied) instead of manually reconstructing Net = Gross - Discounts - Returns from
+// scratch. Falls back to this only if ShopifyQL isn't available — buckets by day using our own
+// PKT day boundaries, and just needs standard order-read access, not the special Reports scope.
+// Gross = sum(originalUnitPrice × quantity) across line items (true pre-discount total).
+// Net = currentSubtotalPriceSet − totalRefundedSet — currentSubtotalPriceSet is already
+// post-discount, so discounts must NOT be subtracted again here.
+async function ovFetchOrdersNetSalesGraphQL(from, to){
+  const fromISO = toUTCISO(from), toISO = toUTCISO(to);
+  let out = [];
+  let cursor=null, hasNextPage=true, guard=0;
+  while(hasNextPage && guard<100){
+    guard++;
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    const gql = `{
+      orders(first:250${afterClause}, query:"created_at:>='${fromISO}' created_at:<='${toISO}'") {
+        edges { node {
+          createdAt
+          currentSubtotalPriceSet { shopMoney { amount } }
+          totalRefundedSet { shopMoney { amount } }
+          lineItems(first:50) {
+            edges { node { quantity originalUnitPriceSet { shopMoney { amount } } } }
+          }
+        }}
+        pageInfo { hasNextPage endCursor }
+      }
+    }`;
+    const d = await shopFetch('/graphql.json','POST',{query:gql});
+    if(d.errors && d.errors.length) throw new Error(d.errors.map(e=>e.message).join('; '));
+    const ordersData = d?.data?.orders;
+    if(!ordersData) break;
+    ordersData.edges.forEach(({node:o})=>{
+      const gross = (o.lineItems?.edges||[]).reduce((s,{node:li})=>{
+        const unitPrice = parseFloat(li.originalUnitPriceSet?.shopMoney?.amount)||0;
+        return s + unitPrice*(li.quantity||0);
+      }, 0);
+      const subtotal = parseFloat(o.currentSubtotalPriceSet?.shopMoney?.amount)||0;
+      const refunded = parseFloat(o.totalRefundedSet?.shopMoney?.amount)||0;
+      out.push({ createdAt: o.createdAt, gross, net: subtotal - refunded });
+    });
+    hasNextPage = ordersData.pageInfo.hasNextPage;
+    cursor = ordersData.pageInfo.endCursor;
+  }
+  return out;
+}
+
+// Same GraphQL approach as the existing Returns stat card (fetchReturnsByDate) — refunds carry
+// their own createdAt, so unlike a single-total lookup, these can be bucketed per day for the
+// Same GraphQL approach as the existing Returns stat card (fetchReturnsByDate) — refunds carry
+// their own createdAt, so unlike a single-total lookup, these can be bucketed per day. Only
+// used by the manual-calc fallback now, since the primary methods above already include returns.
+async function ovFetchRefundsInRange(from, to){
+  const fromISO = toUTCISO(from), toISO = toUTCISO(to);
+  let refunds = [];
+  let cursor=null, hasNextPage=true, guard=0;
+  while(hasNextPage && guard<50){
+    guard++;
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    const gql = `{
+      orders(first:250${afterClause}, query:"updated_at:>='${fromISO}' updated_at:<='${toISO}'") {
+        edges { node {
+          refunds { createdAt refundLineItems(first:50){ edges { node { subtotalSet { shopMoney { amount } } } } } }
+        }}
+        pageInfo { hasNextPage endCursor }
+      }
+    }`;
+    const d = await shopFetch('/graphql.json','POST',{query:gql});
+    const ordersData = d?.data?.orders;
+    if(!ordersData) break;
+    ordersData.edges.forEach(({node:o})=>{
+      (o.refunds||[]).forEach(ref=>{
+        const refDate = new Date(ref.createdAt);
+        if(refDate<from || refDate>to) return;
+        let rv=0;
+        (ref.refundLineItems?.edges||[]).forEach(({node:rli})=>{ rv+=parseFloat(rli.subtotalSet?.shopMoney?.amount||0); });
+        if(rv>0) refunds.push({createdAt:ref.createdAt, value:rv});
+      });
+    });
+    hasNextPage = ordersData.pageInfo.hasNextPage;
+    cursor = ordersData.pageInfo.endCursor;
+  }
+  return refunds;
+}
+
+async function ovRenderTrendChart(){
+  const wrap = document.getElementById('trendChartWrap');
+  if(!wrap) return;
+  const sel = document.getElementById('trendGranularity');
+  const gran = sel ? sel.value : 'dod';
+  // First run on page load — the From/To inputs don't exist yet, so create them with defaults
+  if(!document.getElementById('ovFrom')){
+    document.getElementById('ovRangeInputs').innerHTML = ovRangeInputsHtml(gran);
+  }
+  wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:50px;gap:10px"><div class="spinner"></div><span style="color:var(--muted);font-size:12px">Loading trend...</span></div>';
+
+  try{
+    const buckets = ovBuildBuckets(gran);
+    let sourceNote = '';
+
+    if(gran==='dod'){
+      // 1st choice: ShopifyQL grouped by day — same engine as Shopify's Analytics/Reports,
+      // and uses the store's own configured timezone automatically rather than any timezone
+      // assumption we'd hardcode, so it should match the Reports section exactly.
+      try{
+        const fromStr = buckets[0].dateKey;
+        const toStr = buckets[buckets.length-1].dateKey;
+        const rows = await ovWithTimeout(ovFetchShopifyQLGrouped(fromStr, toStr, 'day'), 20000, 'ShopifyQL fetch');
+        // Rows come back in chronological order with no date field of their own — reconstruct
+        // each row's date as SINCE + i days and match against our buckets' PKT calendar dateKey.
+        const startDate = new Date(fromStr+'T00:00:00Z');
+        const byKey = {};
+        rows.forEach((r,i)=>{
+          const d = new Date(startDate); d.setUTCDate(d.getUTCDate()+i);
+          byKey[d.toISOString().slice(0,10)] = r;
+        });
+        if(rows.length !== buckets.length) console.warn('ShopifyQL returned', rows.length, 'day rows, expected', buckets.length);
+        buckets.forEach(b=>{
+          const r = byKey[b.dateKey];
+          b.value = r ? r.gross : 0;
+          b.netValue = r ? r.net : 0;
+        });
+        sourceNote = 'Live from Shopify (ShopifyQL) — same numbers as your Analytics/Reports section.';
+      }catch(e1){
+        console.warn('ShopifyQL unavailable, trying per-order fields:', e1.message);
+        try{
+          // 2nd choice: Shopify's own per-order money fields — accounts for edits/refunds
+          // without us reconstructing that logic, needs only standard order-read access.
+          const orders = await ovWithTimeout(
+            ovFetchOrdersNetSalesGraphQL(buckets[0].from, buckets[buckets.length-1].to),
+            25000, 'Order sales fetch'
+          );
+          buckets.forEach(b=>{
+            const inRange = orders.filter(o=>{ const t=new Date(o.createdAt); return t>=b.from && t<=b.to; });
+            b.value = inRange.reduce((s,o)=>s+o.gross,0);
+            b.netValue = inRange.reduce((s,o)=>s+o.net,0);
+            b.count = inRange.length;
+          });
+          sourceNote = 'ShopifyQL unavailable (' + e1.message + ') — using Shopify\'s per-order sales fields instead.';
+        }catch(e2){
+          console.warn('Per-order fields also unavailable, falling back to manual orders+refunds calc:', e2.message);
+          // 3rd choice: manual reconstruction — least preferred, doesn't capture order edits
+          const orders = await ovWithTimeout(fetchAllOrders(buckets[0].from, buckets[buckets.length-1].to), 25000, 'Trend chart fetch');
+          let refunds = [];
+          try{
+            refunds = await ovWithTimeout(ovFetchRefundsInRange(buckets[0].from, buckets[buckets.length-1].to), 25000, 'Returns fetch');
+            sourceNote = 'Shopify\'s direct sales fields were unavailable — using a manual Gross − Discounts − Returns calculation instead (may miss order edits).';
+          }catch(e3){
+            sourceNote = 'Shopify\'s direct sales fields and returns data were both unavailable — Net shown is Gross minus discounts only.';
+          }
+          buckets.forEach(b=>{
+            const inRange = orders.filter(o=>{ const t=new Date(o.created_at); return t>=b.from && t<=b.to; });
+            b.value = inRange.reduce((s,o)=>s+parseFloat(o.total_line_items_price||0),0);
+            const disc = inRange.reduce((s,o)=>s+parseFloat(o.total_discounts||0),0);
+            const dayReturns = refunds.filter(r=>{ const t=new Date(r.createdAt); return t>=b.from && t<=b.to; }).reduce((s,r)=>s+r.value,0);
+            b.netValue = b.value - disc - dayReturns;
+            b.count = inRange.length;
+          });
+        }
+      }
+    } else {
+      // MoM/YoY — try ShopifyQL grouped by month first, fall back to Sales & Exp saved totals
+      try{
+        const fromStr = buckets[0].from.toISOString().slice(0,10);
+        const toStr = buckets[buckets.length-1].to.toISOString().slice(0,10);
+        const rows = await ovWithTimeout(ovFetchShopifyQLGrouped(fromStr, toStr, 'month'), 20000, 'ShopifyQL fetch');
+        // Rows come back in chronological order with no month field of their own — reconstruct
+        // each row's YYYY-MM as the starting month + i months.
+        const [fy, fm] = fromStr.split('-').map(Number);
+        const byKey = {};
+        rows.forEach((r,i)=>{
+          const totalM = (fm-1) + i;
+          const y = fy + Math.floor(totalM/12), m = (totalM%12)+1;
+          byKey[`${y}-${ovPad2(m)}`] = r;
+        });
+        if(gran==='mom' && rows.length!==buckets.length){
+          console.warn('ShopifyQL returned', rows.length, 'month rows, expected', buckets.length);
+        }
+        buckets.forEach(b=>{
+          if(gran==='mom'){
+            const r = byKey[b.sortKey];
+            b.value = r ? r.gross : 0;
+            b.netValue = r ? r.net : 0;
+          } else { // yoy — sum every ShopifyQL month row that falls in this year
+            const yearRows = Object.keys(byKey).filter(k=>k.startsWith(b.label+'-')).map(k=>byKey[k]);
+            b.value = yearRows.reduce((s,r)=>s+r.gross,0);
+            b.netValue = yearRows.reduce((s,r)=>s+r.net,0);
+          }
+        });
+        sourceNote = 'Live from Shopify (ShopifyQL) — same numbers as your Analytics/Reports section.';
+      }catch(e){
+        console.warn('ShopifyQL unavailable for', gran, ':', e.message);
+        await ovFillBucketsFromSalesExp(buckets, gran);
+        sourceNote = 'Could not reach Shopify\'s reporting API (' + e.message + ') — showing the Sales & Exp tab\'s saved totals instead.';
+      }
+    }
+
+    const notes = [buckets._clampNote, sourceNote].filter(Boolean).map(n=>`<div style="font-size:11px;color:var(--muted);margin-bottom:6px">ℹ ${n}</div>`).join('');
+    wrap.innerHTML = notes + ovTrendChartSVG(buckets);
+  }catch(e){
+    wrap.innerHTML = '<div style="padding:24px;color:var(--red);font-size:12px">⚠ Could not load trend: '+e.message+'</div>';
+  }
 }
 
 // Client-side pagination — fetches 250 orders per request, yields UI between pages
@@ -3422,6 +4062,7 @@ function switchTab(name,el){
   if(name==='cs'){ setTimeout(renderCSFromSupabase,200); if(!_opsRows||_opsRows.length===0) setTimeout(opsLoadFromSupabase,300); else setTimeout(opsRenderCards,300); }
   if(name==='ads'){ loadAdsTargets(); }
   if(name==='cards') loadCardData();
+  if(name==='salesexp') loadSalesExpData();
   if(name==='gtech'){ gtechinvPopulateSelect(); if(Object.keys(_gtechStockData).length===0) gtechLoadAll(); }
   if(name==='gtechinv'){ gtechinvInit(); }
   if(name==='sorter'){
@@ -4819,10 +5460,97 @@ function renderAdsTargetCards(){
 // ══════════════════════════════════════════════════
 // XSTACK INTEGRATION
 // ══════════════════════════════════════════════════
-const XSTACK_WORKER     = 'https://mendeez-shopify.divine-mouse-0258.workers.dev';
+const XSTACK_WORKER      = 'https://mendeez-shopify.divine-mouse-0258.workers.dev';
+const XSTACK_CLIENT_ID   = 'api-user-vFB6QQAjwX';
+const XSTACK_SECRET      = 'flha1LaPwY-Nuxui2W5Y';
+const XSTACK_COMPANY     = '0b8bd9e671e00824';
+const XSTACK_LOCATION    = '2021';
+// Internal OMS status codes (confirmed against this store's OMS tab names)
+const XSTACK_STATUS = {
+  dispatched: 'DISPATCHED',
+  delivered:  'ORDER_DELIVERED',
+  cancelled:  'DEAD_VIA_CUSTOMER',
+  returned:   'RETURN_VERIFICATION',
+};
 
+// Token is cached in memory and reused across calls — Xstak tokens expire
+// every 5 minutes, so we refresh a bit early (4 min) to stay safe.
+let _xstackToken = null;
+let _xstackTokenExpiry = 0;
 
+async function xstackGetToken(){
+  if(_xstackToken && Date.now() < _xstackTokenExpiry) return _xstackToken;
+  const res = await fetch(XSTACK_WORKER + '/xstack-token', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      clientId: XSTACK_CLIENT_ID,
+      clientSecret: XSTACK_SECRET,
+      grantType: 'client_credentials',
+      companyCode: XSTACK_COMPANY,
+    })
+  });
+  const data = await res.json();
+  if(!data.access_token) throw new Error('Xstak auth failed: '+JSON.stringify(data));
+  _xstackToken = data.access_token;
+  _xstackTokenExpiry = Date.now() + 4*60*1000; // 4 min safety margin
+  return _xstackToken;
+}
 
+// PKT date formatting matching Xstak's required format: YYYY-MM-DDTHH:MM:SS+05:00
+function xstackFmtDate(d, endOfDay){
+  const pkt = new Date(d.getTime() + PKT_OFFSET_MS);
+  const y = pkt.getUTCFullYear(), m = String(pkt.getUTCMonth()+1).padStart(2,'0'), dd = String(pkt.getUTCDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}T${endOfDay?'23:59:59':'00:00:00'}%2B05:00`;
+}
+
+// Fetches ALL orders for a given status + date range (transition date), paginating as needed.
+// Returns raw order objects from the API (not yet normalized).
+async function xstackFetchAllOrders(statusCode, from, to, onProgress){
+  const token = await xstackGetToken();
+  let page = 1;
+  const all = [];
+  const MAX_PAGES = 30; // safety cap (30 * 500 = 15,000 orders max per status)
+  while(page <= MAX_PAGES){
+    const url = XSTACK_WORKER + '/xstack-orders?'
+      + 'order_status=' + encodeURIComponent(statusCode)
+      + '&location_id=' + XSTACK_LOCATION
+      + '&start_date=' + xstackFmtDate(from, false)
+      + '&end_date=' + xstackFmtDate(to, true)
+      + '&size=500&page=' + page
+      + '&date_filter=1' // transition date, not creation date
+      + '&token=' + encodeURIComponent(token);
+    const res = await fetch(url);
+    const data = await res.json();
+    const orders = data.orders || [];
+    all.push(...orders);
+    if(onProgress) onProgress(statusCode, all.length, data.page?.total_elements || all.length);
+    const totalPages = data.page?.total_pages || 1;
+    if(page >= totalPages || orders.length === 0) break;
+    page++;
+  }
+  return all;
+}
+
+// Normalizes a raw Xstak order into the exact row shape popupCalcAndRender already expects.
+// NOTE: we don't have a separate order-creation date from this API — per decision, the
+// transition date (date_time) stands in for "created" everywhere, so MTD/Carry-Forward
+// splits are based on when the order transitioned into this status, not when it was placed.
+function xstackNormalizeOrder(o, bucket){
+  const qty = (o.products||[]).reduce((s,p)=>s+(p.quantity||0), 0);
+  const row = {
+    orderId: o.order_id || '',
+    value: o.total_amount_pkr || 0,
+    qty: qty || 1,
+    created: o.date_time || o.date || '',
+    dispatched: '', delivered: '', cancelled: '', returned: '', retStatus: '', cancelReason: '',
+  };
+  if(bucket === 'dispatched') row.dispatched = row.created;
+  if(bucket === 'delivered')  row.delivered  = row.created;
+  if(bucket === 'cancelled')  row.cancelled  = row.created;
+  if(bucket === 'returned'){ row.returned = row.created; row.retStatus = 'returned'; }
+  return row;
+}
 
 async function xDebugTest(){
   const out = document.getElementById('xs-debug-output');
@@ -7543,6 +8271,691 @@ let _shopifyGross=0;
 
 </script>
 
+<!-- ══════════════════════ SALES & EXP (Supabase-backed, synced across devices) ══════════════════════ -->
+<div class="panel" id="panel-salesexp" style="padding:22px 28px;max-width:1440px">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--accent)">📈 Sales & Operational Expenses</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">Synced via Supabase · <span id="seLastUpdated"></span></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-s btn-sm" onclick="seOpenImport()">⇩ Import history (one-time)</button>
+      <button class="btn btn-s btn-sm" onclick="seLoad(true)"><span id="seRefreshIcon">↻</span> Refresh</button>
+      <button class="btn btn-p btn-sm" onclick="seOpenForm()">＋ Add Month</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="seLoading" style="display:flex;align-items:center;justify-content:center;padding:60px;gap:12px">
+    <div class="spinner"></div>
+    <span style="color:var(--muted);font-size:13px">Loading from Supabase...</span>
+  </div>
+
+  <!-- Error -->
+  <div id="seError" style="display:none;background:var(--red-dim);border:1px solid var(--red);border-radius:8px;padding:16px;color:var(--red);font-size:13px;margin-bottom:20px"></div>
+
+  <div id="seEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--muted)">
+    <div style="font-size:14px;margin-bottom:8px">No months added yet</div>
+    <div style="font-size:12px;margin-bottom:16px;max-width:420px;margin-left:auto;margin-right:auto">Add your first month by hand, or pull in your existing Jan–May history from the Google Sheet once — after that you can keep going right here, from any device.</div>
+  </div>
+
+  <div id="seContent" style="display:none">
+    <div class="sh">
+      <div class="st">Month — <span id="seMonthLbl" style="color:var(--accent)"></span></div>
+      <div class="ss" style="display:flex;align-items:center;gap:8px">
+        All figures in PKR
+        <select class="fi" id="seMonthFilter" onchange="seRenderAll()" style="width:auto;padding:5px 10px;font-size:11px;margin:0"></select>
+      </div>
+    </div>
+    <div class="sg" id="seKpis"></div>
+
+    <div class="sh">
+      <div class="st">Monthly Trend</div>
+      <div class="ss">Gross Sales · Marketing · Operations · Grand Total</div>
+    </div>
+    <div id="seTrends"></div>
+
+    <div class="sh">
+      <div class="st">Full Breakdown</div>
+      <div class="ss">Click any month's column header to edit that month</div>
+    </div>
+    <div class="tc"><div style="overflow-x:auto" id="seTableWrap"></div></div>
+  </div>
+</div>
+
+<!-- ADD / EDIT MONTH -->
+<div class="overlay" id="seFormOverlay" style="display:none">
+  <div class="setup-box" style="max-width:640px">
+    <div class="setup-title" id="seFormTitle">Add Month</div>
+    <div class="setup-sub">Enter the raw numbers — sales and each expense line. ROAS, ROI, % shares, and CPA are calculated for you, same as the sheet.</div>
+
+    <div class="fg">
+      <div class="fl">Month</div>
+      <input class="fi" type="month" id="seF_month">
+    </div>
+
+    <div id="seFormFields"></div>
+
+    <div id="seFormStatus" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-p btn-full" id="seSaveBtn" onclick="seSaveForm()">Save Month</button>
+      <button class="btn btn-s" onclick="seCloseForm()">Cancel</button>
+      <button class="btn btn-s" id="seDeleteBtn" style="display:none;border-color:var(--red);color:var(--red)" onclick="seDeleteMonth()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ONE-TIME IMPORT -->
+<div class="overlay" id="seImportOverlay" style="display:none">
+  <div class="setup-box">
+    <div class="setup-title">Import History</div>
+    <div class="setup-sub">One-time pull of your existing months into Supabase, so you don't lose history. After this, add new months directly here — from any device.</div>
+
+    <div class="setup-sec">From Google Sheet</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Pulls live from the "Sales & Exp 26" tab of your connected sheet.</div>
+    <button class="btn btn-p btn-full" onclick="seRunImport()">Import from Google Sheet</button>
+
+    <div class="setup-sec">From Excel File</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Upload an .xlsx export — must contain a sheet named "Sales & Exp 26" with the same layout.</div>
+    <input class="fi" type="file" id="seImportFile" accept=".xlsx,.xls" style="margin-bottom:8px">
+    <button class="btn btn-p btn-full" onclick="seRunImportFromExcel()">Import from Excel File</button>
+
+    <div id="seImportStatus" style="font-size:12px;color:var(--muted);margin:12px 0"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-s btn-full" onclick="seCloseImport()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Uses the same DB (Supabase) helper + SUPA_URL/SUPA_ANON already configured above.
+// One-time setup required in Supabase (SQL editor):
+//
+//   create table sales_exp_months (
+//     sort_key text primary key,
+//     label text not null,
+//     gross_sales numeric default 0, net_sales numeric default 0,
+//     discounts numeric default 0, returns numeric default 0, orders numeric default 0,
+//     perf_mkt numeric default 0, sms_mkt numeric default 0, content_mkt numeric default 0,
+//     payroll numeric default 0, agency numeric default 0, courier numeric default 0,
+//     mobile numeric default 0, ops_team numeric default 0, packing numeric default 0,
+//     xstak numeric default 0, shopsmart numeric default 0, shopify numeric default 0,
+//     webdev numeric default 0, updated_at timestamptz default now()
+//   );
+//   alter table sales_exp_months disable row level security;
+//
+// (Match whatever RLS approach your other tables like cs_entries/ops_data already use.)
+//
+// Also run this once, for ad-hoc custom expense lines (e.g. an expense that doesn't fit
+// Payroll/Agency/etc — "Add custom expense" in the form saves here):
+//
+//   create table sales_exp_custom_items (
+//     id bigint generated always as identity primary key,
+//     sort_key text not null references sales_exp_months(sort_key) on delete cascade,
+//     section text not null check (section in ('marketing','operations')),
+//     label text not null,
+//     amount numeric not null default 0,
+//     created_at timestamptz default now()
+//   );
+//   alter table sales_exp_custom_items disable row level security;
+
+const SE_TABLE = 'sales_exp_months';
+const SE_CUSTOM_TABLE = 'sales_exp_custom_items';
+const SE_LOCAL_CACHE_KEY = 'mndz_salesexp_cache_v1'; // offline fallback only
+const SE_NUM_FIELDS = ['grossSales','netSales','discounts','returns','orders','perfMkt','smsMkt','contentMkt','payroll','agency','courier','mobile','opsTeam','packing','xstak','shopsmart','shopify','webdev'];
+const SE_FIELD_TO_COL = {
+  grossSales:'gross_sales', netSales:'net_sales', discounts:'discounts', returns:'returns', orders:'orders',
+  perfMkt:'perf_mkt', smsMkt:'sms_mkt', contentMkt:'content_mkt',
+  payroll:'payroll', agency:'agency', courier:'courier', mobile:'mobile', opsTeam:'ops_team',
+  packing:'packing', xstak:'xstak', shopsmart:'shopsmart', shopify:'shopify', webdev:'webdev'
+};
+
+let _seMonths = [];
+let _seCustomItems = []; // [{id, sortKey, section, label, amount}, ...] across all months
+let _seEditingIdx = -1;
+let _seFormCustomItems = []; // custom items currently in the open form, before saving
+
+function seCustomItemsFor(sortKey, section){
+  return _seCustomItems.filter(c => c.sortKey===sortKey && c.section===section);
+}
+function seCustomSumFor(sortKey, section){
+  return seCustomItemsFor(sortKey, section).reduce((s,c)=>s+(c.amount||0), 0);
+}
+
+function seToDbRow(rec){
+  const row = { sort_key: rec.sortKey, label: rec.label };
+  SE_NUM_FIELDS.forEach(k => { row[SE_FIELD_TO_COL[k]] = rec[k]||0; });
+  return row;
+}
+function seFromDbRow(row){
+  const rec = { sortKey: row.sort_key, label: row.label };
+  SE_NUM_FIELDS.forEach(k => { const v = row[SE_FIELD_TO_COL[k]]; rec[k] = (v===null||v===undefined) ? 0 : parseFloat(v)||0; });
+  return rec;
+}
+
+// Bypasses the generic DB.upsert() wrapper (which swallows errors into a bare `null`) so we can
+// show the *actual* Postgres/PostgREST error — e.g. missing table, missing column, or an RLS
+// policy blocking the write — instead of a generic "import failed" message.
+async function seUpsertOneRow(row){
+  const url = `${SUPA_URL}/rest/v1/${SE_TABLE}?on_conflict=sort_key`;
+  let res;
+  try{
+    res = await fetch(url, {
+      method:'POST',
+      headers: {
+        apikey: SUPA_ANON,
+        Authorization: `Bearer ${SUPA_ANON}`,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=representation'
+      },
+      body: JSON.stringify([row])
+    });
+  }catch(e){
+    throw new Error('Network error reaching Supabase: ' + e.message);
+  }
+  const text = await res.text();
+  if(!res.ok){
+    let detail = text;
+    try{ const j = JSON.parse(text); detail = j.message || j.hint || j.details || text; }catch(e){}
+    throw new Error(`Supabase rejected the write for ${row.sort_key} (HTTP ${res.status}): ${detail}`);
+  }
+  try{ return JSON.parse(text||'[]'); }catch(e){ return []; }
+}
+
+// Sends rows one at a time (rather than as a single batch) so that a single INSERT never contains
+// two rows targeting the same conflict key — the cause of Postgres's "ON CONFLICT DO UPDATE
+// command cannot affect row a second time" error — and so one bad row's error is reported clearly
+// instead of failing the whole import silently.
+async function seUpsertRows(rows){
+  const results=[];
+  for(const row of rows){
+    const r = await seUpsertOneRow(row);
+    results.push(...(Array.isArray(r)?r:[r]));
+  }
+  return results;
+}
+
+async function seLoad(force){
+  const loadingEl=document.getElementById('seLoading'), errEl=document.getElementById('seError');
+  const icon=document.getElementById('seRefreshIcon');
+  loadingEl.style.display='flex'; errEl.style.display='none';
+  if(icon) icon.style.animation='spin .8s linear infinite';
+  try{
+    if(typeof DB==='undefined') throw new Error('Supabase not connected yet.');
+    const data = await DB.get(SE_TABLE, 'select=*&order=sort_key.asc');
+    if(!Array.isArray(data)) throw new Error('Could not read the "sales_exp_months" table — has it been created in Supabase yet?');
+    _seMonths = data.map(seFromDbRow);
+    try{ localStorage.setItem(SE_LOCAL_CACHE_KEY, JSON.stringify(_seMonths)); }catch(e){}
+
+    // Custom expense items — non-fatal if this table doesn't exist yet, so the rest of the tab still works
+    try{
+      const customData = await DB.get(SE_CUSTOM_TABLE, 'select=*&order=id.asc');
+      _seCustomItems = Array.isArray(customData) ? customData.map(r=>({id:r.id, sortKey:r.sort_key, section:r.section, label:r.label, amount:parseFloat(r.amount)||0})) : [];
+    }catch(e){ _seCustomItems=[]; }
+
+    document.getElementById('seLastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    // fall back to last-known local cache so the tab still shows something
+    try{ _seMonths = JSON.parse(localStorage.getItem(SE_LOCAL_CACHE_KEY)||'[]'); }catch(_){ _seMonths=[]; }
+    errEl.textContent = '⚠ ' + e.message + (_seMonths.length ? ' Showing last saved data.' : '');
+    errEl.style.display='block';
+  }finally{
+    loadingEl.style.display='none';
+    if(icon) icon.style.animation='';
+  }
+  seRenderAll();
+}
+function loadSalesExpData(){ seLoad(); }
+
+function seFmtPKR(n){ return (n===null||n===undefined) ? '–' : 'Rs ' + Math.round(n).toLocaleString('en-US'); }
+
+// Sections/fields for the Add/Edit Month form. allowMultiple fields get a "+ add line" button
+// so you can add extra amounts within that expense during the month — they're summed on save.
+// Marketing/Operations also get a free-form "+ Add custom expense" for anything that doesn't
+// fit an existing category (new label + amount, saved to sales_exp_custom_items).
+const SE_FORM_SECTIONS = [
+  {title:'Sales', fields:[
+    {key:'grossSales', label:'Gross Sales', allowMultiple:false},
+    {key:'netSales', label:'Net Sales', allowMultiple:false},
+    {key:'discounts', label:'Discounts', allowMultiple:true},
+    {key:'returns', label:'Returns + Cancellations', allowMultiple:true},
+    {key:'orders', label:'Orders', allowMultiple:false},
+  ]},
+  {title:'Marketing Spend', customSection:'marketing', fields:[
+    {key:'perfMkt', label:'Performance Marketing', allowMultiple:true},
+    {key:'smsMkt', label:'SMS Marketing', allowMultiple:true},
+    {key:'contentMkt', label:'Content/Brand/AI', allowMultiple:true},
+  ]},
+  {title:'Operations Spend', customSection:'operations', fields:[
+    {key:'payroll', label:'Payroll', allowMultiple:true},
+    {key:'agency', label:'Agency', allowMultiple:true},
+    {key:'courier', label:'Courier Expense', allowMultiple:true},
+    {key:'mobile', label:'Mobile', allowMultiple:true},
+    {key:'opsTeam', label:'Operations Team', allowMultiple:true},
+    {key:'packing', label:'Packing Material', allowMultiple:true},
+    {key:'xstak', label:'Xstak', allowMultiple:true},
+    {key:'shopsmart', label:'Shopsmart', allowMultiple:true},
+    {key:'shopify', label:'Shopify', allowMultiple:true},
+    {key:'webdev', label:'Website Development', allowMultiple:true},
+  ]},
+];
+
+function seFieldGroupHtml(f){
+  const addBtn = f.allowMultiple ? `<span class="se-chip-btn" onclick="seAddLine('${f.key}')" style="margin-left:6px;padding:2px 8px">+ add line</span>` : '';
+  return `<div class="fg" data-fieldgroup="${f.key}">
+    <div class="fl">${f.label}${addBtn}</div>
+    <div id="seLines_${f.key}"><input class="fi se-line-input" data-field="${f.key}" type="number" placeholder="0"></div>
+  </div>`;
+}
+
+function seCustomRowHtml(section, label, amount){
+  const l = label ? label.replace(/"/g,'&quot;') : '';
+  return `<div class="se-custom-row" style="display:flex;gap:6px;margin-top:6px;align-items:center">
+    <input class="fi se-custom-label" data-section="${section}" type="text" placeholder="Expense name (e.g. Software, Legal Fee)" value="${l}" style="flex:1.6">
+    <input class="fi se-custom-amount" data-section="${section}" type="number" placeholder="0" value="${amount||''}" style="flex:1">
+    <span class="se-remove-btn" onclick="this.parentElement.remove()">×</span>
+  </div>`;
+}
+function seAddCustomRow(section, label, amount){
+  const wrap = document.getElementById('seCustomRows_'+section);
+  if(wrap) wrap.insertAdjacentHTML('beforeend', seCustomRowHtml(section, label||'', amount||''));
+}
+
+function seRenderFormFields(){
+  const html = SE_FORM_SECTIONS.map(sec => {
+    const customBlock = sec.customSection ? `
+      <div id="seCustomRows_${sec.customSection}" style="margin-top:2px"></div>
+      <div style="margin-top:6px">
+        <span class="se-chip-btn" onclick="seAddCustomRow('${sec.customSection}')">+ Add custom expense</span>
+      </div>` : '';
+    return `
+      <div class="setup-sec">${sec.title}</div>
+      <div class="fr">${sec.fields.map(seFieldGroupHtml).join('')}</div>
+      ${customBlock}
+    `;
+  }).join('');
+  document.getElementById('seFormFields').innerHTML = html;
+}
+function seAddLine(key){
+  const wrap=document.getElementById('seLines_'+key);
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;gap:6px;margin-top:5px';
+  row.innerHTML=`<input class="fi se-line-input" data-field="${key}" type="number" placeholder="0" style="flex:1">
+    <span class="se-remove-btn" onclick="this.parentElement.remove()">×</span>`;
+  wrap.appendChild(row);
+}
+function seSetFieldValue(key, v){
+  const el = document.querySelector('.se-line-input[data-field="'+key+'"]');
+  if(el) el.value = v ? v : '';
+}
+function seSumField(key){
+  let sum=0;
+  document.querySelectorAll('.se-line-input[data-field="'+key+'"]').forEach(inp=>{
+    const v=parseFloat(inp.value); if(!isNaN(v)) sum+=v;
+  });
+  return sum;
+}
+
+function seOpenForm(idx){
+  _seEditingIdx = (idx===undefined) ? -1 : idx;
+  document.getElementById('seFormStatus').textContent='';
+  seRenderFormFields(); // fresh single-line inputs for every field
+  if(_seEditingIdx>=0){
+    const m=_seMonths[_seEditingIdx];
+    document.getElementById('seFormTitle').textContent='Edit '+m.label;
+    document.getElementById('seF_month').value = m.sortKey||'';
+    SE_NUM_FIELDS.forEach(k=>{ seSetFieldValue(k, m[k]); });
+    document.getElementById('seDeleteBtn').style.display='inline-block';
+    // pre-fill any custom expense lines already saved for this month
+    seCustomItemsFor(m.sortKey,'marketing').forEach(ci=>seAddCustomRow('marketing', ci.label, ci.amount));
+    seCustomItemsFor(m.sortKey,'operations').forEach(ci=>seAddCustomRow('operations', ci.label, ci.amount));
+  } else {
+    document.getElementById('seFormTitle').textContent='Add Month';
+    document.getElementById('seF_month').value='';
+    document.getElementById('seDeleteBtn').style.display='none';
+  }
+  document.getElementById('seFormOverlay').style.display='flex';
+}
+function seCloseForm(){ document.getElementById('seFormOverlay').style.display='none'; }
+
+// Reads whatever custom expense rows are currently in the form and replaces (delete + re-insert)
+// this month's custom items in Supabase with that set — simplest way to keep it in sync without
+// having to diff row-by-row.
+async function seSyncCustomItems(sortKey){
+  const rows=[];
+  document.querySelectorAll('.se-custom-row').forEach(rowEl=>{
+    const labelEl = rowEl.querySelector('.se-custom-label');
+    const amountEl = rowEl.querySelector('.se-custom-amount');
+    const label = (labelEl?.value||'').trim();
+    const amount = parseFloat(amountEl?.value);
+    if(!label || isNaN(amount) || amount===0) return; // skip blank/incomplete rows
+    rows.push({ sort_key: sortKey, section: labelEl.getAttribute('data-section'), label, amount });
+  });
+  try{ await DB.delete(SE_CUSTOM_TABLE, sortKey, 'sort_key'); }catch(e){}
+  if(rows.length){
+    const res = await DB.insert(SE_CUSTOM_TABLE, rows);
+    if(!res) throw new Error('Saved the month, but custom expense items failed — check the "sales_exp_custom_items" table exists in Supabase.');
+  }
+}
+
+async function seSaveForm(){
+  const monthVal = document.getElementById('seF_month').value;
+  if(!monthVal){ alert('Pick a month first.'); return; }
+  const [y,mm] = monthVal.split('-');
+  const label = new Date(parseInt(y),parseInt(mm)-1,1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'}).replace(' ','-');
+
+  const rec = { sortKey: monthVal, label };
+  SE_NUM_FIELDS.forEach(k=>{ rec[k] = seSumField(k); });
+
+  const statusEl=document.getElementById('seFormStatus');
+  const btn=document.getElementById('seSaveBtn');
+  statusEl.textContent='Saving to Supabase...'; btn.disabled=true;
+  try{
+    await seUpsertRows([seToDbRow(rec)]);
+    await seSyncCustomItems(monthVal);
+    await seLoad();
+    seCloseForm();
+  }catch(e){
+    statusEl.textContent = '⚠ ' + e.message;
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+async function seDeleteMonth(){
+  if(_seEditingIdx<0) return;
+  const m=_seMonths[_seEditingIdx];
+  if(!confirm('Delete '+m.label+'? This cannot be undone.')) return;
+  const statusEl=document.getElementById('seFormStatus');
+  statusEl.textContent='Deleting...';
+  try{
+    await DB.delete(SE_TABLE, m.sortKey, 'sort_key');
+    await seLoad();
+    seCloseForm();
+  }catch(e){
+    statusEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+function seCompute(m, customSums){
+  customSums = customSums || {marketing:0, operations:0};
+  const totalMkt = (m.perfMkt||0)+(m.smsMkt||0)+(m.contentMkt||0) + customSums.marketing;
+  const totalOps = (m.payroll||0)+(m.agency||0)+(m.courier||0)+(m.mobile||0)+(m.opsTeam||0)+(m.packing||0)+(m.xstak||0)+(m.shopsmart||0)+(m.shopify||0)+(m.webdev||0) + customSums.operations;
+  const grandTotal = totalMkt+totalOps;
+  const grossROAS = totalMkt ? m.grossSales/totalMkt : null;
+  const netROAS   = totalMkt ? m.netSales/totalMkt : null;
+  const cpa       = m.orders ? totalMkt/m.orders : null;
+  return {
+    ...m, totalMkt, totalOps, grandTotal,
+    customMkt: customSums.marketing || null,
+    customOps: customSums.operations || null,
+    grossSpentPct: m.grossSales ? grandTotal/m.grossSales : null,
+    netSpentPct:   m.netSales   ? grandTotal/m.netSales   : null,
+    grossROAS, netROAS,
+    grossROI: grossROAS!==null ? grossROAS-1 : null,
+    netROI:   netROAS!==null   ? netROAS-1   : null,
+    cpa,
+  };
+}
+
+function sePopulateMonthFilter(allComputed){
+  const sel = document.getElementById('seMonthFilter');
+  const prevVal = sel.value || 'all';
+  sel.innerHTML = '<option value="all">All Months</option>' + allComputed.map(m=>`<option value="${m.sortKey}">${m.label}</option>`).join('');
+  sel.value = [...sel.options].some(o=>o.value===prevVal) ? prevVal : 'all';
+}
+
+function seRenderAll(){
+  const empty=document.getElementById('seEmpty');
+  const content=document.getElementById('seContent');
+  if(!_seMonths.length){ empty.style.display='block'; content.style.display='none'; return; }
+  empty.style.display='none'; content.style.display='block';
+
+  // allComputed keeps its original index into _seMonths so edit/delete still targets the right record
+  const allComputed = _seMonths.map((m,i)=>({
+    ...seCompute(m, { marketing: seCustomSumFor(m.sortKey,'marketing'), operations: seCustomSumFor(m.sortKey,'operations') }),
+    _origIdx:i
+  }));
+  sePopulateMonthFilter(allComputed);
+  const filterVal = document.getElementById('seMonthFilter').value || 'all';
+  const computed = filterVal==='all' ? allComputed : allComputed.filter(m=>m.sortKey===filterVal);
+
+  const cur  = computed[computed.length-1];
+  let prev = null;
+  if(filterVal==='all'){
+    prev = computed.length>1 ? computed[computed.length-2] : null;
+  } else {
+    const idxInAll = allComputed.findIndex(m=>m.sortKey===filterVal);
+    prev = idxInAll>0 ? allComputed[idxInAll-1] : null;
+  }
+
+  function pctOf(part,whole){ return (part&&whole) ? (part/whole*100).toFixed(1)+'% of gross' : ''; }
+  function deltaVsPrev(curV,prevV,prevLbl){
+    if(!prevV) return '';
+    const d=(curV-prevV)/prevV*100; const up=d>=0;
+    return `<span style="color:${up?'var(--green)':'var(--red)'}">${up?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</span> vs ${prevLbl}`;
+  }
+
+  document.getElementById('seMonthLbl').textContent = cur.label;
+  document.getElementById('seKpis').innerHTML = `
+    <div class="sc"><div class="sl">Gross Sales</div><div class="sv">${seFmtPKR(cur.grossSales)}</div><div class="ssub">${prev?deltaVsPrev(cur.grossSales,prev.grossSales,prev.label):''}</div></div>
+    <div class="sc"><div class="sl">Net Sales</div><div class="sv">${seFmtPKR(cur.netSales)}</div></div>
+    <div class="sc"><div class="sl">Marketing Spend</div><div class="sv amber">${seFmtPKR(cur.totalMkt)}</div><div class="ssub">${pctOf(cur.totalMkt,cur.grossSales)}</div></div>
+    <div class="sc"><div class="sl">Operations Spend</div><div class="sv blue">${seFmtPKR(cur.totalOps)}</div><div class="ssub">${pctOf(cur.totalOps,cur.grossSales)}</div></div>
+    <div class="sc"><div class="sl">Grand Total Spent</div><div class="sv red">${seFmtPKR(cur.grandTotal)}</div><div class="ssub">${pctOf(cur.grandTotal,cur.grossSales)}</div></div>
+    <div class="sc"><div class="sl">Net ROAS</div><div class="sv green">${cur.netROAS!==null?cur.netROAS.toFixed(2)+'x':'–'}</div></div>
+    <div class="sc"><div class="sl">Net ROI</div><div class="sv green">${cur.netROI!==null?cur.netROI.toFixed(2)+'x':'–'}</div></div>
+    <div class="sc"><div class="sl">CPA</div><div class="sv">${seFmtPKR(cur.cpa)}</div><div class="ssub">${cur.orders?cur.orders.toLocaleString()+' orders':''}</div></div>
+  `;
+
+  const trendMetrics = [
+    {label:'Gross Sales', key:'grossSales', color:'var(--green)'},
+    {label:'Marketing Spend', key:'totalMkt', color:'var(--accent)'},
+    {label:'Operations Spend', key:'totalOps', color:'var(--blue)'},
+    {label:'Grand Total Spent', key:'grandTotal', color:'var(--red)'},
+  ];
+  const maxAll = Math.max(1, ...computed.flatMap(m=>trendMetrics.map(t=>m[t.key]||0)));
+  document.getElementById('seTrends').innerHTML = trendMetrics.map(tm=>`
+    <div class="tc" style="padding:14px 16px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px">${tm.label}</div>
+      <div class="sbars">
+        ${computed.map(m=>{
+          const v=m[tm.key]||0; const w=Math.max(2,Math.round(v/maxAll*100));
+          return `<div class="srow"><div class="sname">${m.label}</div>
+            <div class="btrack"><div class="bfill" style="width:${w}%;background:${tm.color}"></div></div>
+            <div class="tm" style="width:120px;text-align:right;font-size:11px">${seFmtPKR(v)}</div></div>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  const rowsDef = [
+    {label:"Gross Sales", key:'grossSales', bold:true},
+    {label:'Net Sales', key:'netSales'},
+    {label:'Additional E-Comm Discounts', key:'discounts', showPct:true},
+    {label:'Returns + Cancellations', key:'returns', showPct:true},
+    {label:'Performance Marketing', key:'perfMkt', showPct:true},
+    {label:'SMS Marketing', key:'smsMkt', showPct:true},
+    {label:'Content/Brand Marketing/AI', key:'contentMkt', showPct:true},
+    {label:'Other / Custom Expense', key:'customMkt', showPct:true},
+    {label:'Total Digital Marketing Spent', key:'totalMkt', bold:true, divider:true, showPct:true},
+    {label:'Payroll', key:'payroll', showPct:true},
+    {label:'Agency', key:'agency', showPct:true},
+    {label:'Courier Expense Total', key:'courier', showPct:true},
+    {label:'Mobile', key:'mobile', showPct:true},
+    {label:'Operations Team', key:'opsTeam', showPct:true},
+    {label:'Packing Material', key:'packing', showPct:true},
+    {label:'Xstak', key:'xstak', showPct:true},
+    {label:'Shopsmart', key:'shopsmart', showPct:true},
+    {label:'Shopify', key:'shopify', showPct:true},
+    {label:'Website Development', key:'webdev', showPct:true},
+    {label:'Other / Custom Expense', key:'customOps', showPct:true},
+    {label:'Total Operations Spent', key:'totalOps', bold:true, divider:true, showPct:true},
+    {label:'Gross Spent %', key:'grossSpentPct', pctFraction:true},
+    {label:'Net Spent %', key:'netSpentPct', pctFraction:true},
+    {label:'Gross ROAS', key:'grossROAS', ratio:true},
+    {label:'Net ROAS', key:'netROAS', ratio:true},
+    {label:'Gross ROI', key:'grossROI', ratio:true},
+    {label:'Net ROI', key:'netROI', ratio:true},
+    {label:'Orders', key:'orders', intRow:true},
+    {label:'CPA', key:'cpa'},
+    {label:'Grand Total Spent', key:'grandTotal', bold:true, divider:true, showPct:true},
+  ];
+
+  const theadMonths = computed.map(m=>`<th style="text-align:right;cursor:pointer" onclick="seOpenForm(${m._origIdx})" title="Click to edit this month">${m.label} ✎</th>`).join('');
+  const bodyRows = rowsDef.map(def=>{
+    const cells = computed.map(m=>{
+      const v = m[def.key];
+      let display;
+      if(v===null||v===undefined) display='–';
+      else if(def.ratio) display=v.toFixed(2)+'x';
+      else if(def.pctFraction) display=(v*100).toFixed(1)+'%';
+      else if(def.intRow) display=Math.round(v).toLocaleString();
+      else{
+        display=seFmtPKR(v);
+        if(def.showPct && m.grossSales){
+          const pct = (v/m.grossSales*100).toFixed(1);
+          display += ` <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`;
+        }
+      }
+      return `<td class="tm" style="text-align:right;${def.bold?'font-weight:700':''}">${display}</td>`;
+    }).join('');
+    return `<tr style="${def.divider?'border-top:2px solid var(--border2)':''}"><td style="${def.bold?'font-weight:700;color:var(--text)':'color:var(--muted)'}">${def.label}</td>${cells}</tr>`;
+  }).join('');
+
+  document.getElementById('seTableWrap').innerHTML = `<table><thead><tr><th>Metric</th>${theadMonths}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+}
+
+// ---- shared parser: turns raw sheet rows (array-of-arrays) into Supabase-ready records ----
+// Works for both the Google Sheet (gviz) rows and rows read from an uploaded Excel file,
+// since both end up as the same array-of-arrays shape.
+
+// Some month header cells (e.g. Apr-26, May-26) are stored as real Excel *dates*, not text,
+// while earlier ones (Jan/Feb/Mar) are plain text. This normalizes either into "Apr-26" style —
+// without it, date cells render as a raw serial number like "46113".
+function seCellToMonthLabel(v){
+  if(v===undefined||v===null) return '';
+  if(v instanceof Date && !isNaN(v)){
+    return v.toLocaleDateString('en-GB',{month:'short'}) + '-' + String(v.getFullYear()).slice(-2);
+  }
+  if(typeof v === 'number'){
+    // Excel serial date fallback (days since 1899-12-30), in case cellDates wasn't applied upstream
+    const d = new Date(Math.round((v-25569)*86400*1000));
+    if(!isNaN(d) && d.getFullYear()>1990 && d.getFullYear()<2100){
+      return d.toLocaleDateString('en-GB',{month:'short'}) + '-' + String(d.getFullYear()).slice(-2);
+    }
+    return String(v).trim();
+  }
+  return v.toString().trim();
+}
+
+function seParseRowsToUpsertRecords(rows){
+  const monthsRow = rows.find(r=>(r[0]||'').toString().trim().toLowerCase()==='months');
+  if(!monthsRow) throw new Error('Could not find the "Months" row — check the sheet/tab layout matches.');
+
+  const monthCols=[];
+  for(let i=1;i<monthsRow.length;i+=2){
+    const label = seCellToMonthLabel(monthsRow[i]);
+    if(label) monthCols.push({label, valCol:i+1});
+  }
+
+  function num(v){
+    if(v===undefined||v===null) return 0;
+    const s=String(v).trim();
+    if(s===''||s==='-'||s.toUpperCase().includes('DIV/0')) return 0;
+    const n=parseFloat(s.replace(/[^0-9.\-]/g,''));
+    return isNaN(n)?0:n;
+  }
+  function findRow(label){ const t=label.toLowerCase(); return rows.find(r=>(r[0]||'').toString().trim().toLowerCase()===t); }
+  function val(label,m){ const r=findRow(label); return r ? num(r[m.valCol]) : 0; }
+
+  const keyMap = [
+    ["Gross Sales 26'",'grossSales'], ["Net Sales 26'",'netSales'],
+    ['Additional E-Comm Discounts','discounts'], ['Returns + Cancellations','returns'],
+    ['Performance Marketing','perfMkt'], ['SMS Marketing','smsMkt'], ['Content/Brand Marketing/AI','contentMkt'],
+    ['Payroll','payroll'], ['Agency','agency'], ['Courier Expense Total','courier'], ['Mobile','mobile'],
+    ['Operations Team','opsTeam'], ['Packing Material','packing'], ['Xstak','xstak'], ['Shopsmart','shopsmart'],
+    ['Shopify','shopify'], ['Website Development','webdev'], ['Orders','orders'],
+  ];
+
+  const monthNames=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  const monthDisplay=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const toUpsert = [];
+  monthCols.forEach((m, idx)=>{
+    const gross = val("Gross Sales 26'", m);
+    if(!gross) return; // skip months that aren't filled in yet
+    const parts = m.label.replace('-',' ').trim().split(/\s+/);
+    const mi = monthNames.indexOf((parts[0]||'').toLowerCase().slice(0,3));
+    const yy = parts[1] ? ('20'+parts[1].replace(/\D/g,'').slice(-2)) : '2026';
+    const sortKey = mi>=0 ? `${yy}-${String(mi+1).padStart(2,'0')}` : `2026-${String(idx+1).padStart(2,'0')}`;
+    const normalizedLabel = mi>=0 ? `${monthDisplay[mi]}-${yy.slice(-2)}` : m.label; // consistent "Apr-26" style either way
+
+    const rec = {sortKey, label:normalizedLabel};
+    keyMap.forEach(([lbl,key])=>{ rec[key]=val(lbl,m); });
+    toUpsert.push(seToDbRow(rec));
+  });
+  return toUpsert;
+}
+
+function seOpenImport(){ document.getElementById('seImportOverlay').style.display='flex'; document.getElementById('seImportStatus').textContent=''; }
+function seCloseImport(){ document.getElementById('seImportOverlay').style.display='none'; }
+
+async function seRunImport(){
+  const statusEl=document.getElementById('seImportStatus');
+  statusEl.textContent='Fetching from Google Sheets...';
+  try{
+    if(!SHEET_ID) throw new Error('No Sheet ID configured.');
+    const rows = await fetchSheetJSONP(SHEET_ID, 'Sales & Exp 26');
+    const toUpsert = seParseRowsToUpsertRecords(rows);
+    if(!toUpsert.length) throw new Error('No filled-in months found to import.');
+
+    await seUpsertRows(toUpsert);
+
+    await seLoad();
+    statusEl.textContent = `✓ Imported ${toUpsert.length} month(s) from the Google Sheet. You can close this now.`;
+  }catch(e){
+    statusEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+async function seRunImportFromExcel(){
+  const statusEl=document.getElementById('seImportStatus');
+  const fileInput=document.getElementById('seImportFile');
+  const file = fileInput.files && fileInput.files[0];
+  if(!file){ statusEl.textContent='⚠ Choose an .xlsx file first.'; return; }
+  if(typeof XLSX==='undefined'){ statusEl.textContent='⚠ Excel reader library not loaded.'; return; }
+
+  statusEl.textContent='Reading ' + file.name + '...';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+
+    // Find the "Sales & Exp 26" sheet — tolerant of minor name differences (case/spacing).
+    const target = 'sales & exp 26';
+    let sheetName = wb.SheetNames.find(n => n.trim().toLowerCase() === target);
+    if(!sheetName) sheetName = wb.SheetNames.find(n => n.trim().toLowerCase().includes('sales') && n.trim().toLowerCase().includes('exp'));
+    if(!sheetName) throw new Error('No sheet named "Sales & Exp 26" found in that file. Sheets in file: ' + wb.SheetNames.join(', '));
+
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+
+    const toUpsert = seParseRowsToUpsertRecords(rows);
+    if(!toUpsert.length) throw new Error('No filled-in months found in "' + sheetName + '".');
+
+    await seUpsertRows(toUpsert);
+
+    await seLoad();
+    statusEl.textContent = `✓ Imported ${toUpsert.length} month(s) from "${file.name}". You can close this now.`;
+  }catch(e){
+    statusEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+seLoad();
+</script>
+
+
 
 <!-- ============ OPS DATA POPUP ============ -->
 <div id="opsPopupOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto">
@@ -7724,6 +9137,54 @@ function popupHandleFile(file){
   reader.readAsArrayBuffer(file);
 }
 
+// ============ LIVE XSTAK FETCH (replaces manual file upload) ============
+async function opsFetchFromXstak(){
+  const {from,to} = getRange();
+  popupSetStatus('⏳ Getting Xstak token...');
+  try{
+    await xstackGetToken();
+  } catch(e){
+    popupSetStatus('❌ Auth failed: '+e.message);
+    return;
+  }
+
+  const buckets = ['dispatched','delivered','cancelled','returned'];
+  const freshRows = [];
+
+  for(const bucket of buckets){
+    const statusCode = XSTACK_STATUS[bucket];
+    try{
+      const orders = await xstackFetchAllOrders(statusCode, from, to, (code, got, total)=>{
+        popupSetStatus('⏳ Fetching '+bucket+' ('+statusCode+')... '+got+'/'+total);
+      });
+      orders.forEach(o => freshRows.push(xstackNormalizeOrder(o, bucket)));
+    } catch(e){
+      popupSetStatus('❌ Failed fetching '+bucket+': '+e.message);
+      return;
+    }
+  }
+
+  // Merge into _popRows exactly like the old file-upload merge did — dedupe by orderId,
+  // keep whichever status fields are present (a real order should only match ONE bucket
+  // per fetch, since it only has one current status, but this merge logic is kept for safety).
+  const mergedMap = {};
+  _popRows.forEach(r=>{ if(r.orderId) mergedMap[r.orderId]={...r}; });
+  freshRows.forEach(r=>{
+    if(!r.orderId) return;
+    if(!mergedMap[r.orderId]){ mergedMap[r.orderId]={...r}; }
+    else {
+      if(r.dispatched) mergedMap[r.orderId].dispatched=r.dispatched;
+      if(r.delivered)  mergedMap[r.orderId].delivered=r.delivered;
+      if(r.cancelled)  mergedMap[r.orderId].cancelled=r.cancelled;
+      if(r.returned){ mergedMap[r.orderId].returned=r.returned; mergedMap[r.orderId].retStatus=r.retStatus; }
+    }
+  });
+  _popRows = Object.values(mergedMap);
+
+  popupSetStatus('✅ '+_popRows.length+' unique orders fetched live from Xstak');
+  popupCalcAndRender();
+}
+
 function popupPd(str){
   if(!str||str==='null'||str==='') return null;
   str=str.trim();
@@ -7787,6 +9248,7 @@ async function popupApplyToMainDash(){
 
   // Update _opsRows instantly and render
   _opsRows = _popRows;
+  window._opsRowsFresh = true; // protect from being overwritten by the automatic Supabase reload on page load
   opsRenderCards();
   closeOpsPopup();
   const statusEl=document.getElementById('opsUploadStatus');
@@ -7820,5 +9282,1582 @@ async function popupApplyToMainDash(){
 }
 </script>
 
+
+<script>
+/* ===== CHATBOT EMBED — from chatbot_dashboard.html ===== */
+
+// ═══════════════════ LIVE DATA CONFIG — FILL THESE IN ═══════════════════
+// SUPABASE_URL / SUPABASE_ANON_KEY: same values as your Worker's secrets
+// (wrangler secret list). Safe to use the anon key here — it's the same
+// key your Worker itself already uses for all its own reads/writes.
+// WORKER_URL: your deployed Worker's base URL (no trailing slash).
+// WORKER_KEY: same value as WEBHOOK_VERIFY_TOKEN (used to gate /agent-reply).
+const CB_CONFIG = {
+  SUPABASE_URL: 'https://afewclisvjjwvpxvyazm.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZXdjbGlzdmpqd3ZweHZ5YXptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODQ3OTcsImV4cCI6MjA5NTI2MDc5N30.bixfpmZU1MDdUKj85rtE1xgoa5F3oX9N2UFdquvWJTQ',
+  WORKER_URL: 'https://mendeez-chatbot-worker.divine-mouse-0258.workers.dev',
+  WORKER_KEY: 'mendeez_bot_2026',
+};
+
+async function cbSupabase(path, options) {
+  const res = await fetch(`${CB_CONFIG.SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: CB_CONFIG.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${CB_CONFIG.SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      ...(options?.method === 'PATCH' ? { Prefer: 'return=minimal' } : {}),
+      ...(options?.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { const body = await res.text(); detail = body ? ' — ' + body.slice(0,300) : ''; } catch(e){}
+    throw new Error(`Supabase ${options?.method || 'GET'} ${path} failed: ${res.status}${detail}`);
+  }
+  if (res.status === 204) return null;
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('cbSupabase: response was not valid JSON:', text.slice(0, 200));
+    return null;
+  }
+}
+
+function cbFormatTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+// Maps a raw chatbot_conversations row (real schema) onto the shape the
+// existing render functions expect (c.name, c.last, c.time, c.unread...).
+// order_ref/location aren't real columns in this schema — left null so
+// the UI just omits them gracefully rather than breaking.
+function cbMapConversation(row){
+  return {
+    id: row.id,
+    name: row.customer_name || row.customer_id || 'Unknown',
+    platform: row.platform || 'whatsapp',
+    channel: row.channel || 'sales',
+    handled_by: row.handled_by || 'ai',
+    escalation_reason: row.escalation_reason || null,
+    order_ref: null,
+    location: null,
+    last: row.last_message || '',
+    time: cbFormatTime(row.last_message_at),
+    unread: row.unread_count || 0,
+    customer_id: row.customer_id,
+  };
+}
+
+async function cbFetchConversations(){
+  try {
+    const rows = await cbSupabase('chatbot_conversations?select=*&order=last_message_at.desc.nullslast&limit=100');
+    CONVERSATIONS = (rows || []).map(cbMapConversation);
+    cbRenderList();
+  } catch (e) {
+    console.error('cbFetchConversations error:', e.message);
+    cbToast('Could not load conversations — check Supabase config');
+  }
+}
+
+async function cbFetchMessages(convId){
+  const rows = await cbSupabase(`chatbot_messages?select=sender,body,created_at,image_url,audio_url&conversation_id=eq.${convId}&order=created_at.asc`);
+  return (rows || []).map(m => ({ sender: m.sender, body: m.body, time: cbFormatTime(m.created_at), image_url: m.image_url, audio_url: m.audio_url }));
+}
+
+// Lightweight polling instead of a full realtime subscription — simple,
+// dependency-free, good enough to feel "live" without pulling in the
+// Supabase JS client. Refreshes the list always; refreshes the open
+// conversation's messages too, if one is open.
+let _cbPollTimer = null;
+function cbStartPolling(){
+  if (_cbPollTimer) clearInterval(_cbPollTimer);
+  _cbPollTimer = setInterval(async () => {
+    await cbFetchConversations();
+    if (_activeId) {
+      try {
+        const msgs = await cbFetchMessages(_activeId);
+        const c = CONVERSATIONS.find(x => x.id === _activeId);
+        if (c) { c.messages = msgs; cbRenderMessages(msgs); }
+      } catch (e) { console.error('poll messages error:', e.message); }
+    }
+  }, 6000);
+}
+// ═══════════════════ END LIVE DATA CONFIG ═══════════════════
+
+const ICONS = {
+  image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-4 4-3-3-6 6"/>',
+  mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>',
+  inbox:'<path d="M3 12h4l2 3h6l2-3h4"/><rect x="3" y="5" width="18" height="14" rx="2.5"/>',
+  alert:'<path d="M12 3.5l9 15.5a1 1 0 0 1-.9 1.5H3.9a1 1 0 0 1-.9-1.5z"/><line x1="12" y1="9.5" x2="12" y2="13.5"/><circle cx="12" cy="16.7" r=".6" fill="currentColor" stroke="none"/>',
+  message:'<path d="M4 4.5h16v11.5H9l-4.5 4V16H4z"/>',
+  shield:'<path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  target:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
+  reply:'<path d="M9 6L3 12l6 6"/><path d="M3 12h11a6 6 0 0 1 6 6v2"/>',
+  plug:'<circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><line x1="10.1" y1="10.1" x2="13.9" y2="13.9"/>',
+  chart:'<line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="12" width="3" height="8" fill="currentColor" stroke="none" rx="1"/><rect x="11" y="7" width="3" height="13" fill="currentColor" stroke="none" rx="1"/><rect x="16" y="3" width="3" height="17" fill="currentColor" stroke="none" rx="1"/>',
+  megaphone:'<path d="M3 10v4h4l6 4V6l-6 4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/>',
+  flask:'<path d="M9 3h6"/><path d="M10 3v6.5l-5.3 8.8A2 2 0 0 0 6.4 21h11.2a2 2 0 0 0 1.7-2.7L14 9.5V3"/>',
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M2.7 20c.4-3.2 3.2-5.4 6.3-5.4s5.9 2.2 6.3 5.4"/><circle cx="17.3" cy="9.3" r="2.5"/><path d="M15.6 20c.4-2.2 1.9-3.9 3.9-4.5"/>',
+  smile:'<circle cx="12" cy="12" r="9"/><path d="M8 13.5s1.6 3 4 3 4-3 4-3"/><circle cx="9" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r=".8" fill="currentColor" stroke="none"/>',
+  bag:'<path d="M6.5 8h11l-1 12.5h-9z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  network:'<circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="12" r="2.2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><line x1="7.2" y1="7.2" x2="10.6" y2="10.6"/><line x1="16.8" y1="7.2" x2="13.4" y2="10.6"/><line x1="7.2" y1="16.8" x2="10.6" y2="13.4"/><line x1="16.8" y1="16.8" x2="13.4" y2="13.4"/>',
+  lifebuoy:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><line x1="5.4" y1="5.4" x2="9.3" y2="9.3"/><line x1="18.6" y1="5.4" x2="14.7" y2="9.3"/><line x1="5.4" y1="18.6" x2="9.3" y2="14.7"/><line x1="18.6" y1="18.6" x2="14.7" y2="14.7"/>',
+  search:'<circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.3" y1="15.3" x2="20.5" y2="20.5"/>',
+  send:'<path d="M3.5 12L20.5 3.5l-6 17-3-7.5-7.5-1z" fill="currentColor" stroke="none"/><path d="M3.5 12L20.5 3.5l-9.5 9.5" fill="none"/>',
+  headset:'<path d="M4 13.5a8 8 0 0 1 16 0"/><rect x="3" y="13.5" width="4.2" height="6.5" rx="1.6"/><rect x="16.8" y="13.5" width="4.2" height="6.5" rx="1.6"/><path d="M20 20v.5a3 3 0 0 1-3 3h-2.7"/>',
+  card:'<rect x="3" y="6" width="18" height="12" rx="2.2"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  cornerRight:'<path d="M6 4v8a2 2 0 0 0 2 2h10.5"/><polyline points="14 10.5 18.5 14 14 17.5"/>',
+  arrowRight:'<line x1="4" y1="12" x2="20" y2="12"/><polyline points="14 6 20 12 14 18"/>',
+  eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 10.7a2.1 2.1 0 0 0 2.9 2.9"/><path d="M9.9 4.3A10 10 0 0 1 12 4c5.2 0 9.3 4.1 10.4 8-.4 1.5-1.2 3-2.3 4.2M6.5 6.6C4.3 8 2.8 10 1.9 12c1 3.9 5.1 8 10.1 8 1.4 0 2.8-.3 4-.9"/>',
+  check:'<circle cx="12" cy="12" r="9"/><polyline points="8 12.5 11 15.5 16 9.5"/>',
+  robot:'<rect x="5" y="8.5" width="14" height="10.5" rx="2.5"/><line x1="12" y1="8.5" x2="12" y2="4.5"/><circle cx="12" cy="3.3" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="13.7" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="13.7" r="1.3" fill="currentColor" stroke="none"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M3.5 6.3l8.5 6.7 8.5-6.7"/>',
+  happy:'<circle cx="12" cy="12" r="9"/><path d="M8 13.5s1.6 3 4 3 4-3 4-3"/><circle cx="9" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r=".8" fill="currentColor" stroke="none"/>',
+  neutral:'<circle cx="12" cy="12" r="9"/><line x1="8" y1="14.5" x2="16" y2="14.5"/><circle cx="9" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r=".8" fill="currentColor" stroke="none"/>',
+  sad:'<circle cx="12" cy="12" r="9"/><path d="M8 16s1.6-3 4-3 4 3 4 3"/><circle cx="9" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r=".8" fill="currentColor" stroke="none"/>',
+  whatsapp:'<path d="M6.5 17.5L4.5 20l2.6-.8A8 8 0 1 0 4.5 12a7.9 7.9 0 0 0 1 3.9z"/><path d="M9 9.7c.2-.6.7-.5 1.1-.5s.6 0 .8.4.7 1.6.7 1.8-.1.4-.3.6-.3.3-.1.6a5.8 5.8 0 0 0 2.5 2.2c.3.1.5.1.7-.1s.7-.8.9-1 .4-.2.6-.1l1.5.7c.2.1.4.2.4.4s0 1-.4 1.5-1.3.9-2 .9a5.8 5.8 0 0 1-2.7-.8A8.6 8.6 0 0 1 9 12.9a4 4 0 0 1-.7-2.2c0-.6.2-1 .4-1.3z" fill="currentColor" stroke="none"/>',
+  instagram:'<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r=".9" fill="currentColor" stroke="none"/>',
+  facebook:'<path d="M14 8.5h2.5V5H14a3.5 3.5 0 0 0-3.5 3.5V11H8v3.5h2.5V21H14v-6.5h2.3l.5-3.5H14z" fill="currentColor" stroke="none"/>',
+  tiktok:'<path d="M13.5 3.5v10.7a2.6 2.6 0 1 1-2.2-2.6"/><path d="M13.5 3.5c.3 2.3 1.9 4 4.4 4.3"/>',
+};
+function ic(name, size, color){
+  const s = size||16;
+  return '<svg class="icon" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="'+(color||'currentColor')+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[name]||'')+'</svg>';
+}
+
+if(document.getElementById('ic-info')) document.getElementById('ic-info').innerHTML = ic('search', 12);
+if(document.getElementById('ic-search')) document.getElementById('ic-search').innerHTML = ic('search', 14);
+
+const NAV_ITEMS = [
+  {key:'inbox', icon:'inbox', label:'Inbox'},
+  {key:'escalations', icon:'alert', label:'Escalations'},
+  {key:'comments', icon:'message', label:'Comments Manager', children:[
+    {key:'fb-comments', label:'Facebook Comments'},
+    {key:'ig-comments', label:'Instagram Comments'},
+    {key:'comment-logs', label:'Comment Logs'},
+  ]},
+  {key:'policy', icon:'shield', label:'Policy'},
+  {key:'strategy', icon:'target', label:'Strategy'},
+  {key:'reports', icon:'chart', label:'Reports'},
+  {key:'campaigns', icon:'megaphone', label:'AI Campaigns'},
+  {key:'customers', icon:'users', label:'Customers'},
+  {key:'shopify', icon:'bag', label:'Shopify Analytics'},
+];
+let _cbExpandedNav = {}; // tracks which parent nav sections are expanded
+function cbRenderNavScroll(){
+  document.getElementById('cb-nav-scroll').innerHTML = NAV_ITEMS.map(function(n){
+    if (n.children) {
+      const expanded = !!_cbExpandedNav[n.key];
+      const chevron = expanded ? '▾' : '▸';
+      const parent = '<div class="cb-nav-item" data-nav="'+n.key+'" onclick="cbToggleNavSection(\''+n.key+'\')"><span class="cb-nav-icon">'+ic(n.icon,16)+'</span><span style="flex:1">'+n.label+'</span><span style="font-size:10px;color:var(--muted2)">'+chevron+'</span></div>';
+      if (!expanded) return parent;
+      const subItems = n.children.map(function(c){
+        return '<div class="cb-nav-item" data-nav="'+c.key+'" style="padding-left:34px;font-size:11.5px" onclick="cbNav(\''+c.key+'\')"><span>'+c.label+'</span></div>';
+      }).join('');
+      return parent + subItems;
+    }
+    return '<div class="cb-nav-item '+(n.key==='inbox'?'active':'')+'" data-nav="'+n.key+'" onclick="cbNav(\''+n.key+'\')"><span class="cb-nav-icon">'+ic(n.icon,16)+'</span><span>'+n.label+'</span></div>';
+  }).join('');
+}
+function cbToggleNavSection(key){
+  _cbExpandedNav[key] = !_cbExpandedNav[key];
+  cbRenderNavScroll();
+}
+cbRenderNavScroll();
+document.getElementById('cb-nav-support').innerHTML =
+  '<div class="cb-nav-item" data-nav="support" onclick="cbNav(\'support\')"><span class="cb-nav-icon">'+ic('lifebuoy',16)+'</span><span>Support</span></div>'+
+  '<div class="cb-nav-item" data-nav="download-report" onclick="cbNav(\'download-report\')"><span class="cb-nav-icon">'+ic('chart',16)+'</span><span>Download Report</span></div>';
+
+function cbRightSidebar(){
+  return '\
+    <div class="cb-filter-card cb-filter-green active" id="cb-qf-all" onclick="cbQuickFilter(\'all\')"><span>All Chats</span><span>42</span></div>\
+    <div class="cb-filter-card cb-filter-blue" id="cb-qf-unread" onclick="cbQuickFilter(\'unread\')"><span>Unread</span><span>9</span></div>\
+    <div class="cb-filter-card cb-filter-red" id="cb-qf-intervention" onclick="cbQuickFilter(\'intervention\')"><span>Intervention</span><span>1</span></div>\
+    <div class="cb-section-lbl">Unified Channels</div>\
+    <div class="cb-channel-row" onclick="cbPlatformFilter(\'whatsapp\')"><span class="cb-channel-dot" style="background:var(--green);color:var(--green)"></span><span>WhatsApp</span><span class="cb-channel-count">24</span></div>\
+    <div class="cb-channel-row" onclick="cbPlatformFilter(\'instagram\')"><span class="cb-channel-dot" style="background:#e1306c;color:#e1306c"></span><span>Instagram</span><span class="cb-channel-count">12</span></div>\
+    <div class="cb-channel-row" onclick="cbPlatformFilter(\'messenger\')"><span class="cb-channel-dot" style="background:var(--blue);color:var(--blue)"></span><span>Facebook</span><span class="cb-channel-count">6</span></div>\
+    <div class="cb-channel-row" style="opacity:.55" onclick="cbNav(\'integrations\')"><span class="cb-channel-dot" style="background:var(--muted2);color:var(--muted2)"></span><span>TikTok</span><span class="cb-channel-count" style="color:var(--accent)">Connect</span></div>\
+    <div class="cb-channel-row" style="opacity:.55" onclick="cbNav(\'integrations\')"><span class="cb-channel-dot" style="background:var(--muted2);color:var(--muted2)"></span><span>Gmail</span><span class="cb-channel-count" style="color:var(--accent)">Connect</span></div>\
+    <div class="cb-channel-row" style="opacity:.6" onclick="cbPlatformFilter(null)"><span class="cb-channel-dot" style="background:var(--muted2);color:var(--muted2)"></span><span>Show all channels</span></div>\
+    <div class="cb-section-lbl">Escalation Reasons (30d)</div>\
+    <div style="display:flex;flex-direction:column;gap:9px;padding:0 4px">\
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--muted);display:flex;align-items:center;gap:7px">'+ic('card',14,'var(--blue)')+'Online payment</span><span style="font-family:var(--mono);color:var(--blue)">14</span></div>\
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--muted);display:flex;align-items:center;gap:7px">'+ic('alert',14,'var(--red)')+'Complex complaint</span><span style="font-family:var(--mono);color:var(--red)">6</span></div>\
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--muted);display:flex;align-items:center;gap:7px">'+ic('cornerRight',14,'var(--accent)')+'Sales transfer</span><span style="font-family:var(--mono);color:var(--accent)">21</span></div>\
+    </div>';
+}
+function cbEmptyChatCol(){
+  return '<div id="cb-chat-header" class="cb-chat-header"><div style="color:var(--muted);font-size:12px">Select a conversation</div></div>\
+    <div id="cb-chat-subheader" class="cb-chat-subheader" style="display:none"></div>\
+    <div id="cb-chat-messages" class="cb-chat-messages"></div>\
+    <div id="cb-chat-input-bar" class="cb-chat-input-bar" style="display:none">\
+      <input type="file" id="cb-image-upload-input" accept="image/*" style="display:none" onchange="cbHandleImageUpload(this)">\
+      <button class="cb-action-link" title="Attach a photo" onclick="document.getElementById(\'cb-image-upload-input\').click()">'+ic('image',14)+'</button>\
+      <span id="cb-voice-controls"><button id="cb-mic-btn" class="cb-action-link" title="Record a voice note" onclick="cbToggleRecording()">'+ic('mic',14)+'</button></span>\
+      <input id="cb-chat-input" placeholder="Type a reply..." onkeydown="if(event.key===\'Enter\')cbSendReply()">\
+      <button class="cb-take-control" style="background:var(--blue)" onclick="cbSendReply()">'+ic('send',13)+' Send</button>\
+    </div>';
+}
+document.getElementById('cb-right-col').innerHTML = cbRightSidebar();
+document.getElementById('cb-chat-col').innerHTML = cbEmptyChatCol();
+
+let CONVERSATIONS = []; // populated live from Supabase — see cbFetchConversations()
+
+const PLATFORM_BADGE = { whatsapp:{label:'W', color:'#4fb287'}, instagram:{label:'IG', color:'#e1306c'}, facebook:{label:'FB', color:'#5b96f0'} };
+let _activeId = null;
+let _quickFilter = 'all';
+let _platformFilter = null;
+
+function cbInitials(name){ return name.trim().split(/\s+/).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
+function cbAvatarGradient(seed){
+  const pairs=[['#4fb287','#3a8f6b'],['#5b96f0','#3d6fce'],['#e8c547','#c9a232'],['#e1306c','#b81f53'],['#f0974a','#cc7530'],['#9b8ef5','#7b6ef0']];
+  let h=0; const s=String(seed); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  const p=pairs[h%pairs.length];
+  return 'linear-gradient(145deg,'+p[0]+','+p[1]+')';
+}
+function cbToast(msg){
+  const t=document.getElementById('cb-toast');
+  t.innerHTML = ic('check',14)+' '+msg;
+  t.classList.add('show');
+  clearTimeout(window._cbToastTimer);
+  window._cbToastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2400);
+}
+
+function cbMdLite(text){
+  if(!text) return '';
+  let esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  esc = esc.replace(/\*([^*]+)\*/g, '<b>$1</b>');
+  const lines = esc.split('\n');
+  let html = '', inList=false;
+  lines.forEach(function(line){
+    const t = line.trim();
+    if(/^[•\-]\s+/.test(t)){
+      if(!inList){ html+='<ul>'; inList=true; }
+      html += '<li>'+t.replace(/^[•\-]\s+/,'')+'</li>';
+    } else {
+      if(inList){ html+='</ul>'; inList=false; }
+      html += t ? '<div>'+t+'</div>' : '<br>';
+    }
+  });
+  if(inList) html+='</ul>';
+  return html;
+}
+
+function cbQuickFilter(f){
+  _quickFilter=f;
+  document.querySelectorAll('.cb-filter-card').forEach(function(el){ el.classList.remove('active'); });
+  const el = document.getElementById('cb-qf-'+f);
+  if(el) el.classList.add('active');
+  cbRenderList();
+}
+function cbPlatformFilter(p){ _platformFilter=p; cbRenderList(); }
+
+function cbRenderList(){
+  const searchEl = document.getElementById('cb-search');
+  const q=(searchEl?searchEl.value:'').toLowerCase();
+  let rows=CONVERSATIONS.slice();
+  if(_quickFilter==='unread') rows=rows.filter(function(c){return c.unread>0;});
+  if(_quickFilter==='intervention') rows=rows.filter(function(c){return c.handled_by==='human';});
+  if(_platformFilter) rows=rows.filter(function(c){return c.platform===_platformFilter;});
+  if(q) rows=rows.filter(function(c){return c.name.toLowerCase().indexOf(q)>=0||c.last.toLowerCase().indexOf(q)>=0;});
+
+  const listEl=document.getElementById('cb-conv-list');
+  if(!listEl) return;
+  if(!rows.length){ listEl.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted2);font-size:12px">No conversations match this filter</div>'; return; }
+
+  listEl.innerHTML = rows.map(function(c){
+    const isActive = c.id===_activeId;
+    const badge = PLATFORM_BADGE[c.platform] || { label: '?', color: '#888' };
+    const unread = c.unread>0 ? '<span class="cb-unread-dot">'+c.unread+'</span>' : '';
+    return '<div class="cb-conv-row '+(isActive?'active':'')+'" onclick="cbOpen('+c.id+')">\
+      <div class="cb-avatar" style="background:'+cbAvatarGradient(c.id)+'">'+cbInitials(c.name)+'\
+        <span class="cb-avatar-badge" style="background:'+badge.color+'">'+badge.label+'</span>\
+      </div>\
+      <div style="flex:1;min-width:0">\
+        <div style="display:flex;justify-content:space-between;align-items:center">\
+          <span style="font-weight:700;font-size:12.5px">'+c.name+'</span>\
+          <span style="font-size:9px;font-family:var(--mono);color:var(--muted2)">'+c.time+'</span>\
+        </div>\
+        <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:195px">'+c.last+'</div>\
+      </div>\
+      '+unread+'\
+    </div>';
+  }).join('');
+}
+
+async function cbOpen(id){
+  if(!document.getElementById('cb-chat-header')){
+    document.getElementById('cb-chat-col').innerHTML = cbEmptyChatCol();
+  }
+  _activeId=id;
+  cbRenderList();
+  const c = CONVERSATIONS.filter(function(x){return x.id===id;})[0];
+  if(!c) return;
+  if(c.unread>0){
+    c.unread=0;
+    cbSupabase(`chatbot_conversations?id=eq.${id}`, { method:'PATCH', body: JSON.stringify({ unread_count: 0 }) }).catch(e=>console.error('unread reset error:', e.message));
+  }
+
+  const aiHandling = c.handled_by==='ai';
+  const platLabel = c.platform==='whatsapp'?'WhatsApp':(c.platform==='instagram'?'Instagram':'Messenger');
+  const platIcon = c.platform==='whatsapp'?'whatsapp':(c.platform==='instagram'?'instagram':'facebook');
+  const controlBtn = aiHandling
+    ? '<button class="cb-take-control" onclick="cbTakeControl('+c.id+')">'+ic('headset',14)+' Take Control</button>'
+    : '<button class="cb-take-control taken" onclick="cbReturnToAI('+c.id+')">'+ic('robot',14)+' Human In Control &middot; Return to AI</button>';
+  document.getElementById('cb-chat-header').innerHTML =
+    '<div style="display:flex;align-items:center;gap:9px">'+ic(platIcon,18)+'<span style="font-weight:700;font-size:14px">'+platLabel+'</span><span class="cb-connected-dot"></span></div>'+
+    controlBtn;
+
+  const reasonTxt = c.escalation_reason==='online_payment' ? ic('card',12)+' Waiting on online payment'
+    : c.escalation_reason==='complex_complaint' ? ic('alert',12)+' Complex complaint'
+    : c.escalation_reason==='manual_override' ? ic('headset',12)+' Manually taken over' : '';
+  let actionBtns='';
+  if(aiHandling && c.channel==='complaints'){
+    actionBtns = '<button class="cb-action-link" onclick="cbAction(\'Transferred to Sales\')">'+ic('cornerRight',13)+' Transfer to Sales</button>'+
+      '<button class="cb-action-link" style="color:var(--red)" onclick="cbAction(\'Escalated as complex complaint\')">'+ic('alert',13)+' Escalate (Complex)</button>';
+  } else if(aiHandling && c.channel==='sales'){
+    actionBtns = '<button class="cb-action-link" style="color:var(--blue)" onclick="cbAction(\'Transferred for online payment\')">'+ic('card',13)+' Transfer for Online Payment</button>';
+  }
+  const subEl=document.getElementById('cb-chat-subheader');
+  subEl.style.display='flex';
+  subEl.innerHTML =
+    '<div class="cb-avatar" style="width:32px;height:32px;font-size:10.5px;background:'+cbAvatarGradient(c.id)+'">'+cbInitials(c.name)+'</div>'+
+    '<div style="flex:1">'+
+      '<div style="font-weight:700;font-size:13px">'+c.name+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px">'+(c.order_ref?'Order #'+c.order_ref+' &middot; ':'')+(c.location||'')+(reasonTxt?' &middot; '+reasonTxt:'')+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+actionBtns+'</div>';
+
+  document.getElementById('cb-chat-messages').innerHTML = '<div style="text-align:center;color:var(--muted2);font-size:12px;padding:20px">Loading messages…</div>';
+  try {
+    const msgs = await cbFetchMessages(id);
+    c.messages = msgs;
+    cbRenderMessages(msgs);
+  } catch (e) {
+    console.error('cbFetchMessages error:', e.message);
+    document.getElementById('cb-chat-messages').innerHTML = '<div style="text-align:center;color:var(--red);font-size:12px;padding:20px">Could not load messages — check Supabase config</div>';
+  }
+  document.getElementById('cb-chat-input-bar').style.display = !aiHandling ? 'flex' : 'none';
+}
+
+function cbRenderMessages(msgs){
+  const el=document.getElementById('cb-chat-messages');
+  let parts=['<div style="display:flex;justify-content:center"><div class="cb-day-sep">Today</div></div>'];
+  msgs.forEach(function(m){
+    if(m.sender==='system'){ parts.push('<div style="display:flex;justify-content:center"><div class="cb-msg-system">'+m.body+'</div></div>'); return; }
+    const isOut = m.sender==='ai'||m.sender==='agent';
+    const avBg = m.sender==='ai'?'linear-gradient(145deg,var(--cb2),var(--cb))':m.sender==='agent'?'linear-gradient(145deg,#79aefc,var(--blue))':cbAvatarGradient('cust');
+    const avInit = m.sender==='ai'?ic('robot',13,'#fff'):m.sender==='agent'?'A':'C';
+    const cls = m.sender==='ai'?'cb-msg-ai':m.sender==='agent'?'cb-msg-agent':'cb-msg-customer';
+    const label = m.sender==='ai'?ic('robot',10)+' AI BOT':m.sender==='agent'?ic('headset',10)+' Agent':'';
+    const imageHtml = m.image_url
+      ? '<img src="'+m.image_url+'" style="max-width:220px;border-radius:12px;margin-bottom:6px;display:block" onerror="this.style.display=\'none\'">'
+      : '';
+    const audioHtml = m.audio_url
+      ? '<audio controls src="'+m.audio_url+'" style="max-width:230px;margin-bottom:6px;display:block;height:36px"></audio>'
+      : '';
+    parts.push('<div class="cb-msg-row '+(isOut?'out':'')+'">'+
+      '<div class="cb-msg-avatar" style="background:'+avBg+'">'+avInit+'</div>'+
+      '<div class="cb-msg-wrap">'+
+        (label?'<div class="cb-msg-label">'+label+'</div>':'')+
+        imageHtml+
+        audioHtml+
+        '<div class="cb-msg '+cls+'">'+cbMdLite(m.body)+'</div>'+
+        '<div class="cb-msg-time">'+(m.time||'')+'</div>'+
+      '</div>'+
+    '</div>');
+  });
+  el.innerHTML = parts.join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function cbTakeControl(id){
+  const c = CONVERSATIONS.filter(function(x){return x.id===id;})[0];
+  if(!c || c.handled_by==='human') return;
+  try {
+    await cbSupabase(`chatbot_conversations?id=eq.${id}`, {
+      method:'PATCH',
+      body: JSON.stringify({ handled_by:'human', escalation_reason:'manual_override' }),
+    });
+    await cbSupabase('chatbot_messages', {
+      method:'POST',
+      body: JSON.stringify({ conversation_id:id, sender:'system', body:'Agent took control of this conversation.' }),
+    });
+    c.handled_by='human'; c.escalation_reason='manual_override';
+    cbToast('Human took control — AI stepped back');
+    cbOpen(id);
+  } catch (e) {
+    console.error('cbTakeControl error:', e.message);
+    cbToast('Could not take control — check Supabase config');
+  }
+}
+
+async function cbReturnToAI(id){
+  const c = CONVERSATIONS.filter(function(x){return x.id===id;})[0];
+  if(!c || c.handled_by==='ai') return;
+  try {
+    await cbSupabase(`chatbot_conversations?id=eq.${id}`, {
+      method:'PATCH',
+      body: JSON.stringify({ handled_by:'ai', escalation_reason:null }),
+    });
+    await cbSupabase('chatbot_messages', {
+      method:'POST',
+      body: JSON.stringify({ conversation_id:id, sender:'system', body:'Returned to AI — the bot will handle replies again.' }),
+    });
+    c.handled_by='ai'; c.escalation_reason=null;
+    cbToast('Returned to AI');
+    cbOpen(id);
+  } catch (e) {
+    console.error('cbReturnToAI error:', e.message);
+    cbToast('Could not return to AI — check Supabase config');
+  }
+}
+
+function cbAction(msg){ cbToast(msg); }
+
+async function cbSendReply(){
+  const input=document.getElementById('cb-chat-input');
+  const body=input.value.trim();
+  if(!body||!_activeId) return;
+  const c=CONVERSATIONS.filter(function(x){return x.id===_activeId;})[0];
+  if(!c) return;
+  input.value='';
+  // Optimistic UI update — the actual send + log happens server-side
+  // (the Worker's /agent-reply endpoint), since that's the only safe
+  // place to hold the real WhatsApp access token.
+  c.messages = c.messages || [];
+  c.messages.push({sender:'agent', body:body, time:'now'});
+  cbRenderMessages(c.messages);
+  try {
+    const res = await fetch(`${CB_CONFIG.WORKER_URL}/agent-reply?key=${encodeURIComponent(CB_CONFIG.WORKER_KEY)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conv_id: _activeId, message: body }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  } catch (e) {
+    console.error('cbSendReply error:', e.message);
+    cbToast('Failed to send — message NOT delivered on WhatsApp');
+  }
+}
+
+// Uploads the selected file directly to Supabase Storage (the 'chat-images'
+// bucket — must be created as a PUBLIC bucket, see setup instructions),
+// then calls the Worker's /agent-send-image endpoint with the resulting
+// public URL. The Worker is the only place that actually sends via
+// WhatsApp/Instagram/Messenger — the dashboard never touches those
+// platform tokens directly, same safe pattern as every other agent action.
+async function cbHandleImageUpload(inputEl){
+  const file = inputEl.files?.[0];
+  if (!file || !_activeId) return;
+  cbToast('Uploading photo...');
+  try {
+    const fileName = `${_activeId}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const uploadRes = await fetch(`${CB_CONFIG.SUPABASE_URL}/storage/v1/object/chat-images/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CB_CONFIG.SUPABASE_ANON_KEY}`,
+        'Content-Type': file.type,
+      },
+      body: file,
+    });
+    if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+    const publicUrl = `${CB_CONFIG.SUPABASE_URL}/storage/v1/object/public/chat-images/${fileName}`;
+
+    const c = CONVERSATIONS.filter(x => x.id === _activeId)[0];
+    if (c) {
+      c.messages = c.messages || [];
+      c.messages.push({ sender: 'agent', body: '📷 Image', time: 'now', image_url: publicUrl });
+      cbRenderMessages(c.messages);
+    }
+
+    const res = await fetch(`${CB_CONFIG.WORKER_URL}/agent-send-image?key=${encodeURIComponent(CB_CONFIG.WORKER_KEY)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conv_id: _activeId, image_url: publicUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    cbToast('Photo sent');
+  } catch (e) {
+    console.error('cbHandleImageUpload error:', e.message);
+    cbToast('Failed to send photo — check the chat-images bucket is public');
+  }
+  inputEl.value = ''; // reset so selecting the same file again still fires onchange
+}
+
+// Reuses the same 'chat-images' Storage bucket as photo uploads — despite
+// the name, Supabase Storage buckets aren't restricted by content type,
+// so this doesn't need a separate bucket/setup step.
+let _cbMediaRecorder = null;
+let _cbRecordedChunks = [];
+let _cbRecordingSeconds = 0;
+let _cbRecordingTimer = null;
+let _cbRecordedBlobUrl = null;
+
+function cbVoiceControlsIdleHTML(){
+  return '<button id="cb-mic-btn" class="cb-action-link" title="Record a voice note" onclick="cbToggleRecording()">'+ic('mic',14)+'</button>';
+}
+
+async function cbToggleRecording(){
+  if (_cbMediaRecorder && _cbMediaRecorder.state === 'recording') {
+    cbStopRecording();
+    return;
+  }
+  if (!_activeId) { cbToast('Open a conversation first'); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    _cbRecordedChunks = [];
+    _cbMediaRecorder = new MediaRecorder(stream);
+    _cbMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) _cbRecordedChunks.push(e.data); };
+    _cbMediaRecorder.onstop = () => {
+      stream.getTracks().forEach(track => track.stop()); // release the mic
+      cbShowRecordingPreview();
+    };
+    _cbMediaRecorder.start();
+
+    // Visual feedback — the mic slot becomes a red "stop" control with a
+    // live timer, so it's obvious recording is actually happening.
+    _cbRecordingSeconds = 0;
+    const controls = document.getElementById('cb-voice-controls');
+    controls.innerHTML = '<button id="cb-stop-btn" class="cb-action-link" style="color:var(--red)" title="Stop recording" onclick="cbStopRecording()">⏹ 0:00</button>';
+    _cbRecordingTimer = setInterval(() => {
+      _cbRecordingSeconds++;
+      const stopBtn = document.getElementById('cb-stop-btn');
+      if (stopBtn) stopBtn.innerHTML = '⏹ ' + String(Math.floor(_cbRecordingSeconds/60)).padStart(1,'0') + ':' + String(_cbRecordingSeconds%60).padStart(2,'0');
+    }, 1000);
+  } catch (e) {
+    console.error('cbToggleRecording error:', e.message);
+    cbToast('Could not access microphone — check browser permission');
+  }
+}
+
+function cbStopRecording(){
+  if (_cbRecordingTimer) { clearInterval(_cbRecordingTimer); _cbRecordingTimer = null; }
+  if (_cbMediaRecorder && _cbMediaRecorder.state === 'recording') {
+    _cbMediaRecorder.stop(); // triggers onstop above, which shows the preview (does NOT send)
+  }
+}
+
+function cbShowRecordingPreview(){
+  if (!_cbRecordedChunks.length) { cbResetVoiceControls(); return; }
+  const blob = new Blob(_cbRecordedChunks, { type: 'audio/webm' });
+  _cbRecordedBlobUrl = URL.createObjectURL(blob);
+  const controls = document.getElementById('cb-voice-controls');
+  controls.innerHTML =
+    '<div style="display:flex;align-items:center;gap:6px">'+
+      '<audio controls src="'+_cbRecordedBlobUrl+'" style="height:30px;max-width:130px"></audio>'+
+      '<button class="cb-action-link" style="color:var(--green)" title="Send voice note" onclick="cbSendRecordedAudio()">'+ic('send',14)+'</button>'+
+      '<button class="cb-action-link" style="color:var(--red)" title="Delete recording" onclick="cbDeleteRecordedAudio()">🗑</button>'+
+    '</div>';
+}
+
+function cbResetVoiceControls(){
+  if (_cbRecordedBlobUrl) { URL.revokeObjectURL(_cbRecordedBlobUrl); _cbRecordedBlobUrl = null; }
+  _cbRecordedChunks = [];
+  const controls = document.getElementById('cb-voice-controls');
+  if (controls) controls.innerHTML = cbVoiceControlsIdleHTML();
+}
+
+function cbDeleteRecordedAudio(){
+  cbResetVoiceControls();
+  cbToast('Recording deleted');
+}
+
+async function cbSendRecordedAudio(){
+  if (!_cbRecordedChunks.length || !_activeId) { cbResetVoiceControls(); return; }
+  cbToast('Uploading voice note...');
+  try {
+    const blob = new Blob(_cbRecordedChunks, { type: 'audio/webm' });
+    const fileName = `${_activeId}_${Date.now()}_recording.webm`;
+    const uploadRes = await fetch(`${CB_CONFIG.SUPABASE_URL}/storage/v1/object/chat-images/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CB_CONFIG.SUPABASE_ANON_KEY}`,
+        'Content-Type': 'audio/webm',
+      },
+      body: blob,
+    });
+    if (!uploadRes.ok) {
+      let detail = '';
+      try { detail = await uploadRes.text(); } catch(e){}
+      throw new Error(`Upload failed: ${uploadRes.status} — ${detail.slice(0,300)}`);
+    }
+    const publicUrl = `${CB_CONFIG.SUPABASE_URL}/storage/v1/object/public/chat-images/${fileName}`;
+
+    const c = CONVERSATIONS.filter(x => x.id === _activeId)[0];
+    if (c) {
+      c.messages = c.messages || [];
+      c.messages.push({ sender: 'agent', body: '🎤 Voice note', time: 'now', audio_url: publicUrl });
+      cbRenderMessages(c.messages);
+    }
+
+    const res = await fetch(`${CB_CONFIG.WORKER_URL}/agent-send-audio?key=${encodeURIComponent(CB_CONFIG.WORKER_KEY)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conv_id: _activeId, audio_url: publicUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    cbToast('Voice note sent');
+  } catch (e) {
+    console.error('cbSendRecordedAudio error:', e.message);
+    cbToast('Voice note failed: ' + e.message.slice(0,120));
+  }
+  cbResetVoiceControls();
+}
+
+let COMMENTS_DATA = []; // populated live from chatbot_comments — see cbFetchComments()
+const TEAM_PERF = [
+  {name:'AI Agent', chats:412, avgResp:'8 sec', resolution:'91%', csat:'4.8'},
+  {name:'Agent 1A',  chats:58,  avgResp:'4 min', resolution:'88%', csat:'4.6'},
+  {name:'Agent 2N',  chats:41,  avgResp:'6 min', resolution:'84%', csat:'4.5'},
+];
+const INTEGRATIONS = [
+  {name:'WhatsApp Business', icon:'whatsapp', color:'#4fb287', status:'connected', detail:'2 numbers - Sales + Complaints'},
+  {name:'Instagram',         icon:'instagram', color:'#e1306c', status:'connected', detail:'Messaging + comments'},
+  {name:'Facebook Messenger',icon:'facebook', color:'#5b96f0', status:'connected', detail:'Messaging + comments'},
+  {name:'Shopify',           icon:'bag', color:'#95bf47', status:'connected', detail:'Orders, edits, cancellations, refunds sync live'},
+  {name:'TikTok',            icon:'tiktok', color:'#e8e8e8', status:'available', detail:'Comments + DMs - not connected yet'},
+  {name:'Gmail',             icon:'mail', color:'#e0575a', status:'available', detail:'Support inbox - not connected yet'},
+];
+
+function cbBar(labelHtml, pct, color, valTxt){
+  return '<div class="cb-bar-row"><div class="cb-bar-name">'+labelHtml+'</div>'+
+    '<div class="cb-bar-track"><div class="cb-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'+
+    '<div class="cb-bar-val">'+valTxt+'</div></div>';
+}
+function cbIconBadge(name, color){
+  return '<div style="width:40px;height:40px;border-radius:12px;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;margin-bottom:11px">'+ic(name,20)+'</div>';
+}
+
+// Facebook Comments queue — pulls unhandled Facebook comments straight
+// from Supabase. This exists specifically because Facebook auto-reply is
+// currently blocked (pages_manage_engagement pending a System User
+// token), so a human needs to see and answer these.
+async function cbFetchFacebookComments(){
+  try {
+    const rows = await cbSupabase('chatbot_comments?select=*&platform=eq.facebook&handled=eq.false&order=created_at.desc&limit=50');
+    COMMENTS_DATA = rows || [];
+  } catch (e) {
+    console.error('cbFetchFacebookComments error:', e.message);
+    COMMENTS_DATA = [];
+  }
+}
+
+async function cbReplyToComment(rowId, commentId, inputEl){
+  const message = inputEl.value.trim();
+  if(!message) return;
+  inputEl.disabled = true;
+  try {
+    const res = await fetch(`${CB_CONFIG.WORKER_URL}/comment-reply?key=${encodeURIComponent(CB_CONFIG.WORKER_KEY)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row_id: rowId, comment_id: commentId, platform: 'facebook', message }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    cbToast('Reply sent');
+    COMMENTS_DATA = COMMENTS_DATA.filter(c => c.id !== rowId);
+    document.getElementById('cb-chat-col').innerHTML = cbRenderFacebookComments();
+  } catch (e) {
+    console.error('cbReplyToComment error:', e.message);
+    cbToast('Failed to send reply — check Facebook permission status');
+    inputEl.disabled = false;
+  }
+}
+
+async function cbHideCommentFromDashboard(rowId, commentId){
+  try {
+    const res = await fetch(`${CB_CONFIG.WORKER_URL}/comment-reply?key=${encodeURIComponent(CB_CONFIG.WORKER_KEY)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // No message = hide-only on the Worker side (see /comment-reply).
+      body: JSON.stringify({ row_id: rowId, comment_id: commentId, platform: 'facebook', message: '' }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    cbToast('Comment marked handled');
+    COMMENTS_DATA = COMMENTS_DATA.filter(c => c.id !== rowId);
+    document.getElementById('cb-chat-col').innerHTML = cbRenderFacebookComments();
+  } catch (e) {
+    console.error('cbHideCommentFromDashboard error:', e.message);
+    cbToast('Failed — check Facebook permission status');
+  }
+}
+
+function cbRenderFacebookComments(){
+  if (!COMMENTS_DATA.length) {
+    return '<div class="cb-dash">\
+      <div class="cb-dash-title">Facebook Comments</div>\
+      <div class="cb-dash-sub">Comments waiting on a human reply (auto-reply is paused for Facebook pending a permission fix).</div>\
+      <div class="cb-panel" style="text-align:center;color:var(--muted);padding:40px 0">No unhandled comments right now.</div>\
+    </div>';
+  }
+  const rows = COMMENTS_DATA.map(function(c){
+    const inputId = 'cb-comment-reply-'+c.id;
+    return '<div class="cb-comment-row">\
+      <div class="cb-thumb">'+ic('facebook',18)+'</div>\
+      <div style="flex:1;min-width:0">\
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">\
+          <span style="font-weight:700;font-size:12.5px">'+(c.from_name||'Unknown')+'</span>\
+          <span style="margin-left:auto;font-size:10px;color:var(--muted2);font-family:var(--mono)">'+cbFormatTime(c.created_at)+'</span>\
+        </div>\
+        <div style="font-size:12.5px;color:var(--text);margin-bottom:9px">'+c.body+'</div>\
+        <div style="display:flex;gap:7px;align-items:center">\
+          <input id="'+inputId+'" placeholder="Type a reply..." style="flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 11px;border-radius:8px;font-family:var(--sans);font-size:12px;outline:none">\
+          <button class="cb-action-link" style="color:var(--cb)" onclick="cbReplyToComment('+c.id+',\''+c.comment_id+'\',document.getElementById(\''+inputId+'\'))">'+ic('reply',13)+' Reply</button>\
+          <button class="cb-action-link" onclick="cbHideCommentFromDashboard('+c.id+',\''+c.comment_id+'\')">'+ic('eyeOff',13)+' Hide</button>\
+        </div>\
+      </div>\
+    </div>';
+  }).join('');
+  return '<div class="cb-dash">\
+    <div class="cb-dash-title">Facebook Comments</div>\
+    <div class="cb-dash-sub">Comments waiting on a human reply (auto-reply is paused for Facebook pending a permission fix).</div>\
+    <div class="cb-panel">'+rows+'</div>\
+  </div>';
+}
+
+// Instagram Comments — read-only live feed. Instagram comments are fully
+// auto-handled by the bot (no human queue needed, unlike Facebook), so
+// this view exists purely so you can SEE what the bot is doing publicly
+// — verify it's working correctly and spot-check for wrong replies.
+let IG_COMMENTS_DATA = [];
+async function cbFetchInstagramComments(){
+  try {
+    const rows = await cbSupabase('chatbot_comments?select=*&platform=eq.instagram&order=created_at.desc&limit=50');
+    IG_COMMENTS_DATA = rows || [];
+  } catch (e) {
+    console.error('cbFetchInstagramComments error:', e.message);
+    IG_COMMENTS_DATA = [];
+  }
+}
+
+const CATEGORY_COLOR = { price:'var(--green)', negative:'var(--red)', positive:'var(--cb)', other:'var(--muted)' };
+const CATEGORY_LABEL = { price:'PRICE', negative:'NEGATIVE', positive:'POSITIVE', other:'NO ACTION' };
+
+function cbRenderInstagramComments(){
+  if (!IG_COMMENTS_DATA.length) {
+    return '<div class="cb-dash">\
+      <div class="cb-dash-title">Instagram Comments — Live Bot Activity</div>\
+      <div class="cb-dash-sub">Read-only — Instagram comments are handled automatically by the bot, nothing to act on here.</div>\
+      <div class="cb-panel" style="text-align:center;color:var(--muted);padding:40px 0">No Instagram comments yet — make sure instagram_manage_comments is added and the webhook field is subscribed.</div>\
+    </div>';
+  }
+  const rows = IG_COMMENTS_DATA.map(function(c){
+    const catColor = CATEGORY_COLOR[c.category] || 'var(--muted)';
+    const catLabel = CATEGORY_LABEL[c.category] || (c.handled ? 'HANDLED' : 'PENDING');
+    return '<div class="cb-comment-row">\
+      <div class="cb-thumb">'+ic('instagram',18)+'</div>\
+      <div style="flex:1;min-width:0">\
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">\
+          <span style="font-weight:700;font-size:12.5px">'+(c.from_name||'Unknown')+'</span>\
+          <span style="font-size:9px;background:'+catColor+'22;color:'+catColor+';padding:2px 8px;border-radius:10px;font-weight:700">'+catLabel+'</span>\
+          <span style="margin-left:auto;font-size:10px;color:var(--muted2);font-family:var(--mono)">'+cbFormatTime(c.created_at)+'</span>\
+        </div>\
+        <div style="font-size:12.5px;color:var(--text);margin-bottom:6px">'+c.body+'</div>\
+        '+(c.reply_text ? '<div style="font-size:11.5px;color:var(--cb);padding-left:11px;border-left:2px solid var(--cb)">🤖 '+c.reply_text+'</div>' : '<div style="font-size:11px;color:var(--muted2);font-style:italic">No action taken</div>')+'\
+      </div>\
+    </div>';
+  }).join('');
+  return '<div class="cb-dash">\
+    <div class="cb-dash-title">Instagram Comments — Live Bot Activity</div>\
+    <div class="cb-dash-sub">Read-only — Instagram comments are handled automatically by the bot. Use this to verify it\'s replying correctly.</div>\
+    <div class="cb-panel">'+rows+'</div>\
+  </div>';
+}
+
+// Comment Logs — full history across BOTH platforms, handled ones only
+// (whether the bot or a human answered them) — the permanent record.
+let COMMENT_LOGS_DATA = [];
+async function cbFetchCommentLogs(){
+  try {
+    const rows = await cbSupabase('chatbot_comments?select=*&handled=eq.true&order=created_at.desc&limit=100');
+    COMMENT_LOGS_DATA = rows || [];
+  } catch (e) {
+    console.error('cbFetchCommentLogs error:', e.message);
+    COMMENT_LOGS_DATA = [];
+  }
+}
+
+function cbRenderCommentLogs(){
+  if (!COMMENT_LOGS_DATA.length) {
+    return '<div class="cb-dash">\
+      <div class="cb-dash-title">Comment Logs</div>\
+      <div class="cb-dash-sub">Complete history of every Facebook and Instagram comment that\'s been answered — by the bot or a human.</div>\
+      <div class="cb-panel" style="text-align:center;color:var(--muted);padding:40px 0">No answered comments yet.</div>\
+    </div>';
+  }
+  const rows = COMMENT_LOGS_DATA.map(function(c){
+    const platformIcon = c.platform === 'instagram' ? 'instagram' : 'facebook';
+    const byBadgeColor = c.replied_by === 'bot' ? 'var(--cb)' : 'var(--blue)';
+    const byLabel = c.replied_by === 'bot' ? '🤖 BOT' : '👤 HUMAN';
+    return '<div class="cb-comment-row">\
+      <div class="cb-thumb">'+ic(platformIcon,18)+'</div>\
+      <div style="flex:1;min-width:0">\
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">\
+          <span style="font-weight:700;font-size:12.5px">'+(c.from_name||'Unknown')+'</span>\
+          <span style="font-size:9px;background:'+byBadgeColor+'22;color:'+byBadgeColor+';padding:2px 8px;border-radius:10px;font-weight:700">'+byLabel+'</span>\
+          <span style="margin-left:auto;font-size:10px;color:var(--muted2);font-family:var(--mono)">'+cbFormatTime(c.created_at)+'</span>\
+        </div>\
+        <div style="font-size:12.5px;color:var(--text);margin-bottom:6px">'+c.body+'</div>\
+        '+(c.reply_text ? '<div style="font-size:11.5px;color:var(--green);padding-left:11px;border-left:2px solid var(--green)">↳ '+c.reply_text+'</div>' : '')+'\
+      </div>\
+    </div>';
+  }).join('');
+  return '<div class="cb-dash">\
+    <div class="cb-dash-title">Comment Logs</div>\
+    <div class="cb-dash-sub">Complete history of every Facebook and Instagram comment that\'s been answered — by the bot or a human.</div>\
+    <div class="cb-panel">'+rows+'</div>\
+  </div>';
+}
+
+// ── Reports — real data, 5 metrics + date-range download ──
+function cbFmtSecs(s){
+  if(!s||s<=0) return '—';
+  if(s<60) return Math.round(s)+' sec';
+  if(s<3600) return Math.round(s/60)+' min';
+  return (s/3600).toFixed(1)+' hr';
+}
+
+async function cbFetchReportMetrics(from, to){
+  const fromISO = toUTCISO(from), toISO = toUTCISO(to);
+  const out = {totalOrders:0, totalConversations:0, revenueAttributed:0, chatOrderCount:0,
+    siteAOV:0, chatAOV:0, aovUpliftPct:null, avgResponseSecs:null,
+    totalAI:0, totalAgent:0, byPlatform:{},
+    totalChatsBot:0, totalEscalated:0, botOrderCount:0, botOrderValue:0,
+    avgResponseBotSecs:null, avgResponseAgentSecs:null};
+
+  // Total Orders — reuses the exact same live Shopify data source as the rest of the dashboard
+  let orders = [];
+  try{ orders = await fetchAllOrders(from, to); }catch(e){ console.warn('cbFetchReportMetrics orders error:', e.message); }
+  out.totalOrders = orders.length;
+  const siteRevenue = orders.reduce((s,o)=>s+parseFloat(o.total_price||0),0);
+  out.siteAOV = orders.length ? siteRevenue/orders.length : 0;
+
+  // Total Conversations
+  let convRows = [];
+  try{
+    convRows = await DB.get('chatbot_conversations',
+      `select=id,created_at,handled_by,platform&created_at=gte.${encodeURIComponent(fromISO)}&created_at=lte.${encodeURIComponent(toISO)}`);
+  }catch(e){ console.warn('cbFetchReportMetrics conversations error:', e.message); }
+  out.totalConversations = (convRows||[]).length;
+  (convRows||[]).forEach(c=>{
+    if(c.handled_by==='ai') out.totalAI++;
+    else if(c.handled_by==='human') out.totalAgent++;
+    const p = c.platform||'unknown';
+    out.byPlatform[p] = (out.byPlatform[p]||0)+1;
+  });
+  // "Handled by bot" / "Escalated to a human" — same definition the Escalations tab's quick filter uses
+  out.totalChatsBot = out.totalAI;
+  out.totalEscalated = out.totalAgent;
+
+  // Orders actually placed through chat — this Worker logs these directly to chatbot_orders
+  // (conversation_id, handled_by, payment_method, shopify_order_id, revenue) whenever the AI
+  // places a real COD order, so this is the source of truth rather than trying to match
+  // conversations back to Shopify orders by reference number.
+  let chatOrders = [];
+  try{
+    chatOrders = await DB.get('chatbot_orders',
+      `select=handled_by,revenue,created_at&created_at=gte.${encodeURIComponent(fromISO)}&created_at=lte.${encodeURIComponent(toISO)}`);
+  }catch(e){ console.warn('cbFetchReportMetrics chatbot_orders error:', e.message); }
+  chatOrders = chatOrders || [];
+  out.chatOrderCount = chatOrders.length;
+  out.revenueAttributed = chatOrders.reduce((s,o)=>s+parseFloat(o.revenue||0),0);
+  out.chatAOV = chatOrders.length ? out.revenueAttributed/chatOrders.length : 0;
+  if(chatOrders.length && out.siteAOV>0) out.aovUpliftPct = ((out.chatAOV-out.siteAOV)/out.siteAOV*100);
+
+  const botOrders = chatOrders.filter(o=>o.handled_by==='ai');
+  out.botOrderCount = botOrders.length;
+  out.botOrderValue = botOrders.reduce((s,o)=>s+parseFloat(o.revenue||0),0);
+
+  // Avg Response Time — first customer message → first bot/human reply, per conversation, split by who replied
+  const convIds = (convRows||[]).map(c=>c.id).filter(Boolean);
+  if(convIds.length){
+    const deltas = [], botDeltas = [], agentDeltas = [];
+    const BATCH = 150;
+    for(let i=0;i<convIds.length;i+=BATCH){
+      const batch = convIds.slice(i,i+BATCH);
+      let msgs = [];
+      try{
+        msgs = await DB.get('chatbot_messages',
+          `select=conversation_id,sender,created_at&conversation_id=in.(${batch.join(',')})&order=created_at.asc`);
+      }catch(e){ console.warn('cbFetchReportMetrics messages error:', e.message); continue; }
+      const byConv = {};
+      (msgs||[]).forEach(m=>{ (byConv[m.conversation_id]=byConv[m.conversation_id]||[]).push(m); });
+      Object.values(byConv).forEach(list=>{
+        const firstCust = list.find(m=>m.sender==='customer');
+        if(!firstCust) return;
+        const reply = list.find(m=>m.sender!=='customer' && m.sender!=='system' && new Date(m.created_at) > new Date(firstCust.created_at));
+        if(reply){
+          const d = (new Date(reply.created_at) - new Date(firstCust.created_at))/1000;
+          if(d>0 && d<86400){ // ignore >24h gaps (stale/reopened chats)
+            deltas.push(d);
+            if(reply.sender==='ai') botDeltas.push(d);
+            else if(reply.sender==='agent') agentDeltas.push(d);
+          }
+        }
+      });
+    }
+    if(deltas.length) out.avgResponseSecs = deltas.reduce((a,b)=>a+b,0)/deltas.length;
+    if(botDeltas.length) out.avgResponseBotSecs = botDeltas.reduce((a,b)=>a+b,0)/botDeltas.length;
+    if(agentDeltas.length) out.avgResponseAgentSecs = agentDeltas.reduce((a,b)=>a+b,0)/agentDeltas.length;
+  }
+
+  return out;
+}
+
+function cbRenderReportsShell(){
+  return '<div class="cb-dash">\
+    <div class="cb-dash-title">Reports</div>\
+    <div class="cb-dash-sub">Real numbers from your live orders and conversations — uses the date range selected on the main dashboard.</div>\
+    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 18px;flex-wrap:wrap;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px">\
+      <span style="font-size:11px;color:var(--muted);white-space:nowrap">📅 View a past day\'s saved snapshot:</span>\
+      <input class="fi" type="date" id="cb-rpt-histdate" style="width:auto">\
+      <button class="btn btn-s btn-sm" onclick="cbLoadHistoricalReport()">View</button>\
+      <button class="btn btn-s btn-sm" onclick="cbBackToLiveReport()">Back to Live</button>\
+      <span id="cb-rpt-hist-status" style="font-size:11px;color:var(--muted)"></span>\
+    </div>\
+    <div class="cb-metric-grid" id="cb-rpt-grid">\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Total Orders</div><div class="cb-metric-val" id="cb-rpt-orders">…</div><div class="cb-metric-sub" id="cb-rpt-orders-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Total Conversations</div><div class="cb-metric-val" id="cb-rpt-conv">…</div><div class="cb-metric-sub" id="cb-rpt-conv-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Revenue Attributed via Chat Orders</div><div class="cb-metric-val" style="color:var(--green)" id="cb-rpt-rev">…</div><div class="cb-metric-sub" id="cb-rpt-rev-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">AOV Uplift — Chat vs Site Avg</div><div class="cb-metric-val" style="color:var(--blue)" id="cb-rpt-aov">…</div><div class="cb-metric-sub" id="cb-rpt-aov-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Avg Response Time</div><div class="cb-metric-val" id="cb-rpt-resp">…</div><div class="cb-metric-sub" id="cb-rpt-resp-sub">loading</div></div>\
+    </div>\
+    <div class="cb-dash-sub" style="margin-top:22px;font-weight:700;color:var(--text);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Bot vs Human Performance</div>\
+    <div class="cb-metric-grid" id="cb-rpt-grid-2" style="margin-top:10px">\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Total Chats by Bot</div><div class="cb-metric-val" style="color:var(--cb)" id="cb-rpt-bot-chats">…</div><div class="cb-metric-sub" id="cb-rpt-bot-chats-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Total Escalated Chats</div><div class="cb-metric-val" style="color:var(--red)" id="cb-rpt-escalated">…</div><div class="cb-metric-sub" id="cb-rpt-escalated-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Orders by Bot + Value</div><div class="cb-metric-val" style="color:var(--green)" id="cb-rpt-bot-orders">…</div><div class="cb-metric-sub" id="cb-rpt-bot-orders-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Avg Response Time — Bot</div><div class="cb-metric-val" style="color:var(--cb)" id="cb-rpt-resp-bot">…</div><div class="cb-metric-sub" id="cb-rpt-resp-bot-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Avg Response Time — Human Agent</div><div class="cb-metric-val" style="color:var(--blue)" id="cb-rpt-resp-agent">…</div><div class="cb-metric-sub" id="cb-rpt-resp-agent-sub">loading</div></div>\
+    </div>\
+    <button class="cb-take-control" style="margin-top:16px" onclick="cbOpenReportDownload()">⬇ Download Report</button>\
+    <div id="cb-rpt-download-modal"></div>\
+  </div>';
+}
+
+// Shared renderer — fills the same cards whether the numbers came from a live fetch or a saved
+// Supabase snapshot for a past day.
+function cbRenderMetricsIntoCards(m, labelText){
+  const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('cb-rpt-orders', (m.totalOrders||0).toLocaleString());
+  set('cb-rpt-orders-sub', labelText);
+  set('cb-rpt-conv', (m.totalConversations||0).toLocaleString());
+  set('cb-rpt-conv-sub', labelText);
+  set('cb-rpt-rev', m.chatOrderCount>0 ? fPKR(m.revenueAttributed) : '—');
+  set('cb-rpt-rev-sub', m.chatOrderCount>0 ? m.chatOrderCount+' linked orders' : 'No linked orders');
+  set('cb-rpt-aov', m.aovUpliftPct!=null ? (m.aovUpliftPct>=0?'+':'')+m.aovUpliftPct.toFixed(1)+'%' : '—');
+  set('cb-rpt-aov-sub', m.aovUpliftPct!=null ? 'chat PKR '+Math.round(m.chatAOV).toLocaleString()+' vs site PKR '+Math.round(m.siteAOV).toLocaleString() : 'No linked orders');
+  set('cb-rpt-resp', cbFmtSecs(m.avgResponseSecs));
+  set('cb-rpt-resp-sub', m.avgResponseSecs!=null ? 'first reply, avg' : 'No replies found');
+
+  const totalHandled = (m.totalChatsBot||0) + (m.totalEscalated||0);
+  set('cb-rpt-bot-chats', (m.totalChatsBot||0).toLocaleString());
+  set('cb-rpt-bot-chats-sub', totalHandled ? (m.totalChatsBot/totalHandled*100).toFixed(0)+'% of handled chats' : labelText);
+  set('cb-rpt-escalated', (m.totalEscalated||0).toLocaleString());
+  set('cb-rpt-escalated-sub', totalHandled ? (m.totalEscalated/totalHandled*100).toFixed(0)+'% of handled chats' : labelText);
+  set('cb-rpt-bot-orders', (m.botOrderCount||0).toLocaleString());
+  set('cb-rpt-bot-orders-sub', m.botOrderCount>0 ? fPKR(m.botOrderValue)+' total' : 'No bot-linked orders');
+  set('cb-rpt-resp-bot', cbFmtSecs(m.avgResponseBotSecs));
+  set('cb-rpt-resp-bot-sub', m.avgResponseBotSecs!=null ? 'first bot reply, avg' : 'No bot replies');
+  set('cb-rpt-resp-agent', cbFmtSecs(m.avgResponseAgentSecs));
+  set('cb-rpt-resp-agent-sub', m.avgResponseAgentSecs!=null ? 'first agent reply, avg' : 'No agent replies');
+}
+
+async function cbLoadReportMetrics(){
+  const {from,to} = getRange();
+  const m = await cbFetchReportMetrics(from,to);
+  cbRenderMetricsIntoCards(m, rangeLabel());
+
+  // Auto-save today's snapshot to Supabase — independent of whatever range is on-screen,
+  // so a running day-by-day archive builds up just from normal use of this tab.
+  cbAutoSaveTodaySnapshot();
+}
+
+// Pulls a previously-saved day straight from Supabase (chatbot_daily_reports) instead of
+// recomputing live — this is what lets you look back at a past date's numbers.
+async function cbLoadHistoricalReport(){
+  const dateStr = document.getElementById('cb-rpt-histdate').value;
+  const statusEl = document.getElementById('cb-rpt-hist-status');
+  if(!dateStr){ if(statusEl) statusEl.textContent='Pick a date first.'; return; }
+  if(statusEl){ statusEl.textContent='Loading '+dateStr+'…'; statusEl.style.color='var(--muted)'; }
+  try{
+    const rows = await DB.get('chatbot_daily_reports', 'select=*&report_date=eq.'+dateStr);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if(!row){
+      if(statusEl){ statusEl.textContent='No saved snapshot for '+dateStr+' — a snapshot only exists for days someone opened this tab.'; statusEl.style.color='var(--red)'; }
+      return;
+    }
+    const m = {
+      totalOrders: row.total_orders, totalConversations: row.total_conversations,
+      revenueAttributed: row.revenue_attributed, chatOrderCount: row.chat_order_count,
+      siteAOV: row.site_aov, chatAOV: row.chat_aov, aovUpliftPct: row.aov_uplift_pct,
+      avgResponseSecs: row.avg_response_secs,
+      totalChatsBot: row.total_chats_bot, totalEscalated: row.total_escalated,
+      botOrderCount: row.bot_order_count, botOrderValue: row.bot_order_value,
+      avgResponseBotSecs: row.avg_response_bot_secs, avgResponseAgentSecs: row.avg_response_agent_secs,
+    };
+    const updated = row.updated_at ? new Date(row.updated_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+    cbRenderMetricsIntoCards(m, 'Saved · '+dateStr+(updated?' (as of '+updated+')':''));
+    if(statusEl){ statusEl.textContent='Showing saved snapshot for '+dateStr+'.'; statusEl.style.color='var(--accent)'; }
+  }catch(e){
+    if(statusEl){ statusEl.textContent='⚠ '+e.message+' — has the chatbot_daily_reports table been created?'; statusEl.style.color='var(--red)'; }
+  }
+}
+function cbBackToLiveReport(){
+  document.getElementById('cb-rpt-histdate').value='';
+  const statusEl = document.getElementById('cb-rpt-hist-status');
+  if(statusEl){ statusEl.textContent=''; }
+  cbLoadReportMetrics();
+}
+
+
+function pktTodayDateStr(){
+  const pkt = pktNow();
+  return pkt.getUTCFullYear()+'-'+String(pkt.getUTCMonth()+1).padStart(2,'0')+'-'+String(pkt.getUTCDate()).padStart(2,'0');
+}
+
+// One row per calendar day (PKT), always covering 00:00 → the moment this runs — re-saving
+// later the same day just overwrites that day's row with the latest numbers.
+// One-time setup in Supabase SQL editor:
+//   create table chatbot_daily_reports (
+//     report_date text primary key,
+//     total_orders int default 0, total_conversations int default 0,
+//     revenue_attributed numeric default 0, chat_order_count int default 0,
+//     site_aov numeric default 0, chat_aov numeric default 0, aov_uplift_pct numeric,
+//     avg_response_secs numeric,
+//     total_chats_bot int default 0, total_escalated int default 0,
+//     bot_order_count int default 0, bot_order_value numeric default 0,
+//     avg_response_bot_secs numeric, avg_response_agent_secs numeric,
+//     updated_at timestamptz default now()
+//   );
+//   alter table chatbot_daily_reports disable row level security;
+let _cbAutoSaveInFlight = false;
+async function cbAutoSaveTodaySnapshot(){
+  if(_cbAutoSaveInFlight) return; // avoid overlapping saves if triggered rapidly
+  _cbAutoSaveInFlight = true;
+  try{
+    const todayPKT = pktNow();
+    const from = pktMidnight(todayPKT, 0);
+    const to = new Date(); // "till that time" — the actual current moment, not end-of-day
+    const m = await cbFetchReportMetrics(from, to);
+    const row = {
+      report_date: pktTodayDateStr(),
+      total_orders: m.totalOrders, total_conversations: m.totalConversations,
+      revenue_attributed: Math.round(m.revenueAttributed||0), chat_order_count: m.chatOrderCount,
+      site_aov: Math.round(m.siteAOV||0), chat_aov: Math.round(m.chatAOV||0), aov_uplift_pct: m.aovUpliftPct,
+      avg_response_secs: m.avgResponseSecs,
+      total_chats_bot: m.totalChatsBot, total_escalated: m.totalEscalated,
+      bot_order_count: m.botOrderCount, bot_order_value: Math.round(m.botOrderValue||0),
+      avg_response_bot_secs: m.avgResponseBotSecs, avg_response_agent_secs: m.avgResponseAgentSecs,
+      updated_at: new Date().toISOString(),
+    };
+    await DB.upsert('chatbot_daily_reports', row, 'report_date');
+  }catch(e){
+    console.warn('cbAutoSaveTodaySnapshot failed (has the chatbot_daily_reports table been created?):', e.message);
+  }finally{
+    _cbAutoSaveInFlight = false;
+  }
+}
+
+function cbOpenReportDownload(){
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('cb-rpt-download-modal').innerHTML =
+    '<div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)cbCloseReportDownload()">\
+      <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:22px;width:320px">\
+        <div style="font-weight:700;font-size:14px;margin-bottom:14px">Download Report</div>\
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">From</div>\
+        <input type="date" id="cb-rpt-from" value="'+today+'" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:7px;font-family:var(--mono);font-size:12px;margin-bottom:12px;outline:none">\
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">To</div>\
+        <input type="date" id="cb-rpt-to" value="'+today+'" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:7px;font-family:var(--mono);font-size:12px;margin-bottom:16px;outline:none">\
+        <div id="cb-rpt-dl-status" style="font-size:11px;color:var(--muted);margin-bottom:10px;min-height:14px"></div>\
+        <div style="display:flex;gap:8px">\
+          <button onclick="cbCloseReportDownload()" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--sans)">Cancel</button>\
+          <button onclick="cbDownloadReport()" style="flex:2;padding:9px;border-radius:8px;border:none;background:var(--cb);color:#000;font-weight:700;cursor:pointer;font-family:var(--sans)">Download</button>\
+        </div>\
+      </div>\
+    </div>';
+}
+function cbCloseReportDownload(){
+  const el=document.getElementById('cb-rpt-download-modal');
+  if(el) el.innerHTML='';
+}
+async function cbDownloadReport(){
+  const fromV = document.getElementById('cb-rpt-from').value;
+  const toV = document.getElementById('cb-rpt-to').value;
+  const statusEl = document.getElementById('cb-rpt-dl-status');
+  if(!fromV || !toV){ statusEl.textContent='Pick both dates'; statusEl.style.color='var(--red)'; return; }
+  statusEl.textContent='Fetching data…'; statusEl.style.color='var(--muted)';
+  const from = new Date(fromV+'T00:00:00');
+  const to = new Date(toV+'T23:59:59');
+  try{
+    const m = await cbFetchReportMetrics(from, to);
+    const wsData = [
+      ['Mendeez Chatbot Report'],
+      ['Range', fromV+' to '+toV],
+      [],
+      ['Metric','Value'],
+      ['Total Orders', m.totalOrders],
+      ['Total Conversations', m.totalConversations],
+      ['Revenue Attributed via Chat Orders (PKR)', m.chatOrderCount>0?Math.round(m.revenueAttributed):'No linked orders'],
+      ['Linked Chat Orders', m.chatOrderCount],
+      ['AOV Uplift — Chat vs Site Avg', m.aovUpliftPct!=null?m.aovUpliftPct.toFixed(1)+'%':'No linked orders'],
+      ['Site AOV (PKR)', Math.round(m.siteAOV)],
+      ['Chat Order AOV (PKR)', m.chatOrderCount>0?Math.round(m.chatAOV):'—'],
+      ['Avg Response Time', cbFmtSecs(m.avgResponseSecs)],
+      [],
+      ['Total Chats by Bot', m.totalChatsBot],
+      ['Total Escalated Chats', m.totalEscalated],
+      ['Orders by Bot', m.botOrderCount],
+      ['Orders by Bot — Value (PKR)', m.botOrderCount>0?Math.round(m.botOrderValue):'—'],
+      ['Avg Response Time — Bot', cbFmtSecs(m.avgResponseBotSecs)],
+      ['Avg Response Time — Human Agent', cbFmtSecs(m.avgResponseAgentSecs)],
+    ];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{wch:38},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Report');
+    XLSX.writeFile(wb, 'Mendeez_Chatbot_Report_'+fromV+'_to_'+toV+'.xlsx');
+    statusEl.textContent='✓ Downloaded'; statusEl.style.color='var(--green)';
+    setTimeout(cbCloseReportDownload, 900);
+  }catch(e){
+    statusEl.textContent='Failed: '+e.message; statusEl.style.color='var(--red)';
+  }
+}
+
+// ── Download Report — full-page date-range report, real data ──
+let _cbFullReportData = null;
+
+function cbRenderDownloadReportPage(){
+  const today = new Date().toISOString().slice(0,10);
+  return '<div class="cb-dash">\
+    <div class="cb-dash-title">Download Report</div>\
+    <div class="cb-dash-sub">Pick a date range to see real chatbot and order performance for that period.</div>\
+    <div class="cb-panel" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:20px">\
+      <div>\
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">From</div>\
+        <input type="date" id="cb-frpt-from" value="'+today+'" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:7px;font-family:var(--mono);font-size:12px;outline:none">\
+      </div>\
+      <div>\
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">To</div>\
+        <input type="date" id="cb-frpt-to" value="'+today+'" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:7px;font-family:var(--mono);font-size:12px;outline:none">\
+      </div>\
+      <button onclick="cbGenerateFullReport()" style="background:var(--cb);color:#000;border:none;border-radius:8px;padding:9px 22px;font-weight:700;cursor:pointer;font-family:var(--sans);font-size:13px">Generate Report</button>\
+    </div>\
+    <div id="cb-full-rpt-results"></div>\
+  </div>';
+}
+
+async function cbGenerateFullReport(){
+  const fromV = document.getElementById('cb-frpt-from').value;
+  const toV = document.getElementById('cb-frpt-to').value;
+  const results = document.getElementById('cb-full-rpt-results');
+  if(!fromV || !toV){ results.innerHTML='<div style="color:var(--red);font-size:12px">Pick both dates</div>'; return; }
+  results.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12px">Fetching real data…</div>';
+  const from = new Date(fromV+'T00:00:00');
+  const to = new Date(toV+'T23:59:59');
+  try{
+    const convStats = await cbFetchReportMetrics(from, to);
+    const opsStats = await cbFetchOpsMetricsForRange(from, to);
+    const shopifyReturns = await cbFetchShopifyReturnsForRange(from, to);
+    const orderAdj = shopifyReturns - (opsStats.returnsMTDPKR + opsStats.returnsCFPKR + opsStats.cancelMTDPKR + opsStats.cancelCFPKR);
+    _cbFullReportData = {fromV:fromV, toV:toV, convStats:convStats, opsStats:opsStats, shopifyReturns:shopifyReturns, orderAdj:orderAdj};
+    results.innerHTML = cbRenderFullReportResults(_cbFullReportData);
+  }catch(e){
+    results.innerHTML = '<div style="color:var(--red);font-size:12px">Failed to load: '+e.message+'</div>';
+  }
+}
+
+function cbRenderFullReportResults(d){
+  const cs = d.convStats, os = d.opsStats;
+  const platformRows = Object.entries(cs.byPlatform).sort(function(a,b){return b[1]-a[1];}).map(function(entry){
+    const p=entry[0], n=entry[1];
+    const label = p.charAt(0).toUpperCase()+p.slice(1);
+    return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"><span style="font-size:12.5px">'+label+'</span><span style="font-family:var(--mono);font-weight:700;font-size:12.5px;color:var(--cb)">'+n+'</span></div>';
+  }).join('') || '<div style="color:var(--muted);font-size:12px;padding:8px 0">No conversations in this range</div>';
+
+  const card = function(lbl,val,sub,color){
+    return '<div class="cb-metric-card"><div class="cb-metric-lbl">'+lbl+'</div><div class="cb-metric-val"'+(color?' style="color:'+color+'"':'')+'>'+val+'</div>'+(sub?'<div class="cb-metric-sub">'+sub+'</div>':'')+'</div>';
+  };
+
+  return '\
+    <div class="cb-metric-grid">\
+      '+card('Total AI Chats', cs.totalAI.toLocaleString())+'\
+      '+card('Total Agent Chats', cs.totalAgent.toLocaleString())+'\
+      '+card('Conversion Value', cs.chatOrderCount>0?fPKR(cs.revenueAttributed):'—', cs.chatOrderCount>0?cs.chatOrderCount+' orders':'No linked orders', 'var(--green)')+'\
+      '+card('Order Adjustment Value', fPKR(Math.abs(d.orderAdj)), d.orderAdj>=0?'▲ Surplus':'▼ Shortfall', d.orderAdj>=0?'#8b5cf6':'var(--red)')+'\
+    </div>\
+    <div class="cb-section-head">Platform-wise Conversions</div>\
+    <div class="cb-panel" style="margin-bottom:20px">'+platformRows+'</div>\
+    <div class="cb-metric-grid">\
+      '+card('Total Dispatched', fPKR(os.dispatchedPKR), os.dispatchedCount+' orders', 'var(--blue)')+'\
+      '+card('Total Delivered', fPKR(os.deliveredPKR), os.deliveredCount+' orders', 'var(--green)')+'\
+      '+card('Returns MTD', fPKR(os.returnsMTDPKR), os.returnsMTDCount+' orders')+'\
+      '+card('Returns CF', fPKR(os.returnsCFPKR), os.returnsCFCount+' orders')+'\
+    </div>\
+    <div class="cb-metric-grid">\
+      '+card('Cancellation MTD', fPKR(os.cancelMTDPKR), os.cancelMTDCount+' orders', 'var(--red)')+'\
+      '+card('Cancellation CF', fPKR(os.cancelCFPKR), os.cancelCFCount+' orders', 'var(--red)')+'\
+    </div>\
+    <button onclick="cbDownloadFullReportExcel()" style="margin-top:8px;background:var(--cb);color:#000;border:none;border-radius:8px;padding:11px 26px;font-weight:700;cursor:pointer;font-family:var(--sans);font-size:13px">⬇ Download Excel Report</button>\
+  ';
+}
+
+function cbDownloadFullReportExcel(){
+  if(!_cbFullReportData) return;
+  const d = _cbFullReportData, cs=d.convStats, os=d.opsStats;
+  const platformLines = Object.entries(cs.byPlatform).map(function(entry){
+    return [entry[0].charAt(0).toUpperCase()+entry[0].slice(1), entry[1]];
+  });
+  const wsData = [
+    ['Mendeez Chatbot — Full Report'],
+    ['Range', d.fromV+' to '+d.toV],
+    [],
+    ['Metric','Value'],
+    ['Total AI Chats', cs.totalAI],
+    ['Total Agent Chats', cs.totalAgent],
+    [],
+    ['Platform-wise Conversions','Count'],
+  ].concat(platformLines, [
+    [],
+    ['Conversion Value (PKR)', cs.chatOrderCount>0?Math.round(cs.revenueAttributed):'No linked orders'],
+    ['Total Dispatched (PKR)', Math.round(os.dispatchedPKR)],
+    ['Total Delivered (PKR)', Math.round(os.deliveredPKR)],
+    ['Returns MTD (PKR)', Math.round(os.returnsMTDPKR)],
+    ['Returns CF (PKR)', Math.round(os.returnsCFPKR)],
+    ['Cancellation MTD (PKR)', Math.round(os.cancelMTDPKR)],
+    ['Cancellation CF (PKR)', Math.round(os.cancelCFPKR)],
+    ['Order Adjustment Value (PKR)', Math.round(d.orderAdj)],
+  ]);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:34},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Full Report');
+  XLSX.writeFile(wb, 'Mendeez_Full_Report_'+d.fromV+'_to_'+d.toV+'.xlsx');
+}
+
+async function cbFetchOpsMetricsForRange(from, to){
+  const monthStart = new Date(from.getFullYear(), from.getMonth(), 1);
+  let data = [];
+  let lastId = 0;
+  const CHUNK = 1000;
+  while(true){
+    const url = SUPA_URL+'/rest/v1/ops_order_dump?select=id,orderId,value,qty,created,dispatched,delivered,cancelled,returned,retStatus&order=id.asc&limit='+CHUNK+'&id=gt.'+lastId;
+    let chunk = [];
+    try{ chunk = await fetch(url, {headers: DB.h}).then(function(r){return r.json();}); }catch(e){ break; }
+    if(!chunk || !Array.isArray(chunk) || !chunk.length) break;
+    data = data.concat(chunk);
+    lastId = chunk[chunk.length-1].id;
+    if(chunk.length < CHUNK) break;
+  }
+  const disp = data.filter(function(r){ const dd=opsPd(r.dispatched); return dd&&dd>=from&&dd<=to; });
+  const deliv = data.filter(function(r){ const dd=opsPd(r.delivered); return dd&&dd>=from&&dd<=to; });
+  const cancAll = data.filter(function(r){ const dd=opsPd(r.cancelled); return dd&&dd>=from&&dd<=to; });
+  const retAll = data.filter(function(r){ const dd=opsPd(r.returned); return dd&&dd>=from&&dd<=to&&(r.retStatus||'').toLowerCase().trim()==='returned'; });
+  const cMTD = cancAll.filter(function(r){ const dd=opsPd(r.created); return dd&&dd>=monthStart; });
+  const cCF = cancAll.filter(function(r){ const dd=opsPd(r.created); return dd&&dd<monthStart; });
+  const rMTD = retAll.filter(function(r){ const dd=opsPd(r.created); return dd&&dd>=monthStart; });
+  const rCF = retAll.filter(function(r){ const dd=opsPd(r.created); return dd&&dd<monthStart; });
+  return {
+    dispatchedPKR: opsSumPKR(disp), dispatchedCount: opsCountOrders(disp),
+    deliveredPKR: opsSumPKR(deliv), deliveredCount: opsCountOrders(deliv),
+    cancelMTDPKR: opsSumPKR(cMTD), cancelMTDCount: opsCountOrders(cMTD),
+    cancelCFPKR: opsSumPKR(cCF), cancelCFCount: opsCountOrders(cCF),
+    returnsMTDPKR: opsSumPKR(rMTD), returnsMTDCount: opsCountOrders(rMTD),
+    returnsCFPKR: opsSumPKR(rCF), returnsCFCount: opsCountOrders(rCF)
+  };
+}
+
+async function cbFetchShopifyReturnsForRange(from, to){
+  const fromISO = toUTCISO(from), toISO = toUTCISO(to);
+  let returnValue = 0;
+  let cursor=null, hasNextPage=true, guard=0;
+  while(hasNextPage && guard<50){
+    guard++;
+    const afterClause = cursor ? (', after: "'+cursor+'"') : '';
+    const gql = `{ orders(first:250${afterClause}, query:"updated_at:>='${fromISO}' updated_at:<='${toISO}'") { edges { node { refunds { createdAt refundLineItems(first:50){ edges { node { subtotalSet { shopMoney { amount } } } } } } } } pageInfo { hasNextPage endCursor } } }`;
+    let d;
+    try{ d = await shopFetch('/graphql.json','POST',{query:gql}); }catch(e){ break; }
+    const od = d && d.data && d.data.orders;
+    if(!od) break;
+    od.edges.forEach(function(edge){
+      const o = edge.node;
+      (o.refunds||[]).forEach(function(ref){
+        const refDate = new Date(ref.createdAt);
+        if(refDate<from || refDate>to) return;
+        let rv=0;
+        ((ref.refundLineItems && ref.refundLineItems.edges)||[]).forEach(function(e2){
+          rv += parseFloat((e2.node.subtotalSet && e2.node.subtotalSet.shopMoney && e2.node.subtotalSet.shopMoney.amount) || 0);
+        });
+        if(rv>0) returnValue += rv;
+      });
+    });
+    hasNextPage = od.pageInfo.hasNextPage;
+    cursor = od.pageInfo.endCursor;
+  }
+  return returnValue;
+}
+
+// ── Policy tab ──
+// Read-only display of stored business policies — this same text also
+// feeds into the bot's system prompt (via the Worker), so whatever's
+// saved here is what the bot actually knows when answering policy
+// questions (returns, shipping, etc). "Edit" is here so someone can
+// actually get content INTO this in the first place — day-to-day it's
+// meant to be read, not chatted with.
+let POLICY_TEXT = '';
+let POLICY_EDITING = false;
+async function cbFetchPolicy(){
+  try {
+    const rows = await cbSupabase('chatbot_settings?select=value&key=eq.policy');
+    POLICY_TEXT = rows?.[0]?.value || '';
+  } catch (e) {
+    console.error('cbFetchPolicy error:', e.message);
+    POLICY_TEXT = '';
+  }
+}
+async function cbSavePolicy(){
+  const textarea = document.getElementById('cb-policy-textarea');
+  const value = textarea.value.trim();
+  try {
+    await cbSupabase('chatbot_settings?on_conflict=key', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({ key: 'policy', value, updated_at: new Date().toISOString() }),
+    });
+    POLICY_TEXT = value;
+    POLICY_EDITING = false;
+    cbToast('Policy saved — the bot will use this from now on');
+    document.getElementById('cb-chat-col').innerHTML = cbRenderPolicy();
+  } catch (e) {
+    console.error('cbSavePolicy error:', e.message);
+    cbToast('Failed to save policy');
+  }
+}
+function cbTogglePolicyEdit(){
+  POLICY_EDITING = !POLICY_EDITING;
+  document.getElementById('cb-chat-col').innerHTML = cbRenderPolicy();
+}
+function cbRenderPolicy(){
+  if (POLICY_EDITING) {
+    return '<div class="cb-dash">\
+      <div class="cb-dash-title">Policy</div>\
+      <div class="cb-dash-sub">This is what the bot will treat as your official policies — shipping, returns, exchanges, warranty, etc. Read by the bot, not a chat interface.</div>\
+      <div class="cb-panel">\
+        <textarea id="cb-policy-textarea" style="width:100%;min-height:320px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:14px;border-radius:10px;font-family:var(--sans);font-size:13px;line-height:1.6;resize:vertical" placeholder="e.g. Returns accepted within 7 days of delivery, item must be unused with tags attached. Free shipping on orders above PKR 3000. Cash on Delivery available nationwide...">'+POLICY_TEXT+'</textarea>\
+        <div style="display:flex;gap:8px;margin-top:12px">\
+          <button class="cb-take-control" onclick="cbSavePolicy()">Save</button>\
+          <button class="cb-action-link" onclick="cbTogglePolicyEdit()">Cancel</button>\
+        </div>\
+      </div>\
+    </div>';
+  }
+  return '<div class="cb-dash">\
+    <div class="cb-dash-title">Policy</div>\
+    <div class="cb-dash-sub">Read-only reference — this is exactly what the bot uses to answer policy questions. <span style="color:var(--cb);cursor:pointer" onclick="cbTogglePolicyEdit()">Edit</span></div>\
+    <div class="cb-panel" style="white-space:pre-wrap;line-height:1.7;font-size:13px">'+(POLICY_TEXT || '<span style="color:var(--muted)">No policy text saved yet — click Edit to add one.</span>')+'</div>\
+  </div>';
+}
+
+// ── Strategy tab ──
+// Plain-English selling strategy guidance the bot should follow (feeds
+// into its system prompt, same mechanism as Policy), plus a live queue
+// of questions the BOT itself raised mid-conversation when it genuinely
+// didn't know something about a product or how to handle a selling
+// situation — a human answers these here, and the bot can reference the
+// answer for future similar questions.
+let STRATEGY_TEXT = '';
+let STRATEGY_EDITING = false;
+let BOT_QUESTIONS = [];
+let SHOWING_QUESTIONS = false;
+
+async function cbFetchStrategy(){
+  try {
+    const rows = await cbSupabase('chatbot_settings?select=value&key=eq.strategy');
+    STRATEGY_TEXT = rows?.[0]?.value || '';
+  } catch (e) {
+    console.error('cbFetchStrategy error:', e.message);
+    STRATEGY_TEXT = '';
+  }
+}
+async function cbSaveStrategy(){
+  const textarea = document.getElementById('cb-strategy-textarea');
+  const value = textarea.value.trim();
+  try {
+    await cbSupabase('chatbot_settings?on_conflict=key', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({ key: 'strategy', value, updated_at: new Date().toISOString() }),
+    });
+    STRATEGY_TEXT = value;
+    STRATEGY_EDITING = false;
+    cbToast('Strategy saved — the bot will use this from now on');
+    document.getElementById('cb-chat-col').innerHTML = cbRenderStrategy();
+  } catch (e) {
+    console.error('cbSaveStrategy error:', e.message);
+    cbToast('Failed to save strategy');
+  }
+}
+function cbToggleStrategyEdit(){
+  STRATEGY_EDITING = !STRATEGY_EDITING;
+  document.getElementById('cb-chat-col').innerHTML = cbRenderStrategy();
+}
+async function cbToggleQuestions(){
+  SHOWING_QUESTIONS = !SHOWING_QUESTIONS;
+  if (SHOWING_QUESTIONS) {
+    try {
+      BOT_QUESTIONS = await cbSupabase('chatbot_bot_questions?select=*&answered=eq.false&order=created_at.desc') || [];
+    } catch (e) {
+      console.error('cbToggleQuestions error:', e.message);
+      BOT_QUESTIONS = [];
+    }
+  }
+  document.getElementById('cb-chat-col').innerHTML = cbRenderStrategy();
+}
+async function cbAnswerBotQuestion(id, inputEl){
+  const answer = inputEl.value.trim();
+  if (!answer) return;
+  try {
+    await cbSupabase(`chatbot_bot_questions?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ answer, answered: true }),
+    });
+    cbToast('Answer saved — the bot will use this going forward');
+    BOT_QUESTIONS = BOT_QUESTIONS.filter(q => q.id !== id);
+    document.getElementById('cb-chat-col').innerHTML = cbRenderStrategy();
+  } catch (e) {
+    console.error('cbAnswerBotQuestion error:', e.message);
+    cbToast('Failed to save answer');
+  }
+}
+
+function cbRenderStrategy(){
+  if (STRATEGY_EDITING) {
+    return '<div class="cb-dash">\
+      <div class="cb-dash-title">Strategy</div>\
+      <div class="cb-dash-sub">Write your selling approach in plain English — tone, what to emphasize, how to handle objections, upselling style, etc. The bot follows this alongside its normal rules.</div>\
+      <div class="cb-panel">\
+        <textarea id="cb-strategy-textarea" style="width:100%;min-height:280px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:14px;border-radius:10px;font-family:var(--sans);font-size:13px;line-height:1.6;resize:vertical" placeholder="e.g. Always mention our loyalty program to first-time customers. If someone asks about a competitor, focus on our quality and free shipping rather than comparing directly. For customers asking about bulk orders, always offer to connect them with our wholesale team...">'+STRATEGY_TEXT+'</textarea>\
+        <div style="display:flex;gap:8px;margin-top:12px">\
+          <button class="cb-take-control" onclick="cbSaveStrategy()">Save</button>\
+          <button class="cb-action-link" onclick="cbToggleStrategyEdit()">Cancel</button>\
+        </div>\
+      </div>\
+    </div>';
+  }
+  const questionsPanel = !SHOWING_QUESTIONS ? '' : (
+    !BOT_QUESTIONS.length
+      ? '<div class="cb-panel" style="margin-top:14px;text-align:center;color:var(--muted);padding:30px 0">No pending questions from the bot right now.</div>'
+      : '<div class="cb-panel" style="margin-top:14px">' + BOT_QUESTIONS.map(function(q){
+          const inputId = 'cb-bq-answer-'+q.id;
+          return '<div style="padding:13px 0;border-bottom:1px solid var(--border)">\
+            <div style="font-size:12.5px;font-weight:600;margin-bottom:8px">❓ '+q.question+'</div>\
+            <div style="display:flex;gap:7px">\
+              <input id="'+inputId+'" placeholder="Type your answer..." style="flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:8px;font-family:var(--sans);font-size:12px;outline:none">\
+              <button class="cb-action-link" style="color:var(--cb)" onclick="cbAnswerBotQuestion('+q.id+',document.getElementById(\''+inputId+'\'))">Answer</button>\
+            </div>\
+          </div>';
+        }).join('') + '</div>'
+  );
+  return '<div class="cb-dash">\
+    <div class="cb-dash-title">Strategy</div>\
+    <div class="cb-dash-sub">Selling guidance for the bot, in your own words. <span style="color:var(--cb);cursor:pointer" onclick="cbToggleStrategyEdit()">Edit</span></div>\
+    <div class="cb-panel" style="white-space:pre-wrap;line-height:1.7;font-size:13px">'+(STRATEGY_TEXT || '<span style="color:var(--muted)">No strategy saved yet — click Edit to add one.</span>')+'</div>\
+    <button class="cb-take-control" style="margin-top:16px" onclick="cbToggleQuestions()">'+(SHOWING_QUESTIONS ? 'Hide' : 'Do you have any question?')+'</button>\
+    '+questionsPanel+'\
+  </div>';
+}
+
+const STUB_INFO = {
+  campaigns:{icon:'megaphone', title:'AI Campaigns', sub:'Broadcast/blast messages to segments of customers via WhatsApp/Meta - future addition.'},
+  customers:{icon:'users', title:'Customers', sub:'Unified customer profiles pulling order history from Shopify plus chat history from here - future addition.'},
+  shopify:{icon:'bag', title:'Shopify Analytics', sub:'Already lives in your main dashboard\'s other tabs - this would be a shortcut into that same data.'},
+  support:{icon:'lifebuoy', title:'Support', sub:'Get help with the chatbot module itself.'},
+};
+
+function cbNav(key){
+  document.querySelectorAll('.cb-nav-item').forEach(function(el){ el.classList.remove('active'); });
+  const navEl=document.querySelector('[data-nav="'+key+'"]');
+  if(navEl) navEl.classList.add('active');
+
+  const listCol=document.getElementById('cb-list-col');
+  const rightCol=document.getElementById('cb-right-col');
+  const chatCol=document.getElementById('cb-chat-col');
+
+  if(key==='inbox'){
+    listCol.style.display='flex'; rightCol.style.display='flex';
+    if(!document.getElementById('cb-chat-header')) chatCol.innerHTML = cbEmptyChatCol();
+    return;
+  }
+  if(key==='escalations'){
+    listCol.style.display='flex'; rightCol.style.display='flex';
+    if(!document.getElementById('cb-chat-header')) chatCol.innerHTML = cbEmptyChatCol();
+    cbQuickFilter('intervention');
+    return;
+  }
+
+  listCol.style.display='none'; rightCol.style.display='none';
+  if(key==='comments' || key==='fb-comments'){
+    chatCol.innerHTML = '<div class="cb-dash"><div class="cb-dash-title">Facebook Comments</div><div style="color:var(--muted);padding:20px 0">Loading…</div></div>';
+    cbFetchFacebookComments().then(function(){ chatCol.innerHTML = cbRenderFacebookComments(); });
+    return;
+  }
+  if(key==='ig-comments'){
+    chatCol.innerHTML = '<div class="cb-dash"><div class="cb-dash-title">Instagram Comments</div><div style="color:var(--muted);padding:20px 0">Loading…</div></div>';
+    cbFetchInstagramComments().then(function(){ chatCol.innerHTML = cbRenderInstagramComments(); });
+    return;
+  }
+  if(key==='comment-logs'){
+    chatCol.innerHTML = '<div class="cb-dash"><div class="cb-dash-title">Comment Logs</div><div style="color:var(--muted);padding:20px 0">Loading…</div></div>';
+    cbFetchCommentLogs().then(function(){ chatCol.innerHTML = cbRenderCommentLogs(); });
+    return;
+  }
+  if(key==='reports'){
+    chatCol.innerHTML = cbRenderReportsShell();
+    cbLoadReportMetrics();
+    return;
+  }
+  if(key==='download-report'){
+    chatCol.innerHTML = cbRenderDownloadReportPage();
+    return;
+  }
+  if(key==='policy'){
+    POLICY_EDITING = false;
+    chatCol.innerHTML = '<div class="cb-dash"><div class="cb-dash-title">Policy</div><div style="color:var(--muted);padding:20px 0">Loading…</div></div>';
+    cbFetchPolicy().then(function(){ chatCol.innerHTML = cbRenderPolicy(); });
+    return;
+  }
+  if(key==='strategy'){
+    STRATEGY_EDITING = false;
+    SHOWING_QUESTIONS = false;
+    chatCol.innerHTML = '<div class="cb-dash"><div class="cb-dash-title">Strategy</div><div style="color:var(--muted);padding:20px 0">Loading…</div></div>';
+    cbFetchStrategy().then(function(){ chatCol.innerHTML = cbRenderStrategy(); });
+    return;
+  }
+
+  const info = STUB_INFO[key] || {icon:'plug', title:key, sub:'Coming soon.'};
+  chatCol.innerHTML = '<div class="cb-stub">\
+    <div class="cb-stub-icon">'+ic(info.icon,28)+'</div>\
+    <div class="cb-stub-title">'+info.title+'</div>\
+    <div class="cb-stub-sub">'+info.sub+'</div>\
+  </div>';
+}
+
+cbFetchConversations().then(function(){
+  if (CONVERSATIONS.length) cbOpen(CONVERSATIONS[0].id);
+});
+cbStartPolling();
+
+</script>
 </body>
 </html>
