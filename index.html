@@ -2945,7 +2945,7 @@ function processCS(rows){
   const dropdownMonths=[...sectionHeaders].sort((a,b)=>b.year!==a.year?b.year-a.year:b.monthNum-a.monthNum);
   ['csMonthSel','overviewMonthSel'].forEach(id=>{
     const sel=document.getElementById(id);
-    if(!sel)return;
+    if(!sel || !sel.options) return; // skip if missing, or no longer an actual <select> (e.g. hidden placeholder div)
     sel.innerHTML=dropdownMonths.length>0
       ?dropdownMonths.map(m=>`<option value="${m.label}">${m.label}</option>`).join('')
       :`<option value="${currentLabel}">${currentLabel}</option>`;
@@ -8176,7 +8176,11 @@ function opsRenderCards(){
   const disp    = _opsRows.filter(r=>{ const d=opsPd(r.dispatched); return d&&d>=from&&d<=to; });
   const deliv   = _opsRows.filter(r=>{ const d=opsPd(r.delivered);  return d&&d>=from&&d<=to; });
   const cancAll = _opsRows.filter(r=>{ const d=opsPd(r.cancelled);  return d&&d>=from&&d<=to; });
-  const retAll  = _opsRows.filter(r=>{ const d=opsPd(r.returned);   return d&&d>=from&&d<=to&&(r.retStatus||'').toLowerCase().trim()==='returned'; });
+  // Relies on the actual return-completion date (r.returned) being present — not on exact-matching
+  // the free-text status column, which has had typos (e.g. "Retuned" instead of "Returned") that
+  // silently broke this match before. The date field itself is the reliable signal that a return
+  // actually completed, vs. still being "in transit" back (which has no completion date yet).
+  const retAll  = _opsRows.filter(r=>{ const d=opsPd(r.returned);   return d&&d>=from&&d<=to; });
   const pend    = _opsRows.filter(r=>{ const d=opsPd(r.created); return d&&d>=from&&d<=to&&opsIsBlank(r.dispatched)&&opsIsBlank(r.cancelled); });
 
   const cMTD = cancAll.filter(r=>{ const d=opsPd(r.created); return d&&d>=monthStart; });
@@ -9229,7 +9233,8 @@ function popupCalcAndRender(){
   const deliv   = _popRows.filter(r=>{const d=popupPd(r.delivered); return d&&d>=from&&d<=to;});
   const pend    = _popRows.filter(r=>{const d=popupPd(r.created);   return d&&d>=from&&d<=to&&(!r.dispatched||!r.dispatched.trim())&&(!r.cancelled||!r.cancelled.trim());});
   const cancAll = _popRows.filter(r=>{const d=popupPd(r.cancelled); return d&&d>=from&&d<=to;});
-  const retAll  = _popRows.filter(r=>{const d=popupPd(r.returned);  return d&&d>=from&&d<=to&&(r.retStatus||'').toLowerCase().trim()==='returned';});
+  // Same fix as opsRenderCards — rely on the completion date, not a fragile status-text match
+  const retAll  = _popRows.filter(r=>{const d=popupPd(r.returned);  return d&&d>=from&&d<=to;});
 
   const cMTD=cancAll.filter(r=>{const d=popupPd(r.created);return d&&d>=monthStart;});
   const cCF =cancAll.filter(r=>{const d=popupPd(r.created);return d&&d<monthStart;});
@@ -9368,6 +9373,7 @@ function cbMapConversation(row){
     time: cbFormatTime(row.last_message_at),
     unread: row.unread_count || 0,
     customer_id: row.customer_id,
+    is_complaint: !!row.is_complaint,
   };
 }
 
@@ -9642,6 +9648,9 @@ async function cbOpen(id){
   } else if(aiHandling && c.channel==='sales'){
     actionBtns = '<button class="cb-action-link" style="color:var(--blue)" onclick="cbAction(\'Transferred for online payment\')">'+ic('card',13)+' Transfer for Online Payment</button>';
   }
+  actionBtns += c.is_complaint
+    ? '<button class="cb-action-link" style="color:var(--red)" onclick="cbToggleComplaint('+c.id+')">'+ic('alert',13)+' Marked as Complaint (undo)</button>'
+    : '<button class="cb-action-link" onclick="cbToggleComplaint('+c.id+')">'+ic('alert',13)+' Mark as Complaint</button>';
   const subEl=document.getElementById('cb-chat-subheader');
   subEl.style.display='flex';
   subEl.innerHTML =
@@ -9693,6 +9702,24 @@ function cbRenderMessages(msgs){
   });
   el.innerHTML = parts.join('');
   el.scrollTop = el.scrollHeight;
+}
+
+async function cbToggleComplaint(id){
+  const c = CONVERSATIONS.filter(function(x){return x.id===id;})[0];
+  if(!c) return;
+  const newVal = !c.is_complaint;
+  try {
+    await cbSupabase(`chatbot_conversations?id=eq.${id}`, {
+      method:'PATCH',
+      body: JSON.stringify({ is_complaint: newVal }),
+    });
+    c.is_complaint = newVal;
+    cbToast(newVal ? 'Marked as complaint' : 'Unmarked as complaint');
+    cbOpen(id);
+  } catch (e) {
+    console.error('cbToggleComplaint error:', e.message);
+    cbToast('Could not update — check Supabase config (has is_complaint column been added?)');
+  }
 }
 
 async function cbTakeControl(id){
@@ -10152,7 +10179,7 @@ async function cbFetchReportMetrics(from, to){
     siteAOV:0, chatAOV:0, aovUpliftPct:null, avgResponseSecs:null,
     totalAI:0, totalAgent:0, byPlatform:{},
     totalChatsBot:0, totalEscalated:0, botOrderCount:0, botOrderValue:0,
-    avgResponseBotSecs:null, avgResponseAgentSecs:null};
+    avgResponseBotSecs:null, avgResponseAgentSecs:null, totalComplaints:0};
 
   // Total Orders — reuses the exact same live Shopify data source as the rest of the dashboard
   let orders = [];
@@ -10165,9 +10192,10 @@ async function cbFetchReportMetrics(from, to){
   let convRows = [];
   try{
     convRows = await DB.get('chatbot_conversations',
-      `select=id,created_at,handled_by,platform&created_at=gte.${encodeURIComponent(fromISO)}&created_at=lte.${encodeURIComponent(toISO)}`);
+      `select=id,created_at,handled_by,platform,is_complaint&created_at=gte.${encodeURIComponent(fromISO)}&created_at=lte.${encodeURIComponent(toISO)}`);
   }catch(e){ console.warn('cbFetchReportMetrics conversations error:', e.message); }
   out.totalConversations = (convRows||[]).length;
+  out.totalComplaints = (convRows||[]).filter(c=>c.is_complaint).length;
   (convRows||[]).forEach(c=>{
     if(c.handled_by==='ai') out.totalAI++;
     else if(c.handled_by==='human') out.totalAgent++;
@@ -10245,11 +10273,10 @@ function cbRenderReportsShell(){
       <span id="cb-rpt-hist-status" style="font-size:11px;color:var(--muted)"></span>\
     </div>\
     <div class="cb-metric-grid" id="cb-rpt-grid">\
-      <div class="cb-metric-card"><div class="cb-metric-lbl">Total Orders</div><div class="cb-metric-val" id="cb-rpt-orders">…</div><div class="cb-metric-sub" id="cb-rpt-orders-sub">loading</div></div>\
-      <div class="cb-metric-card"><div class="cb-metric-lbl">Total Conversations</div><div class="cb-metric-val" id="cb-rpt-conv">…</div><div class="cb-metric-sub" id="cb-rpt-conv-sub">loading</div></div>\
       <div class="cb-metric-card"><div class="cb-metric-lbl">Revenue Attributed via Chat Orders</div><div class="cb-metric-val" style="color:var(--green)" id="cb-rpt-rev">…</div><div class="cb-metric-sub" id="cb-rpt-rev-sub">loading</div></div>\
       <div class="cb-metric-card"><div class="cb-metric-lbl">AOV Uplift — Chat vs Site Avg</div><div class="cb-metric-val" style="color:var(--blue)" id="cb-rpt-aov">…</div><div class="cb-metric-sub" id="cb-rpt-aov-sub">loading</div></div>\
       <div class="cb-metric-card"><div class="cb-metric-lbl">Avg Response Time</div><div class="cb-metric-val" id="cb-rpt-resp">…</div><div class="cb-metric-sub" id="cb-rpt-resp-sub">loading</div></div>\
+      <div class="cb-metric-card"><div class="cb-metric-lbl">Complaints</div><div class="cb-metric-val" style="color:var(--red)" id="cb-rpt-complaints">…</div><div class="cb-metric-sub" id="cb-rpt-complaints-sub">loading</div></div>\
     </div>\
     <div class="cb-dash-sub" style="margin-top:22px;font-weight:700;color:var(--text);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Bot vs Human Performance</div>\
     <div class="cb-metric-grid" id="cb-rpt-grid-2" style="margin-top:10px">\
@@ -10268,16 +10295,14 @@ function cbRenderReportsShell(){
 // Supabase snapshot for a past day.
 function cbRenderMetricsIntoCards(m, labelText){
   const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
-  set('cb-rpt-orders', (m.totalOrders||0).toLocaleString());
-  set('cb-rpt-orders-sub', labelText);
-  set('cb-rpt-conv', (m.totalConversations||0).toLocaleString());
-  set('cb-rpt-conv-sub', labelText);
   set('cb-rpt-rev', m.chatOrderCount>0 ? fPKR(m.revenueAttributed) : '—');
   set('cb-rpt-rev-sub', m.chatOrderCount>0 ? m.chatOrderCount+' linked orders' : 'No linked orders');
   set('cb-rpt-aov', m.aovUpliftPct!=null ? (m.aovUpliftPct>=0?'+':'')+m.aovUpliftPct.toFixed(1)+'%' : '—');
   set('cb-rpt-aov-sub', m.aovUpliftPct!=null ? 'chat PKR '+Math.round(m.chatAOV).toLocaleString()+' vs site PKR '+Math.round(m.siteAOV).toLocaleString() : 'No linked orders');
   set('cb-rpt-resp', cbFmtSecs(m.avgResponseSecs));
   set('cb-rpt-resp-sub', m.avgResponseSecs!=null ? 'first reply, avg' : 'No replies found');
+  set('cb-rpt-complaints', (m.totalComplaints||0).toLocaleString());
+  set('cb-rpt-complaints-sub', 'Chats marked as complaint');
 
   const totalHandled = (m.totalChatsBot||0) + (m.totalEscalated||0);
   set('cb-rpt-bot-chats', (m.totalChatsBot||0).toLocaleString());
@@ -10324,6 +10349,7 @@ async function cbLoadHistoricalReport(){
       totalChatsBot: row.total_chats_bot, totalEscalated: row.total_escalated,
       botOrderCount: row.bot_order_count, botOrderValue: row.bot_order_value,
       avgResponseBotSecs: row.avg_response_bot_secs, avgResponseAgentSecs: row.avg_response_agent_secs,
+      totalComplaints: row.total_complaints||0,
     };
     const updated = row.updated_at ? new Date(row.updated_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
     cbRenderMetricsIntoCards(m, 'Saved · '+dateStr+(updated?' (as of '+updated+')':''));
@@ -10357,9 +10383,13 @@ function pktTodayDateStr(){
 //     total_chats_bot int default 0, total_escalated int default 0,
 //     bot_order_count int default 0, bot_order_value numeric default 0,
 //     avg_response_bot_secs numeric, avg_response_agent_secs numeric,
+//     total_complaints int default 0,
 //     updated_at timestamptz default now()
 //   );
 //   alter table chatbot_daily_reports disable row level security;
+//
+// Also run this once, for the "Mark as Complaint" button in the chat view:
+//   alter table chatbot_conversations add column if not exists is_complaint boolean default false;
 let _cbAutoSaveInFlight = false;
 async function cbAutoSaveTodaySnapshot(){
   if(_cbAutoSaveInFlight) return; // avoid overlapping saves if triggered rapidly
@@ -10378,6 +10408,7 @@ async function cbAutoSaveTodaySnapshot(){
       total_chats_bot: m.totalChatsBot, total_escalated: m.totalEscalated,
       bot_order_count: m.botOrderCount, bot_order_value: Math.round(m.botOrderValue||0),
       avg_response_bot_secs: m.avgResponseBotSecs, avg_response_agent_secs: m.avgResponseAgentSecs,
+      total_complaints: m.totalComplaints||0,
       updated_at: new Date().toISOString(),
     };
     await DB.upsert('chatbot_daily_reports', row, 'report_date');
@@ -10581,7 +10612,8 @@ async function cbFetchOpsMetricsForRange(from, to){
   const disp = data.filter(function(r){ const dd=opsPd(r.dispatched); return dd&&dd>=from&&dd<=to; });
   const deliv = data.filter(function(r){ const dd=opsPd(r.delivered); return dd&&dd>=from&&dd<=to; });
   const cancAll = data.filter(function(r){ const dd=opsPd(r.cancelled); return dd&&dd>=from&&dd<=to; });
-  const retAll = data.filter(function(r){ const dd=opsPd(r.returned); return dd&&dd>=from&&dd<=to&&(r.retStatus||'').toLowerCase().trim()==='returned'; });
+  // Same fix — rely on the completion date, not a fragile status-text match
+  const retAll = data.filter(function(r){ const dd=opsPd(r.returned); return dd&&dd>=from&&dd<=to; });
   const cMTD = cancAll.filter(function(r){ const dd=opsPd(r.created); return dd&&dd>=monthStart; });
   const cCF = cancAll.filter(function(r){ const dd=opsPd(r.created); return dd&&dd<monthStart; });
   const rMTD = retAll.filter(function(r){ const dd=opsPd(r.created); return dd&&dd>=monthStart; });
