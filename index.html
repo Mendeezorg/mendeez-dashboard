@@ -1164,6 +1164,17 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
         <input type="checkbox" id="autoLimitNewIn" checked>
         Auto-limit New In to 100 after upload
       </label>
+
+      <!-- One-time cleanup for automatic collection 272017686637 (200 limit) -->
+      <div style="margin-top:14px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:2px">🧹 Cleanup: Automatic Collection Limit (200)</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:8px">Checks collection 272017686637 and previews how many of the oldest products would be hidden to bring it down to 200.</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-s btn-sm" onclick="previewCollection272Cleanup()" id="c272PreviewBtn">🔍 Preview</button>
+          <button class="btn btn-p btn-sm" onclick="runCollection272Cleanup()" id="c272RunBtn" disabled style="opacity:.4">✓ Confirm & Run Cleanup</button>
+        </div>
+        <div id="c272CleanupResult" style="display:none;margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--text);line-height:1.7;max-height:160px;overflow-y:auto"></div>
+      </div>
     </div>
 
     <!-- Progress -->
@@ -6045,6 +6056,8 @@ async function upSubmit(){
         if(autoLimit && autoLimit.checked){
           autoLimitNewInCollection();
         }
+        // Auto-limit the automatic collection (272017686637) to 200 products
+        autoLimitCollection272();
       }
       document.getElementById('upCsvResult').style.display='block';
       document.getElementById('upCsvResult').innerHTML='<div class="alert '+(csvFail===0?'al-green':'al-amber')+'"><div>'+(csvFail===0?'✅':'⚠')+'</div><div>'
@@ -6676,6 +6689,138 @@ async function autoLimitNewInCollection(){
   } catch(e){
     console.warn('Auto-limit failed:', e.message);
   }
+}
+
+// ── Auto-limit Automatic Collection (272017686637) via hide-tag ──
+// This collection is SMART/AUTOMATIC (rule: Inventory > 0 AND Tag does not include
+// "factory outlet" AND Tag does not include "collection-limit-hide").
+// Smart collections can't have products removed directly via /collects.json —
+// Shopify recalculates membership from the rule. So instead we ADD the
+// "collection-limit-hide" tag to the oldest excess products; Shopify then
+// automatically drops them from the collection because the rule excludes that tag.
+async function autoLimitCollection272(){
+  const COLLECTION_ID = '272017686637';
+  const LIMIT = 200;
+  const HIDE_TAG = 'collection-limit-hide';
+  try {
+    // Fetch all products currently in the collection
+    let allProds = [];
+    let sinceId = 0;
+    while(true){
+      const data = await shopFetch(`/products.json?limit=250&collection_id=${COLLECTION_ID}&fields=id,title,created_at,tags&since_id=${sinceId}`);
+      const prods = data.products||[];
+      if(!prods.length) break;
+      allProds = [...allProds, ...prods];
+      sinceId = prods[prods.length-1].id;
+      if(prods.length < 250) break;
+    }
+
+    if(allProds.length <= LIMIT){
+      console.log('✅ Auto-limit (272): already within limit ('+allProds.length+'/'+LIMIT+')');
+      return;
+    }
+
+    // Keep the newest LIMIT products, hide the rest (oldest first)
+    allProds.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)); // newest first
+    const toHide = allProds.slice(LIMIT);
+
+    // Add hide-tag in batches of 5
+    for(let i=0; i<toHide.length; i+=5){
+      const batch = toHide.slice(i, i+5);
+      await Promise.all(batch.map(async p=>{
+        try{
+          const currentTags = (p.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+          if(currentTags.includes(HIDE_TAG)) return; // already hidden
+          const newTags = [...currentTags, HIDE_TAG].join(', ');
+          await shopFetch(`/products/${p.id}.json`, 'PUT', {product:{id:p.id, tags:newTags}});
+        }catch(e){ console.warn('Auto-limit (272) hide failed:', p.id, e.message); }
+      }));
+      await new Promise(r=>setTimeout(r,300));
+    }
+    console.log('✅ Auto-limit (272): hid '+toHide.length+' oldest products, collection capped at '+LIMIT);
+  } catch(e){
+    console.warn('Auto-limit (272) failed:', e.message);
+  }
+}
+
+// ── One-time manual cleanup preview + run for collection 272017686637 ──
+let _c272PendingHideList = null; // cached preview result awaiting confirmation
+
+async function _c272FetchAllProducts(){
+  const COLLECTION_ID = '272017686637';
+  let allProds = [];
+  let sinceId = 0;
+  while(true){
+    const data = await shopFetch(`/products.json?limit=250&collection_id=${COLLECTION_ID}&fields=id,title,created_at,tags&since_id=${sinceId}`);
+    const prods = data.products||[];
+    if(!prods.length) break;
+    allProds = [...allProds, ...prods];
+    sinceId = prods[prods.length-1].id;
+    if(prods.length < 250) break;
+  }
+  return allProds;
+}
+
+async function previewCollection272Cleanup(){
+  const LIMIT = 200;
+  const btn = document.getElementById('c272PreviewBtn');
+  const runBtn = document.getElementById('c272RunBtn');
+  const out = document.getElementById('c272CleanupResult');
+  btn.disabled = true; btn.textContent = '⏳ Checking...';
+  runBtn.disabled = true; runBtn.style.opacity = '.4';
+  out.style.display='block'; out.innerHTML = 'Fetching collection products...';
+  try{
+    const allProds = await _c272FetchAllProducts();
+    if(allProds.length <= LIMIT){
+      out.innerHTML = `✅ Already within limit — ${allProds.length}/${LIMIT} products. Nothing to clean up.`;
+      _c272PendingHideList = null;
+      return;
+    }
+    allProds.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)); // newest first
+    const toHide = allProds.slice(LIMIT);
+    _c272PendingHideList = toHide;
+    const sample = toHide.slice(0,8).map(p=>`• ${p.title} (${new Date(p.created_at).toISOString().slice(0,10)})`).join('<br>');
+    out.innerHTML = `Total in collection: <b>${allProds.length}</b><br>`+
+      `Will hide (oldest first): <b>${toHide.length}</b> products to bring it down to ${LIMIT}<br><br>`+
+      `Sample of products to be hidden:<br>${sample}${toHide.length>8?'<br>…and '+(toHide.length-8)+' more':''}`;
+    runBtn.disabled = false; runBtn.style.opacity = '1';
+  }catch(e){
+    out.innerHTML = '❌ Preview failed: '+e.message;
+    _c272PendingHideList = null;
+  }finally{
+    btn.disabled = false; btn.textContent = '🔍 Preview';
+  }
+}
+
+async function runCollection272Cleanup(){
+  const HIDE_TAG = 'collection-limit-hide';
+  const out = document.getElementById('c272CleanupResult');
+  const runBtn = document.getElementById('c272RunBtn');
+  if(!_c272PendingHideList || !_c272PendingHideList.length){
+    out.innerHTML = 'Nothing to run — click Preview first.';
+    return;
+  }
+  const toHide = _c272PendingHideList;
+  runBtn.disabled = true; runBtn.textContent = '⏳ Running...';
+  let done=0, failed=0;
+  for(let i=0; i<toHide.length; i+=5){
+    const batch = toHide.slice(i, i+5);
+    await Promise.all(batch.map(async p=>{
+      try{
+        const currentTags = (p.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+        if(currentTags.includes(HIDE_TAG)){ done++; return; }
+        const newTags = [...currentTags, HIDE_TAG].join(', ');
+        await shopFetch(`/products/${p.id}.json`, 'PUT', {product:{id:p.id, tags:newTags}});
+        done++;
+      }catch(e){ failed++; console.warn('Cleanup hide failed:', p.id, e.message); }
+    }));
+    out.innerHTML = `Running... ${done+failed}/${toHide.length} processed (${failed} failed)`;
+    await new Promise(r=>setTimeout(r,300));
+  }
+  out.innerHTML = `✅ Done — hid ${done} products${failed?', '+failed+' failed (check console)':''}. Collection should settle at ~200 within a minute.`;
+  _c272PendingHideList = null;
+  runBtn.textContent = '✓ Confirm & Run Cleanup';
+  runBtn.disabled = true; runBtn.style.opacity = '.4';
 }
 
 function openDebugPanel(){
