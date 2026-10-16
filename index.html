@@ -702,6 +702,7 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
 #courierLive .cl-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
 #courierLive .cl-chip{font-size:11px;font-family:var(--mono);border:1px solid var(--border);border-radius:6px;padding:4px 10px;max-width:100%;word-break:break-word}
 #courierLive .cl-chip.ok{color:var(--green);border-color:var(--green-dim)}
+#courierLive .cl-chip.warn{color:var(--orange);border-color:var(--orange-dim);background:var(--orange-dim)}
 #courierLive .cl-chip.bad{color:var(--red);border-color:var(--red-dim);background:var(--red-dim)}
 #courierLive .cl-add{background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:14px;margin-bottom:14px;display:none}
 #courierLive .cl-add textarea{width:100%;min-height:210px;box-sizing:border-box;padding:8px}
@@ -734,8 +735,9 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
     var status = x;
     var s = String(status || '').trim().toLowerCase();
     if (s === 'delivered') return 'delivered';
-    if (s === 'returned') return 'returned';
-    if (s === 'return in transit') return 'returning';
+    // PostEx writes these as "Return" and "Return In-Transit" (checked against live data); other couriers vary,
+    // so anything starting with "return" is a return, and one that mentions transit is still on its way back.
+    if (s.indexOf('return') === 0) return s.indexOf('transit') !== -1 ? 'returning' : 'returned';
     if (s === 'cancelled' || s === 'expired' || s === 'unbooked') return 'other';
     return 'pending'; // Booked, In Stock, Picked, Delivery En-Route, Attempted, Transferred, Under Verification
   }
@@ -842,7 +844,7 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
       .then(function (x) {
         if (!x.ok) return { c: c, error: (x.j && (typeof x.j.error === 'string' ? x.j.error : JSON.stringify(x.j))) || 'Request failed' };
         var list = (x.j.orders || []).map(function (o) { o.courier = c.id; return o; });
-        return { c: c, orders: list, truncated: !!x.j.truncated, windows: x.j.windows };
+        return { c: c, orders: list, truncated: !!x.j.truncated, windows: x.j.windows, notes: x.j.notes || [] };
       })
       .catch(function (e) { return { c: c, error: e.message }; });
   }
@@ -857,6 +859,7 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
       var all = [], chips = '', anyErr = false;
       rs.forEach(function (r) {
         if (r.error) { anyErr = true; chips += '<div class="cl-chip bad">✗ ' + esc(r.c.name) + ' — ' + esc(r.error) + '</div>'; }
+        else if (!r.orders.length && r.notes && r.notes.length) { all = all.concat(r.orders); chips += '<div class="cl-chip warn">⚠ ' + esc(r.c.name) + ' · 0 orders — ' + esc(r.notes[0]) + '</div>'; }
         else { all = all.concat(r.orders); chips += '<div class="cl-chip ok">✓ ' + esc(r.c.name) + ' · ' + r.orders.length + ' orders' + (r.truncated ? ' · range cut to ' + (r.windows * 30) + ' days' : '') + '</div>'; }
       });
       $('clChips').innerHTML = chips;
