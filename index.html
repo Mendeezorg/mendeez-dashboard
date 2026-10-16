@@ -7721,22 +7721,51 @@ function getDemandProductName(barcode){
 }
 
 // ── Load all locations in parallel ──
+// ── Fetch ONE location from the Worker. A real answer is a LIST of stock rows. Anything else (TIMEOUT, HTTP 5xx, an error
+//    object, HTML, an empty body) is a FAILURE and must never be shown as "0 stock". Retries twice, because GTECH drops some
+//    requests when many arrive at once. ──
+async function gtechFetchLocation(o){
+  let lastErr = 'no answer';
+  const wait = window.GTECH_RETRY_MS || 1500;
+  for(let attempt = 1; attempt <= 3; attempt++){
+    try{
+      const r = await fetch(`${GTECH_BALANCE_URL}?api=${GTECH_API_KEY}&Location=${encodeURIComponent(o.loc)}`);
+      const j = await r.json().catch(() => null);
+      if(!r.ok) throw new Error((j && j.error) ? String(j.error) : 'HTTP ' + r.status);
+      const rows = Array.isArray(j) ? j : (j && (j.data || j.result || j.records));
+      if(!Array.isArray(rows)) throw new Error((j && j.error) ? String(j.error) : 'unexpected response');
+      return rows;
+    }catch(e){
+      lastErr = e.message || String(e);
+      if(attempt < 3) await new Promise(res => setTimeout(res, attempt * wait));
+    }
+  }
+  throw new Error(lastErr);
+}
+// Run fn over items with at most `limit` in flight; never throws — returns [{status, value|reason}] in order.
+async function gtechRunLimited(items, limit, fn){
+  const out = new Array(items.length); let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while(next < items.length){
+      const i = next++;
+      try{ out[i] = { status:'fulfilled', value: await fn(items[i]) }; }
+      catch(e){ out[i] = { status:'rejected', reason: e }; }
+    }
+  }));
+  return out;
+}
+
 async function gtechLoadAll(){
   const wrap = document.getElementById('gtechStockWrap');
   wrap.innerHTML = `<div style="color:var(--muted);font-size:12px;font-family:var(--mono);padding:24px;text-align:center">
     <div class="spinner" style="margin:0 auto 12px"></div>Loading all ${GT_OUTLETS.length} locations in parallel…</div>`;
 
-  const results = await Promise.allSettled(
-    GT_OUTLETS.map(o =>
-      fetch(`${GTECH_BALANCE_URL}?api=${GTECH_API_KEY}&Location=${encodeURIComponent(o.loc)}`)
-        .then(r => r.json())
-        .then(rows => {
-          if(!Array.isArray(rows)) rows = rows.data || rows.result || rows.records || [];
-          _gtechStockData[o.loc] = rows;
-          return { outlet: o, rows };
-        })
-    )
-  );
+  // 4 at a time (not all 10 at once), each with retries; a location that still fails is dropped from the data, never stored as empty
+  const results = await gtechRunLimited(GT_OUTLETS, 4, async o => {
+    try{ const rows = await gtechFetchLocation(o); _gtechStockData[o.loc] = rows; return { outlet: o, rows }; }
+    catch(e){ delete _gtechStockData[o.loc]; throw e; }
+  });
+  const failedCount = results.filter(r => r.status === 'rejected').length;
 
   // Build summary table
   let totalSKUs = 0, totalQty = 0;
@@ -7745,7 +7774,7 @@ async function gtechLoadAll(){
     if(r.status === 'rejected' || !_gtechStockData[o.loc]){
       return `<tr>
         <td style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600">${o.short}</td>
-        <td colspan="4" style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--red);font-family:var(--mono);font-size:11px">⚠ Failed to load</td>
+        <td colspan="4" style="padding:8px 12px;border-bottom:1px solid var(--border);color:var(--red);font-family:var(--mono);font-size:11px">⚠ Failed to load — ${(r.reason && r.reason.message) ? r.reason.message : 'no data'}</td>
       </tr>`;
     }
     const data   = _gtechStockData[o.loc];
@@ -7784,6 +7813,7 @@ async function gtechLoadAll(){
         </tr>
       </tfoot>
     </table>
+    ${failedCount ? `<div style="font-size:12px;color:var(--red);font-family:var(--mono);margin-top:10px">⚠ ${failedCount} location(s) failed to load, so the totals above are incomplete. Click Refresh All Locations to retry.</div>` : ''}
     <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:8px">
       Last updated: ${new Date().toLocaleTimeString()}
     </div>`;
@@ -8046,20 +8076,15 @@ async function gtechinvEnsureLoaded(){
   if(status) { status.textContent = '⏳ Loading all locations…'; status.style.color='var(--muted)'; }
   if(body) body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px"><div class="spinner" style="margin:0 auto 10px"></div>Loading stock from all locations…</td></tr>';
 
-  const results = await Promise.allSettled(
-    GT_OUTLETS.map(o =>
-      fetch(GTECH_BALANCE_URL + '?api=' + GTECH_API_KEY + '&Location=' + encodeURIComponent(o.loc))
-        .then(r => r.json())
-        .then(rows => {
-          if(!Array.isArray(rows)) rows = rows.data||rows.result||rows.records||[];
-          _gtechAllStock[o.loc] = { outlet: o, rows };
-        })
-    )
-  );
-
-  _gtechStockReady = true;
+  const todo = GT_OUTLETS.filter(o => !_gtechAllStock[o.loc]);   // only fetch what is still missing
+  const results = await gtechRunLimited(todo, 4, async o => { const rows = await gtechFetchLocation(o); _gtechAllStock[o.loc] = { outlet: o, rows }; });
+  const failedNames = todo.map((o, i) => results[i].status === 'rejected' ? o.short + ' (' + results[i].reason.message + ')' : null).filter(Boolean);
   const loaded = Object.keys(_gtechAllStock).length;
-  if(status) { status.textContent = '✓ ' + loaded + ' locations loaded'; status.style.color='var(--green)'; }
+  _gtechStockReady = (loaded === GT_OUTLETS.length);   // stays "not ready" until every location is in, so reopening the tab retries the missing ones
+  if(status){
+    if(failedNames.length){ status.textContent = '⚠ ' + loaded + ' of ' + GT_OUTLETS.length + ' locations loaded — failed: ' + failedNames.join(', ') + '. Reopen this tab to retry.'; status.style.color = 'var(--red)'; }
+    else { status.textContent = '✓ ' + loaded + ' locations loaded'; status.style.color = 'var(--green)'; }
+  }
   if(body) body.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">Type a barcode or product name to search</td></tr>';
 }
 
