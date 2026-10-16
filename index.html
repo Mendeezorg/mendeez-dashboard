@@ -732,6 +732,7 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
 <script>
 (function () {
   function W() { return (typeof GTECH_WORKER !== 'undefined') ? GTECH_WORKER : 'https://mendeez-shopify.divine-mouse-0258.workers.dev'; }
+  var PANEL_BUILD = 'c3-alert-ignores-date-filter';   // shown in the panel header so you can tell which file is running
   var ROW_LIMIT = 500;
   var orders = [];          // everything loaded for the chosen date range (all selected couriers)
   var pay = {};             // "courier:CN" -> payment record
@@ -863,7 +864,7 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
     if (built) return; built = true;
     var to = new Date(), from = new Date(); from.setDate(from.getDate() - 29);
     $('courierLive').innerHTML =
-      '<div class="ds"><div><div class="dt">Courier Tracking</div><div class="dsub">Live from courier APIs · Pending = booked, in transit or out for delivery</div></div>' +
+      '<div class="ds"><div><div class="dt">Courier Tracking</div><div class="dsub">Live from courier APIs · Pending = booked, in transit or out for delivery · panel build ' + PANEL_BUILD + '</div></div>' +
         '<button class="cl-sec" id="clRefresh">↻ Refresh</button></div>' +
       '<div class="cl-bar">' +
         '<span class="dlbl">Order date</span><input type="date" id="clFrom" value="' + ymd(from) + '">' +
@@ -1116,6 +1117,7 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
       var el = $('courierLive'); if (el && el.offsetParent !== null && !loading) load();
     }, 5 * 60 * 1000);
   };
+  window.courierLiveBuild = PANEL_BUILD;
   window.courierLiveTest = { groupOf: groupOf, summarize: summarize, delayedList: delayedList }; // used by tests
 })();
 </script>
