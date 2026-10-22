@@ -1645,6 +1645,20 @@ svg.icon{display:inline-block;vertical-align:-4px;flex-shrink:0}
         </div>
         <div id="c272CleanupResult" style="display:none;margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--text);line-height:1.7;max-height:160px;overflow-y:auto"></div>
       </div>
+
+      <!-- Repair: new products that were uploaded with the hide tag by mistake -->
+      <div style="margin-top:10px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:2px">🩹 Fix: new products wrongly hidden from the collection</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:8px">Finds products created recently that carry the <b>collection-limit-hide</b> tag and removes it, so they show up in the collection again.</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--muted)">Created in the last</span>
+          <input type="number" id="fixHideDays" value="14" min="1" max="90" style="width:60px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:11px">
+          <span style="font-size:11px;color:var(--muted)">days</span>
+          <button class="btn btn-s btn-sm" onclick="previewUnhideNewProducts()" id="fixHidePreviewBtn">🔍 Preview</button>
+          <button class="btn btn-p btn-sm" onclick="runUnhideNewProducts()" id="fixHideRunBtn" disabled style="opacity:.4">✓ Confirm & Remove Tag</button>
+        </div>
+        <div id="fixHideResult" style="display:none;margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--text);line-height:1.7;max-height:160px;overflow-y:auto"></div>
+      </div>
     </div>
 
     <!-- Progress -->
@@ -6327,6 +6341,13 @@ function upUpdateSubmitBtn(){
 // ── SUBMIT ──
 const SHOPIFY_HDRS=['Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published','Option1 Name','Option1 Value','Option1 Linked To','Option2 Name','Option2 Value','Option2 Linked To','Option3 Name','Option3 Value','Option3 Linked To','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Unit Price Total Measure','Unit Price Total Measure Unit','Unit Price Base Measure','Unit Price Base Measure Unit','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card','SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product','Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2','Google Shopping / Custom Label 3','Google Shopping / Custom Label 4','related products (product.metafields.custom.related_products)','EComposer product countdown end at (product.metafields.ecomposer.countdown)','EComposer product countdown start at (product.metafields.ecomposer.countdown_from)','Google: Custom Product (product.metafields.mm-google-shopping.custom_product)','Design Code (product.metafields.my_fields.design_code)','Product rating count (product.metafields.reviews.rating_count)','Activewear clothing features (product.metafields.shopify.activewear-clothing-features)','Activity (product.metafields.shopify.activity)','Age group (product.metafields.shopify.age-group)','Clothing accessory material (product.metafields.shopify.clothing-accessory-material)','Color (product.metafields.shopify.color-pattern)','Pants length type (product.metafields.shopify.pants-length-type)','Size (product.metafields.shopify.size)','Target gender (product.metafields.shopify.target-gender)','Complementary products (product.metafields.shopify--discovery--product_recommendation.complementary_products)','Related products (product.metafields.shopify--discovery--product_recommendation.related_products)','Related products settings (product.metafields.shopify--discovery--product_recommendation.related_products_display)','Search product boosts (product.metafields.shopify--discovery--product_search_boost.queries)','Variant Image','Variant Weight Unit','Variant Tax Code','Cost per item','Included / Pakistan','Price / Pakistan','Compare At Price / Pakistan','Status'];
 
+// ── Tags added by the "Automatic Collection Limit" cleanup. They must NEVER be copied onto a new product:
+//    a product carrying 'collection-limit-hide' is excluded by the automatic collection's rule, so it would never show up there.
+const HOUSEKEEPING_TAGS = ['collection-limit-hide'];
+function stripHousekeepingTags(tagStr){
+  return String(tagStr||'').split(',').map(t=>t.trim()).filter(t=>t && !HOUSEKEEPING_TAGS.includes(t.toLowerCase())).join(', ');
+}
+
 // ── DYNAMIC TAG CACHE — fetched live from Shopify per category ──
 const _tagCache = {}; // type → tags string (cleared on each upload session)
 
@@ -6342,7 +6363,7 @@ async function getAutoTags(type){
       .sort((a,b) => new Date(b.created_at||0) - new Date(a.created_at||0)); // most recently created first
 
     for(const p of ofType){
-      const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
+      const tagStr = stripHousekeepingTags(Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||''));
       if(tagStr.trim() && !tagStr.toLowerCase().includes('factory outlet')){
         _tagCache[typeKey] = tagStr;
         console.log('Auto-tags for "'+type+'" (from allProducts id desc):', tagStr);
@@ -6357,7 +6378,7 @@ async function getAutoTags(type){
       const d = await shopFetch('/products.json?limit=50&product_type='+encodeURIComponent(type)+'&fields=id,tags,created_at&order=created_at+desc');
       const products = d.products||[];
       for(const p of products){
-        const tagStr = Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||'');
+        const tagStr = stripHousekeepingTags(Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags||''));
         if(tagStr.trim() && !tagStr.toLowerCase().includes('factory outlet')){
           _tagCache[typeKey] = tagStr;
           console.log('Auto-tags for "'+type+'" (from API):', tagStr);
@@ -6487,7 +6508,7 @@ async function upSubmit(){
               body_html:    p.desc||'',
               vendor:       p.vendor||'MENDEEZ',
               product_type: p.type||'',
-              tags:         autoTags,
+              tags:         stripHousekeepingTags(autoTags),
               status:       p.status||'draft',
               options:      p.isQty ? [{name:'Title'}] : [{name:'Size'}],
               variants:     variants
@@ -7322,6 +7343,55 @@ async function runCollection272Cleanup(){
   _c272PendingHideList = null;
   runBtn.textContent = '✓ Confirm & Run Cleanup';
   runBtn.disabled = true; runBtn.style.opacity = '.4';
+}
+
+// ── Repair: remove the hide tag from products created recently (they were tagged by mistake) ──
+let _fixHidePending = null;
+async function _fixHideFetchRecent(days){
+  const since = new Date(Date.now() - days*864e5).toISOString();
+  let all = [], sinceId = 0;
+  while(true){
+    const data = await shopFetch(`/products.json?limit=250&created_at_min=${encodeURIComponent(since)}&fields=id,title,created_at,tags,status&since_id=${sinceId}`);
+    const prods = data.products||[];
+    if(!prods.length) break;
+    all = all.concat(prods); sinceId = prods[prods.length-1].id;
+    if(prods.length < 250) break;
+  }
+  return all.filter(p => (p.tags||'').split(',').map(t=>t.trim().toLowerCase()).includes('collection-limit-hide'));
+}
+async function previewUnhideNewProducts(){
+  const days = Math.min(Math.max(parseInt(document.getElementById('fixHideDays').value,10)||14,1),90);
+  const btn = document.getElementById('fixHidePreviewBtn'), runBtn = document.getElementById('fixHideRunBtn'), out = document.getElementById('fixHideResult');
+  btn.disabled = true; btn.textContent = '⏳ Checking...'; runBtn.disabled = true; runBtn.style.opacity = '.4';
+  out.style.display = 'block'; out.innerHTML = 'Looking at products created in the last '+days+' days...';
+  try{
+    const hit = await _fixHideFetchRecent(days);
+    if(!hit.length){ out.innerHTML = '✅ None of the products created in the last '+days+' days carry the hide tag. Nothing to fix.'; _fixHidePending = null; return; }
+    _fixHidePending = hit;
+    const sample = hit.slice(0,10).map(p=>`• ${p.title} (${new Date(p.created_at).toISOString().slice(0,10)}, ${p.status})`).join('<br>');
+    out.innerHTML = `Found <b>${hit.length}</b> recent product(s) with the hide tag:<br><br>${sample}${hit.length>10?'<br>…and '+(hit.length-10)+' more':''}`;
+    runBtn.disabled = false; runBtn.style.opacity = '1';
+  }catch(e){ out.innerHTML = '❌ Preview failed: '+e.message; _fixHidePending = null; }
+  finally{ btn.disabled = false; btn.textContent = '🔍 Preview'; }
+}
+async function runUnhideNewProducts(){
+  const out = document.getElementById('fixHideResult'), runBtn = document.getElementById('fixHideRunBtn');
+  if(!_fixHidePending || !_fixHidePending.length){ out.innerHTML = 'Nothing to run. Click Preview first.'; return; }
+  const list = _fixHidePending; runBtn.disabled = true; runBtn.textContent = '⏳ Running...';
+  let done = 0, failed = 0;
+  for(let i=0; i<list.length; i+=5){
+    await Promise.all(list.slice(i,i+5).map(async p=>{
+      try{
+        const tags = stripHousekeepingTags(p.tags);
+        await shopFetch(`/products/${p.id}.json`, 'PUT', {product:{id:p.id, tags:tags}});
+        done++;
+      }catch(e){ failed++; console.warn('Un-hide failed:', p.id, e.message); }
+    }));
+    out.innerHTML = `Running... ${done+failed}/${list.length} processed (${failed} failed)`;
+    await new Promise(r=>setTimeout(r,300));
+  }
+  out.innerHTML = `✅ Done. Removed the tag from ${done} product(s)${failed?', '+failed+' failed (see console)':''}. They will show in the collection within a minute.`;
+  _fixHidePending = null; runBtn.textContent = '✓ Confirm & Remove Tag'; runBtn.disabled = true; runBtn.style.opacity = '.4';
 }
 
 function openDebugPanel(){
