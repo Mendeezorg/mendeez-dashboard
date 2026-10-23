@@ -10362,7 +10362,7 @@ function opsPd(str){
   return null;
 }
 
-function opsIsBlank(s){ return !s||s.trim()===''||s.trim()==='null'; }
+function opsIsBlank(s){ return !s||s.trim()===''||s.trim()==='null'||s.trim()==='\\N'; }
 function opsFmt(n){ return Math.round(n).toLocaleString(); }
 function opsSumPKR(arr){ const seen={}; return arr.reduce((s,r)=>{ if(!r.orderId||seen[r.orderId])return s; seen[r.orderId]=true; return s+r.value; },0); }
 function opsCountOrders(arr){ return new Set(arr.map(r=>r.orderId).filter(Boolean)).size||arr.length; }
@@ -10385,7 +10385,8 @@ function opsParseRows(headers, dataRows){
   const rows=[];
   for(const r of dataRows){
     if(!r||!r[idx.orderId])continue;
-    const toStr = v => v ? String(v).trim() : '';
+    // The Xstak export writes empty cells as the literal text \N — treat that as blank
+    const toStr = v => { if(v==null) return ''; const t=String(v).trim(); return (t==='\\N'||t.toLowerCase()==='null') ? '' : t; };
     rows.push({
       orderId:      toStr(r[idx.orderId]),
       value:        parseFloat(r[idx.value])||0,
@@ -10395,7 +10396,7 @@ function opsParseRows(headers, dataRows){
       delivered:    toStr(r[idx.delivered]),
       cancelled:    toStr(r[idx.cancelled]),
       returned:     toStr(r[idx.returned]),
-      retStatus:    idx.retStatus>=0 ? (r[idx.retStatus]!=null ? String(r[idx.retStatus]).trim() : '') : '',
+      retStatus:    idx.retStatus>=0 ? toStr(r[idx.retStatus]) : '',
       cancelReason: toStr(r[idx.cancelReason]),
     });
   }
@@ -10604,9 +10605,33 @@ async function opsLoadFromOMSLive(){
       }
     }catch(e){ console.warn('Historical ops load failed:', e.message); }
 
+    // Field-wise merge. Xstack is still the system actually dispatching/delivering orders, so an
+    // order sitting in OMS as "Pending" has blank status dates — letting that blank row replace the
+    // uploaded file's real dispatch/delivery/cancel/return dates wiped them out of the report.
+    // OMS value wins only where OMS actually has one; otherwise the uploaded file's value stays.
+    const blankV = v => !v || String(v).trim()==='' || String(v).trim()==='\\N' || String(v).trim().toLowerCase()==='null';
+    const pick = (oms, file) => !blankV(oms) ? oms : (blankV(file) ? '' : file);
+    const histById = new Map(historical.map(r=>[r.orderId, r]));
+    const mergedLive = liveRows.map(o=>{
+      const h = histById.get(o.orderId);
+      if(!h) return o;
+      return {
+        ...o,
+        // the file's order date is the real one; OMS created_at is only when the row was inserted
+        created:      blankV(h.created) ? o.created : h.created,
+        dispatched:   pick(o.dispatched, h.dispatched),
+        delivered:    pick(o.delivered,  h.delivered),
+        cancelled:    pick(o.cancelled,  h.cancelled),
+        returned:     pick(o.returned,   h.returned),
+        retStatus:    pick(o.retStatus,  h.retStatus),
+        cancelReason: pick(o.cancelReason, h.cancelReason),
+        value: o.value || parseFloat(h.value) || 0,
+        qty:   o.qty   || parseInt(h.qty)     || 0,
+      };
+    });
     const liveIds = new Set(liveRows.map(r=>r.orderId));
     const historicalOnly = historical.filter(r=>!liveIds.has(r.orderId));
-    _opsRows = [...historicalOnly, ...liveRows];
+    _opsRows = [...historicalOnly, ...mergedLive];
 
     if(statusEl) statusEl.textContent = `✅ Live: ${liveRows.length} from OMS + ${historicalOnly.length} historical = ${_opsRows.length} total`;
 
@@ -13023,6 +13048,8 @@ function popupHandleFile(file){
       cancelReason:headers.indexOf('cancellation_reason'),
     };
 
+    // Xstak export writes empty cells as the literal text \N — treat that as blank
+    const nv = v => { if(v==null) return ''; const t=String(v).trim(); return (t==='\\N'||t.toLowerCase()==='null') ? '' : t; };
     const rawRows = [];
     for(let i=1;i<data.length;i++){
       const r=data[i];
@@ -13031,13 +13058,13 @@ function popupHandleFile(file){
         orderId:      String(r[idx.orderId]||'').trim(),
         value:        parseFloat(r[idx.value])||0,
         qty:          parseInt(r[idx.qty])||1,
-        created:      r[idx.created]||'',
-        dispatched:   r[idx.dispatched]||'',
-        delivered:    r[idx.delivered]||'',
-        cancelled:    r[idx.cancelled]||'',
-        returned:     r[idx.returned]||'',
-        retStatus:    idx.retStatus>=0 ? (r[idx.retStatus]!=null ? String(r[idx.retStatus]).trim() : '') : '',
-        cancelReason: r[idx.cancelReason]||'',
+        created:      nv(r[idx.created]),
+        dispatched:   nv(r[idx.dispatched]),
+        delivered:    nv(r[idx.delivered]),
+        cancelled:    nv(r[idx.cancelled]),
+        returned:     nv(r[idx.returned]),
+        retStatus:    idx.retStatus>=0 ? nv(r[idx.retStatus]) : '',
+        cancelReason: nv(r[idx.cancelReason]),
       });
     }
 
