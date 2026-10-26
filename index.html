@@ -2855,6 +2855,28 @@ async function tryFetch(url){
   return txt;
 }
 
+// ── Google Sheets JSONP support ──
+// gviz does NOT honour a "callback=" parameter. Without a valid responseHandler it answers with
+//   google.visualization.Query.setResponse({...})
+// which threw "google is not defined" and left every tab waiting for the full timeout (while loadAll
+// waits on the sheets before it starts the Shopify returns calculation). Two layers fix that:
+//   a) ask for the response through responseHandler:<our callback> (the documented parameter)
+//   b) keep a default google.visualization.Query.setResponse that routes by reqId, in case a response
+//      still arrives through Google's default handler.
+let _gsReqSeq = 0;
+window.__gsPending = window.__gsPending || {};
+(function(){
+  window.google = window.google || {};
+  window.google.visualization = window.google.visualization || {};
+  window.google.visualization.Query = window.google.visualization.Query || {};
+  if(typeof window.google.visualization.Query.setResponse !== 'function'){
+    window.google.visualization.Query.setResponse = function(d){
+      const cb = window.__gsPending[d && d.reqId];
+      if(cb) cb(d);
+    };
+  }
+})();
+
 async function fetchSheetJSONP(sheetId, tab){
   const googleUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
   const encoded   = encodeURIComponent(googleUrl);
@@ -2880,16 +2902,17 @@ async function fetchSheetJSONP(sheetId, tab){
   // Method 4-JSONP: works from file:// — uses script tag, bypasses CORS entirely
   return new Promise((resolve, reject)=>{
     const cbName = 'gs_cb_' + Math.random().toString(36).slice(2);
+    const reqId = String(++_gsReqSeq);
     const script = document.createElement('script');
     const timeout = setTimeout(()=>{
-      delete window[cbName];
+      delete window[cbName]; delete window.__gsPending[reqId];
       try{document.body.removeChild(script);}catch(e){}
       reject(new Error('All methods failed for tab: '+tab+'. Check sheet is set to Anyone with link can view.'));
-    }, 45000);
+    }, 20000);
 
     window[cbName] = function(data){
       clearTimeout(timeout);
-      delete window[cbName];
+      delete window[cbName]; delete window.__gsPending[reqId];
       try{document.body.removeChild(script);}catch(e){}
       try{
         // Check for Google error response
@@ -2919,11 +2942,12 @@ async function fetchSheetJSONP(sheetId, tab){
       }catch(e){reject(e);}
     };
 
-    const jsonpUrl=`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&callback=${cbName}&sheet=${encodeURIComponent(tab)}`;
+    window.__gsPending[reqId] = window[cbName];
+    const jsonpUrl=`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;reqId:${reqId};responseHandler:${cbName}&sheet=${encodeURIComponent(tab)}`;
     script.src=jsonpUrl;
     script.onerror=()=>{
       clearTimeout(timeout);
-      delete window[cbName];
+      delete window[cbName]; delete window.__gsPending[reqId];
       reject(new Error('All fetch methods failed for: '+tab));
     };
     document.body.appendChild(script);
@@ -10340,6 +10364,10 @@ function fmtPKR(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFraction
 // OPERATIONS DATA — CSV/Excel Upload + Supabase
 // ═══════════════════════════════════════════════════
 let _opsRows = [];
+// OMS rows only get dispatch/cancel dates when an order is processed INSIDE OMS. While Xstak is still the
+// system that actually dispatches/cancels orders, OMS rows have blank dates and every one of them is counted
+// as "Pending". Keep this false until OMS has replaced Xstak; set true to feed OMS orders into this report again.
+const OPS_INCLUDE_OMS = false;
 let _opsHistoricalRows = []; // rows from an uploaded file (pre-OMS history) — merged with live OMS data, never overwritten by it
 const OPS_TABLE = 'ops_order_dump';
 
@@ -10563,12 +10591,12 @@ async function opsLoadFromSupabase(){
 // exactly matching how the original file's date columns worked.
 async function opsLoadFromOMSLive(){
   const statusEl=document.getElementById('opsUploadStatus');
-  if(statusEl){ statusEl.style.display='block'; statusEl.textContent='Loading live order data from OMS...'; }
+  if(statusEl){ statusEl.style.display='block'; statusEl.textContent= OPS_INCLUDE_OMS ? 'Loading live order data from OMS...' : 'Loading uploaded order data...'; }
   try{
     let data = [];
     let lastId = 0;
     const CHUNK = 1000;
-    while(true){
+    while(OPS_INCLUDE_OMS){
       const chunk = await DB.get('oms_orders', `select=*&order=id.asc&limit=${CHUNK}&id=gt.${lastId}`);
       if(!chunk || !Array.isArray(chunk) || !chunk.length) break;
       data = data.concat(chunk);
@@ -10633,7 +10661,9 @@ async function opsLoadFromOMSLive(){
     const historicalOnly = historical.filter(r=>!liveIds.has(r.orderId));
     _opsRows = [...historicalOnly, ...mergedLive];
 
-    if(statusEl) statusEl.textContent = `✅ Live: ${liveRows.length} from OMS + ${historicalOnly.length} historical = ${_opsRows.length} total`;
+    if(statusEl) statusEl.textContent = OPS_INCLUDE_OMS
+      ? `✅ Live: ${liveRows.length} from OMS + ${historicalOnly.length} historical = ${_opsRows.length} total`
+      : `✅ Uploaded data only (OMS not included): ${_opsRows.length} orders`;
 
     const _tryRender = (attempts) => {
       if(window._shopifyReturnValue !== undefined && window._shopifyReturnValue > 0){
@@ -11056,6 +11086,7 @@ async function omsSyncNewOrders(){
         payment_method: (o.financial_status==='pending' || (o.payment_gateway_names||[]).some(g=>/cod/i.test(g))) ? 'COD' : 'Prepaid',
         total: parseFloat(o.total_price||0),
         stage: 'pending',
+        created_at: o.created_at || undefined, // real Shopify order time, not the moment OMS inserted the row
       });
       const newId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
       if(newId) omsLogHistory(newId, 'PENDING (order received)');
