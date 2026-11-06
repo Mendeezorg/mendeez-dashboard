@@ -8474,6 +8474,7 @@ function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
         </div>
         <button class="btn btn-p btn-sm" id="cvDetailAddBtn">+ Add Top-up</button>
         <button class="btn btn-s btn-sm" id="cvDetailSpendBtn">+ Spend</button>
+        <button class="btn btn-s btn-sm" onclick="cvOpenStmtUpload()">⬆ Upload Statement</button>
         <button class="btn btn-s btn-sm" id="cvDetailEditBtn">✏️ Edit Vendor</button>
         <button class="btn btn-s btn-sm" id="cvDalalReconcileBtn" style="display:none;color:#a855f7;border-color:#a855f7" onclick="cvApplyDalalReconciliation(_cvActiveVendorId)">🔄 Apply Statement Reconciliation</button>
         <button class="btn btn-s btn-sm" id="cvDetailExportBtn" style="color:var(--accent);border-color:var(--accent)" onclick="cvExportExcel()">📊 Export Excel</button>
@@ -8508,6 +8509,8 @@ function gtechinvPopulateSelect(){ /* no-op — no dropdown needed */ }
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase">Debit</th>
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase">Credit</th>
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase">Balance</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase">≈ USD</th>
+              <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase">≈ PKR</th>
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:#10b981;text-transform:uppercase">PKR Received</th>
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:#8b5cf6;text-transform:uppercase">After Comm.</th>
               <th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase">$ Rate</th>
@@ -9332,9 +9335,11 @@ function cvRenderDetail(){
 
   const latestRateRow = (()=>{ const r=rows.filter(x=>parseFloat(x.dollar_rate||0)>0); return r.length?r[r.length-1]:null; })();
   const latestRate = latestRateRow ? parseFloat(latestRateRow.dollar_rate) : 0;
-  const pkrLine = (amt) => latestRate>0
+  const usdOf = (amt) => cur==='AED' ? amt/CV_USD_AED_PEG : null;
+  const pkrLine = (amt) => (latestRate>0
     ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--mono)">≈ PKR ${fmt(Math.round(amt*latestRate))}</div>`
-    : `<div style="font-size:11px;color:var(--muted);margin-top:4px">No ${cur} rate available yet</div>`;
+    : `<div style="font-size:11px;color:var(--muted);margin-top:4px">No ${cur} rate available yet</div>`)
+    + (usdOf(amt)!==null ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono)">≈ ${cvStmtMoney(usdOf(amt),'USD')}</div>` : '');
 
   document.getElementById('cvDetailCards').innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden">
@@ -9491,6 +9496,7 @@ function cvRenderDetailTable(rows){
       <td style="padding:8px 14px;font-size:12px;text-align:right;color:${parseFloat(t.debit||0)>0?'var(--red)':'var(--muted2)'}">${parseFloat(t.debit||0)>0?cvFmtCur(t.debit,cur):'—'}</td>
       <td style="padding:8px 14px;font-size:12px;text-align:right;color:${parseFloat(t.credit||0)>0?'var(--green)':'var(--muted2)'}">${parseFloat(t.credit||0)>0?cvFmtCur(t.credit,cur):'—'}</td>
       <td style="padding:8px 14px;font-size:12px;text-align:right;font-weight:700;color:${t._runningBalance>=0?'var(--text)':'var(--red)'}">${cvFmtCur(t._runningBalance,cur)}</td>
+      ${cvRowEquivCells(t, cur)}
       <td style="padding:8px 14px;font-size:12px;text-align:right;color:${parseFloat(t.pkr_received||0)>0?'#10b981':'var(--muted2)'}">${parseFloat(t.pkr_received||0)>0?'PKR '+fmt(t.pkr_received):'—'}</td>
       <td style="padding:8px 14px;font-size:12px;text-align:right;color:${parseFloat(t.after_commission||0)>0?'#8b5cf6':'var(--muted2)'}">${parseFloat(t.after_commission||0)>0?'PKR '+fmt(t.after_commission):'—'}</td>
       <td style="padding:8px 14px;font-size:12px;text-align:right;color:${parseFloat(t.dollar_rate||0)>0?'#f59e0b':'var(--muted2)'}">${parseFloat(t.dollar_rate||0)>0?'PKR '+parseFloat(t.dollar_rate).toFixed(2):'—'}</td>
@@ -9498,7 +9504,7 @@ function cvRenderDetailTable(rows){
         <span class="se-chip-btn" onclick="cvOpenEditTxn(${t.id})">✏️</span>
         <span class="se-chip-btn" style="color:var(--red)" onclick="cvDeleteTxn(${t.id})">✕</span>
       </td>
-    </tr>`).join('') || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:24px;font-size:12px">No top-ups logged yet.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="13" style="text-align:center;color:var(--muted);padding:24px;font-size:12px">No top-ups logged yet.</td></tr>`;
 }
 
 function cvOpenAddVendor(){
@@ -14889,5 +14895,330 @@ cbFetchConversations().then(function(){
 cbStartPolling();
 
 </script>
+<!-- Paste this whole block just above </body> in your dashboard file. -->
+<!-- CARD VENDORS: UPLOAD BANK STATEMENT MODAL -->
+<div class="overlay" id="cvStmtOverlay" style="display:none">
+  <div class="setup-box" style="max-width:980px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="setup-title" style="margin:0">Upload statement for <span id="cvStmtVendorName" style="color:var(--accent)"></span></div>
+      <span onclick="cvCloseStmtUpload()" style="cursor:pointer;font-size:18px;color:var(--muted)">✕</span>
+    </div>
+    <input class="fi" type="file" id="cvStmtFile" accept=".csv,.xlsx,.xls" onchange="cvStmtHandleFile(this.files[0])" style="margin-bottom:14px">
+    <div id="cvStmtBody"></div>
+    <div id="cvStmtStatus" style="font-size:11px;color:var(--muted);margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-s" onclick="cvCloseStmtUpload()">Cancel</button>
+      <button class="btn btn-p btn-full" id="cvStmtImportBtn" onclick="cvStmtImport()" disabled>Import transactions</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CARD BALANCES — BANK STATEMENT UPLOAD (pure helpers)
+// ═══════════════════════════════════════════════════
+const CV_USD_AED_PEG = 3.6725;
+function cvP2(n){ return String(n).padStart(2,'0'); }
+function cvStmtKey(k){ return String(k||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function cvStmtRef(v){ if(v===null||v===undefined) return ''; return String(v).trim().replace(/\.0+$/,''); }
+function cvStmtNum(v){ if(typeof v==='number') return v; const n=parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+function cvStmtDate(v){
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+cvP2(v.getMonth()+1)+'-'+cvP2(v.getDate());
+  if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*864e5)); return isNaN(d)?'':d.toISOString().slice(0,10); }
+  const s=String(v||'').trim();
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return m[1]+'-'+cvP2(m[2])+'-'+cvP2(m[3]);
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); // bank exports use Month/Day/Year
+  if(m){ const y=m[3].length===2?'20'+m[3]:m[3]; return y+'-'+cvP2(m[1])+'-'+cvP2(m[2]); }
+  return '';
+}
+// Finds the statement table in any sheet of the workbook (header row can be anywhere in the first 15 rows)
+function cvStmtRowsFromWorkbook(wb){
+  for(const name of wb.SheetNames){
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:'', raw:true});
+    for(let h=0; h<Math.min(15, grid.length); h++){
+      const keys = grid[h].map(cvStmtKey);
+      if(keys.includes('date') && keys.includes('amount') && keys.includes('description')){
+        const out=[];
+        grid.slice(h+1).forEach(arr=>{
+          const r={}; keys.forEach((k,i)=>{ if(k) r[k]=arr[i]; });
+          const date=cvStmtDate(r.date);
+          if(!date || r.amount===''||r.amount===undefined) return;
+          out.push({
+            account: cvStmtRef(r.accountnumber) || 'main',
+            currency: String(r.accountcurrency||'').trim().toUpperCase() || 'AED',
+            card: String(r.cardnumber||'').trim(),
+            type: String(r.transactiontype||'').trim(),
+            date, ref: cvStmtRef(r.refnumber),
+            desc: String(r.description||'').trim(),
+            amount: cvStmtNum(r.amount), balance: cvStmtNum(r.balance),
+            origRef: cvStmtRef(r.originalrefnumber), notes: String(r.notes||'').trim(),
+          });
+        });
+        if(out.length) return out;
+      }
+    }
+  }
+  return [];
+}
+function cvStmtCategory(r){
+  const d=r.desc.toLowerCase(), t=r.type.toLowerCase();
+  if(/facebk|facebook/.test(d)) return 'Meta';
+  if(/snap/.test(d)) return 'Snapchat';
+  if(/anthropic|claude/.test(d)) return 'Claude';
+  if(/google/.test(d)) return 'Google';
+  if(/shopify/.test(d)) return 'Shopify';
+  if(/vercel/.test(d)) return 'Vercel';
+  if(/weshop/.test(d)) return 'WeShop AI';
+  if(/kling/.test(d)) return 'Kling AI';
+  if(/openai|chatgpt/.test(d)) return 'OpenAI';
+  if(/railway/.test(d)) return 'Railway';
+  if(/kapso/.test(d)) return 'Kapso';
+  if(/tiktok/.test(d)) return 'TikTok';
+  if(/exchange/.test(t) || /^(aed|usd) to (aed|usd)$/.test(d)) return 'Currency exchange';
+  if(/fee/.test(t) || /fee/.test(d)) return 'Bank fees';
+  if(/transfer/.test(t)) return r.amount>=0 ? 'Transfers in' : 'Transfers out';
+  return 'Other';
+}
+// opts: {account, mergeFees, addOpening, aedPkr, usdAed, vendorCurrency, existingRefs:Set}
+function cvStmtBuild(rows, opts){
+  const acc = rows.filter(r=>r.account===opts.account)
+    .sort((a,b)=>a.date.localeCompare(b.date) || (Number(a.ref)||0)-(Number(b.ref)||0));
+  const cur = (acc[0] && acc[0].currency) || 'AED';
+  const byRef = {}; acc.forEach(r=>{ if(r.ref) byRef[r.ref]=r; });
+  const isLinkedFee = r => /fee/i.test(r.type) && r.origRef && byRef[r.origRef];
+  const feeOf = {};
+  if(opts.mergeFees) acc.forEach(r=>{ if(isLinkedFee(r)) feeOf[r.origRef]=(feeOf[r.origRef]||0)+r.amount; });
+
+  const toAED = a => cur==='USD' ? a*opts.usdAed : a;
+  const toUSD = a => cur==='USD' ? a : a/opts.usdAed;
+  const toPKR = a => toAED(a)*opts.aedPkr;
+  const vcur = (opts.vendorCurrency||cur).toUpperCase();
+  const toVendor = a => vcur===cur ? a : (vcur==='USD' ? toUSD(a) : vcur==='AED' ? toAED(a) : a);
+  const vendorRate = vcur==='USD' ? opts.usdAed*opts.aedPkr : opts.aedPkr; // 1 vendor-currency unit in PKR
+
+  const items = [];
+  acc.forEach(r=>{
+    if(opts.mergeFees && isLinkedFee(r)) return;
+    const fee = feeOf[r.ref]||0;
+    const net = +(r.amount+fee).toFixed(2);
+    if(!net) return;
+    items.push({...r, fee:+fee.toFixed(2), net, category:cvStmtCategory(r), dup: !!(r.ref && opts.existingRefs && opts.existingRefs.has(r.ref)),
+      aed:toAED(net), usd:toUSD(net), pkr:toPKR(net), vendorAmt:+toVendor(net).toFixed(2)});
+  });
+
+  const movement = acc.reduce((s,r)=>s+r.amount,0);
+  const closing = acc.length ? acc[acc.length-1].balance : 0;
+  const opening = +(closing-movement).toFixed(2);
+  let openingRow = null;
+  if(opts.addOpening && opening && acc.length){
+    const ref = 'OPENING-'+opts.account+'-'+acc[0].date;
+    openingRow = {date:acc[0].date, ref, desc:'Opening balance (bank statement)', category:'Opening balance', card:'',
+      net:opening, fee:0, aed:toAED(opening), usd:toUSD(opening), pkr:toPKR(opening), vendorAmt:+toVendor(opening).toFixed(2),
+      dup: !!(opts.existingRefs && opts.existingRefs.has(ref))};
+  }
+
+  const cats = {};
+  items.forEach(i=>{ const c=cats[i.category]||(cats[i.category]={name:i.category,count:0,net:0}); c.count++; c.net+=i.net; });
+  const conv = a => ({native:a, aed:toAED(a), usd:toUSD(a), pkr:toPKR(a)});
+  return {
+    currency:cur, vendorCurrency:vcur, vendorRate, items, openingRow,
+    categories:Object.values(cats).map(c=>({...c, ...conv(c.net)})).sort((a,b)=>Math.abs(b.net)-Math.abs(a.net)),
+    opening:conv(opening), closing:conv(closing), movement:conv(movement),
+    totalIn:conv(items.filter(i=>i.net>0).reduce((s,i)=>s+i.net,0)),
+    totalOut:conv(items.filter(i=>i.net<0).reduce((s,i)=>s+i.net,0)),
+    fromDate: acc.length?acc[0].date:'', toDate: acc.length?acc[acc.length-1].date:'',
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// CARD BALANCES — BANK STATEMENT UPLOAD (modal + import)
+// ═══════════════════════════════════════════════════
+let _cvStmt = null;
+
+function cvStmtMoney(n, cur, dp){
+  const d = dp==null ? 2 : dp;
+  const v = Number(n)||0;
+  const s = Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+  return (v<0?'-':'')+(cur==='USD'?'$'+s:cur+' '+s);
+}
+function cvStmtTriple(c){ // native/AED, USD, PKR stacked
+  return `<div style="font-family:var(--mono);font-weight:700">${cvStmtMoney(c.aed,'AED')}</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">${cvStmtMoney(c.usd,'USD')} · ${cvStmtMoney(c.pkr,'PKR',0)}</div>`;
+}
+
+function cvOpenStmtUpload(){
+  const v = _cvVendors.find(x=>x.id===_cvActiveVendorId);
+  if(!v){ alert('Open a vendor first.'); return; }
+  _cvStmt = null;
+  document.getElementById('cvStmtVendorName').textContent = v.name;
+  document.getElementById('cvStmtFile').value = '';
+  document.getElementById('cvStmtBody').innerHTML = '<div style="font-size:12px;color:var(--muted)">Choose the statement your bank lets you download (CSV or Excel). It needs the Date, Ref. number, Description, Amount and Balance columns.</div>';
+  document.getElementById('cvStmtStatus').textContent = '';
+  const btn = document.getElementById('cvStmtImportBtn');
+  btn.disabled = true; btn.textContent = 'Import transactions';
+  document.getElementById('cvStmtOverlay').style.display = 'flex';
+}
+function cvCloseStmtUpload(){ document.getElementById('cvStmtOverlay').style.display = 'none'; }
+
+async function cvStmtHandleFile(file){
+  if(!file) return;
+  const body = document.getElementById('cvStmtBody');
+  if(typeof XLSX==='undefined'){ body.innerHTML='<div style="color:var(--red);font-size:12px">The Excel reader didn\'t load. Check your connection and reload the page.</div>'; return; }
+  body.innerHTML = '<div style="font-size:12px;color:var(--muted)">Reading '+file.name+'…</div>';
+  try{
+    const wb = /\.csv$/i.test(file.name)
+      ? XLSX.read(await file.text(), {type:'string', raw:true})          // keep CSV dates as written (M/D/YYYY)
+      : XLSX.read(await file.arrayBuffer(), {type:'array', cellDates:true});
+    const rows = cvStmtRowsFromWorkbook(wb);
+    if(!rows.length) throw new Error('No transactions found. The file needs Date, Ref. number, Description, Amount and Balance columns, like the bank\'s statement export.');
+
+    const v = _cvVendors.find(x=>x.id===_cvActiveVendorId);
+    const vcur = (v.currency||'AED').toUpperCase();
+    const groups = {};
+    rows.forEach(r=>{ const g=groups[r.account]||(groups[r.account]={account:r.account,currency:r.currency,count:0}); g.count++; });
+    const accounts = Object.values(groups).sort((a,b)=>((b.currency===vcur)-(a.currency===vcur)) || b.count-a.count);
+
+    // Default PKR rate: this vendor's most recent saved rate, converted to AED→PKR
+    const existing = _cvTxnsByVendor[v.id]||[];
+    const rated = existing.filter(t=>parseFloat(t.dollar_rate||0)>0);
+    const lastRate = rated.length ? parseFloat(rated[rated.length-1].dollar_rate) : 0;
+    const aedPkr = lastRate ? (vcur==='USD' ? lastRate/CV_USD_AED_PEG : lastRate) : 76.5;
+
+    _cvStmt = { rows, fileName:file.name, accounts, account:accounts[0].account,
+      mergeFees:true, addOpening: existing.length===0, aedPkr:+aedPkr.toFixed(2), usdAed:CV_USD_AED_PEG };
+    cvStmtRender();
+  }catch(e){
+    body.innerHTML = '<div style="color:var(--red);font-size:12px">'+e.message+'</div>';
+  }
+}
+
+function cvStmtSet(field, value){
+  if(!_cvStmt) return;
+  if(field==='aedPkr' || field==='usdAed'){ const n=parseFloat(value); if(!(n>0)) return; _cvStmt[field]=n; }
+  else _cvStmt[field]=value;
+  cvStmtRender();
+}
+
+function cvStmtCurrentBuild(){
+  const v = _cvVendors.find(x=>x.id===_cvActiveVendorId);
+  const existingRefs = new Set((_cvTxnsByVendor[v.id]||[]).map(t=>String(t.tracking_id||'').trim()).filter(Boolean));
+  return cvStmtBuild(_cvStmt.rows, { account:_cvStmt.account, mergeFees:_cvStmt.mergeFees, addOpening:_cvStmt.addOpening,
+    aedPkr:_cvStmt.aedPkr, usdAed:_cvStmt.usdAed, vendorCurrency:v.currency||'AED', existingRefs });
+}
+
+function cvStmtRender(){
+  const s = _cvStmt; if(!s) return;
+  const b = cvStmtCurrentBuild();
+  const newItems = b.items.filter(i=>!i.dup);
+  const dupCount = b.items.length - newItems.length;
+  const willOpen = b.openingRow && !b.openingRow.dup;
+
+  const accOpts = s.accounts.map(a=>`<option value="${a.account}" ${a.account===s.account?'selected':''}>${a.account} (${a.currency}) · ${a.count} rows</option>`).join('');
+  const mismatch = b.currency!==b.vendorCurrency
+    ? `<div style="font-size:11px;color:var(--accent);margin-top:6px">This account is in ${b.currency} but the vendor is in ${b.vendorCurrency}. Amounts will be converted to ${b.vendorCurrency} at the rates above.</div>` : '';
+
+  const card = (label, c) => `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${label}</div>${cvStmtTriple(c)}</div>`;
+
+  const catRows = b.categories.map(c=>`<tr style="border-top:1px solid var(--border)">
+      <td style="padding:7px 10px;font-size:12px">${c.name}</td>
+      <td style="padding:7px 10px;font-size:12px;text-align:center;font-family:var(--mono);color:var(--muted)">${c.count}</td>
+      <td style="padding:7px 10px;font-size:12px;text-align:right;font-family:var(--mono);color:${c.net<0?'var(--red)':'var(--green)'}">${cvStmtMoney(c.aed,'AED')}</td>
+      <td style="padding:7px 10px;font-size:12px;text-align:right;font-family:var(--mono)">${cvStmtMoney(c.usd,'USD')}</td>
+      <td style="padding:7px 10px;font-size:12px;text-align:right;font-family:var(--mono)">${cvStmtMoney(c.pkr,'PKR',0)}</td></tr>`).join('');
+
+  const listRows = (b.openingRow?[b.openingRow]:[]).concat(b.items).slice(0,400).map(i=>`<tr style="border-top:1px solid var(--border);${i.dup?'opacity:.4':''}">
+      <td style="padding:6px 10px;font-size:11px;font-family:var(--mono);white-space:nowrap">${i.date}</td>
+      <td style="padding:6px 10px;font-size:11px">${i.desc}${i.fee?` <span style="color:var(--muted)">(incl. fee ${Math.abs(i.fee).toFixed(2)})</span>`:''}${i.dup?' <span style="color:var(--muted)">· already imported</span>':''}</td>
+      <td style="padding:6px 10px;font-size:11px;color:var(--muted)">${i.category}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;font-family:var(--mono);color:${i.net<0?'var(--red)':'var(--green)'}">${cvStmtMoney(i.aed,'AED')}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;font-family:var(--mono)">${cvStmtMoney(i.usd,'USD')}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;font-family:var(--mono)">${cvStmtMoney(i.pkr,'PKR',0)}</td></tr>`).join('');
+  const th = (t,right) => `<th style="padding:7px 10px;text-align:${right?'right':'left'};font-size:10px;color:var(--muted);font-weight:600">${t}</th>`;
+
+  document.getElementById('cvStmtBody').innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${s.fileName} · ${b.fromDate} to ${b.toDate}</div>
+    <div class="fr">
+      <div class="fg"><div class="fl">Account in file</div><select class="fi" onchange="cvStmtSet('account',this.value)">${accOpts}</select></div>
+      <div class="fg"><div class="fl">1 AED = PKR</div><input class="fi" type="number" step="0.01" value="${s.aedPkr}" onchange="cvStmtSet('aedPkr',this.value)"></div>
+      <div class="fg"><div class="fl">1 USD = AED</div><input class="fi" type="number" step="0.0001" value="${s.usdAed}" onchange="cvStmtSet('usdAed',this.value)"></div>
+    </div>
+    ${mismatch}
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px;cursor:pointer">
+      <input type="checkbox" ${s.mergeFees?'checked':''} onchange="cvStmtSet('mergeFees',this.checked)"> Add each bank FX fee to the charge it belongs to</label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:6px;cursor:pointer">
+      <input type="checkbox" ${s.addOpening?'checked':''} onchange="cvStmtSet('addOpening',this.checked)"> Add the opening balance as the first entry, so the ledger closes on the statement balance</label>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:16px 0">
+      ${card('Opening balance', b.opening)}${card('Money in', b.totalIn)}${card('Money out', b.totalOut)}${card('Closing balance', b.closing)}
+    </div>
+
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px">By category</div>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin-bottom:16px">
+      <table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2)">${th('Category')}${th('Txns')}${th('AED',1)}${th('USD',1)}${th('PKR',1)}</tr></thead><tbody>${catRows}</tbody></table>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px">Transactions</div>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:auto;max-height:320px">
+      <table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2);position:sticky;top:0">${th('Date')}${th('Description')}${th('Category')}${th('AED',1)}${th('USD',1)}${th('PKR',1)}</tr></thead><tbody>${listRows}</tbody></table>
+    </div>`;
+
+  const total = newItems.length + (willOpen?1:0);
+  document.getElementById('cvStmtStatus').textContent = dupCount ? `${dupCount} already in this ledger will be skipped.` : '';
+  const btn = document.getElementById('cvStmtImportBtn');
+  btn.disabled = total===0;
+  btn.textContent = total ? `Import ${total} transaction${total!==1?'s':''}` : 'Nothing new to import';
+}
+
+async function cvStmtImport(){
+  if(!_cvStmt) return;
+  const v = _cvVendors.find(x=>x.id===_cvActiveVendorId);
+  const b = cvStmtCurrentBuild();
+  const rows = (b.openingRow && !b.openingRow.dup ? [b.openingRow] : []).concat(b.items.filter(i=>!i.dup));
+  if(!rows.length) return;
+  const rate = +b.vendorRate.toFixed(4);
+  const payload = rows.map(i=>({
+    vendor_id: v.id, txn_date: i.date, description: i.desc, tracking_id: i.ref,
+    card_number: i.card || v.card_number || '',
+    debit:  i.vendorAmt<0 ? Math.abs(i.vendorAmt) : 0,
+    credit: i.vendorAmt>0 ? i.vendorAmt : 0,
+    pkr_received: 0, after_commission: 0, dollar_rate: rate,
+  }));
+  if(!confirm(`Add ${payload.length} transactions from ${_cvStmt.fileName} to ${v.name}?`)) return;
+
+  const btn = document.getElementById('cvStmtImportBtn');
+  const status = document.getElementById('cvStmtStatus');
+  btn.disabled = true;
+  let saved = 0;
+  try{
+    for(let i=0;i<payload.length;i+=200){
+      btn.textContent = `Importing ${saved}/${payload.length}…`;
+      const res = await DB.insert('card_vendor_transactions', payload.slice(i,i+200));
+      if(!res) throw new Error('Supabase rejected the write after '+saved+' rows.');
+      saved += Math.min(200, payload.length-i);
+    }
+    await cvLoad();
+    cvCloseStmtUpload();
+    alert(`Imported ${saved} transactions into ${v.name}.`);
+  }catch(e){
+    status.textContent = '⚠ '+e.message+' Re-uploading the same file is safe: rows already saved are skipped.';
+    status.style.color = 'var(--red)';
+    await cvLoad();
+    cvStmtRender();
+    btn.disabled = false; btn.textContent = 'Retry import';
+  }
+}
+
+// ≈ USD / ≈ PKR cells for each row of the vendor ledger table
+function cvRowEquivCells(t, cur){
+  const amt = parseFloat(t.credit||0) - parseFloat(t.debit||0);
+  const rate = parseFloat(t.dollar_rate||0);
+  const usd = cur==='USD' ? amt : (cur==='AED' ? amt/CV_USD_AED_PEG : null);
+  const col = amt<0 ? 'var(--red)' : 'var(--green)';
+  const cell = txt => `<td style="padding:8px 14px;font-size:12px;text-align:right;font-family:var(--mono);color:${txt==='—'?'var(--muted2)':col}">${txt}</td>`;
+  return cell(usd!==null && amt ? cvStmtMoney(usd,'USD') : '—') + cell(rate>0 && amt ? cvStmtMoney(amt*rate,'PKR',0) : '—');
+}
+</script>
+
 </body>
 </html>
